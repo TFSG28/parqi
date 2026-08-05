@@ -1,18 +1,67 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Parqi - Prisma schema
+// PostgreSQL + PostGIS (geometry columns are `Unsupported`, manipulated via raw SQL)
 
 generator client {
-    provider      = "prisma-client-js"
-    output        = "../src/generated/prisma"
-    binaryTargets = ["native", "debian-openssl-1.0.x"]
+    provider        = "prisma-client-js"
+    output          = "../src/generated/prisma"
+    binaryTargets   = ["native", "debian-openssl-1.0.x"]
+    previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-    provider = "mysql"
+    // A URL de conexão é definida em prisma.config.ts (env DATABASE_URL)
+    provider   = "postgresql"
+    extensions = [postgis]
 }
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum UserRole {
+    USER
+    ADMIN
+}
+
+enum ParkingType {
+    SURFACE
+    UNDERGROUND
+    MULTI_STORY
+    STREET
+    OTHER
+}
+
+enum CapacityRange {
+    RANGE_1_5
+    RANGE_6_20
+    RANGE_21_50
+    RANGE_51_100
+    RANGE_100_PLUS
+}
+
+enum DataSource {
+    COMMUNITY
+    OVERPASS
+    GEOAPIFY
+    MUNICIPAL
+}
+
+enum ContributionStatus {
+    PENDING
+    APPROVED
+    REJECTED
+    FLAGGED
+}
+
+enum GeometryType {
+    POINT
+    POLYGON
+}
+
+enum ModerationAction {
+    APPROVE
+    REJECT
+}
+
+// ─────────────────────────── Models ───────────────────────────
 
 model User {
     id        String   @id @default(uuid())
@@ -20,10 +69,87 @@ model User {
     updatedAt DateTime @updatedAt
 
     name     String
-    email    String  @unique
+    email    String   @unique
     password String
-    isActive Boolean @default(true)
+    role     UserRole @default(USER)
+    isActive Boolean  @default(true)
+
+    contributions  ParkingSpot[]
+    votes          ParkingVote[]
+    moderationLogs ModerationLog[]
 
     @@index([id])
     @@index([email])
+}
+
+model ParkingSpot {
+    id        String   @id @default(uuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    name          String
+    description   String?
+    latitude      Float?
+    longitude     Float?
+    // PostGIS: always a point (centroid for polygon spots) + optional polygon boundary
+    geom          Unsupported("geometry(Point, 4326)")?
+    boundary      Unsupported("geometry(Polygon, 4326)")?
+    geometryType  GeometryType                            @default(POINT)
+    parkingType   ParkingType                             @default(OTHER)
+    capacityRange CapacityRange?
+    isFree        Boolean?
+
+    source     DataSource         @default(COMMUNITY)
+    externalId String? // e.g. "node:123" (OSM), "geoapify:abc123"
+    status     ContributionStatus @default(PENDING)
+    trustScore Float              @default(0)
+
+    duplicateOfId String?
+    duplicateOf   ParkingSpot?  @relation("DuplicateGroup", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+    duplicates    ParkingSpot[] @relation("DuplicateGroup")
+
+    contributorId String?
+    contributor   User?   @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+
+    votes          ParkingVote[]
+    moderationLogs ModerationLog[]
+
+    @@unique([source, externalId])
+    @@index([status])
+    @@index([source])
+    @@index([latitude, longitude])
+    @@index([duplicateOfId])
+}
+
+model ParkingVote {
+    id        String   @id @default(uuid())
+    createdAt DateTime @default(now())
+
+    value  Int // 1 = upvote, -1 = downvote
+    reason String? // obrigatório em votos negativos (porquê)
+
+    parkingSpotId String
+    parkingSpot   ParkingSpot @relation(fields: [parkingSpotId], references: [id], onDelete: Cascade)
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, parkingSpotId])
+    @@index([parkingSpotId])
+}
+
+model ModerationLog {
+    id        String   @id @default(uuid())
+    createdAt DateTime @default(now())
+
+    action ModerationAction
+    reason String?
+
+    parkingSpotId String
+    parkingSpot   ParkingSpot @relation(fields: [parkingSpotId], references: [id], onDelete: Cascade)
+
+    moderatorId String?
+    moderator   User?   @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
+
+    @@index([parkingSpotId])
 }

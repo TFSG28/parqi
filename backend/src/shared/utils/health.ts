@@ -66,7 +66,7 @@ export const readinessCheck = async (req: Request, res: Response) => {
     try {
         await prisma.$queryRaw`SELECT 1`;
         res.status(200).json({ status: 'ready' });
-    } catch (error) {
+    } catch {
         res.status(503).json({ status: 'not ready' });
     }
 };

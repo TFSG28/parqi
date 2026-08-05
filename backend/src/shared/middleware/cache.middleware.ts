@@ -15,7 +15,7 @@ export const cacheMiddleware = (ttl = 300) => {
         }
 
         const originalJson = res.json.bind(res);
-        res.json = (body: any) => {
+        res.json = (body: unknown) => {
             cacheSet(key, JSON.stringify(body), ttl).catch(() => {});
             return originalJson(body);
         };

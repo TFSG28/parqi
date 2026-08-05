@@ -6,13 +6,14 @@ export function errorHandler(
     err: Error,
     req: Request,
     res: Response,
-    next: NextFunction
+    _next: NextFunction
 ) {
     if (err instanceof AppError) {
         return res.status(err.statusCode).json({
             status: 'error',
             message: err.message,
-            ...(err instanceof ValidationError && err.errors && { errors: err.errors })
+            ...(err instanceof ValidationError && err.errors && { errors: err.errors }),
+            ...(err.details && { details: err.details })
         });
     }
 

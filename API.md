@@ -117,6 +117,96 @@ Create a new user.
 
 ---
 
+### Parking (Estacionamentos)
+
+Modelo de validação **híbrido**: as contribuições da comunidade são auto-validadas
+(coordenadas dentro de Portugal, sem duplicados a < 30 m) e entram como `PENDING`;
+os votos da comunidade calculam a confiança (0-10) e fazem a transição de estado.
+Quando a confiança é negativa, o estacionamento fica `FLAGGED` e entra na fila de
+moderação manual (admin).
+
+Estados: `PENDING`, `APPROVED`, `REJECTED`, `FLAGGED`
+Fontes: `COMMUNITY`, `OVERPASS`, `GEOAPIFY`
+Tipos: `SURFACE`, `UNDERGROUND`, `MULTI_STORY`, `STREET`, `OTHER`
+Lotação: `RANGE_1_5`, `RANGE_6_20`, `RANGE_21_50`, `RANGE_51_100`, `RANGE_100_PLUS`
+
+A vista pública do mapa devolve `APPROVED` + `PENDING` (pendentes aparecem com
+badge "em verificação"); `FLAGGED`/`REJECTED` ficam escondidos.
+
+#### GET /parking
+Lista estacionamentos. Query params:
+- `bbox` (opcional): `minLon,minLat,maxLon,maxLat` (ex.: `-8.35,41.40,-8.25,41.50`)
+- `type` (opcional): filtrar por `parkingType`
+- `page`, `limit` (default 1 e 20, máximo 100)
+
+**Response:** envelope paginado `{ status, data, pagination }`, cada item com
+`latitude`, `longitude`, `trustScore`, `status`, `source`, etc.
+
+#### GET /parking/:id
+Detalhe de um estacionamento. Inclui `geometry` (GeoJSON Point ou Polygon) e
+`status`. `REJECTED` só é visível para o autor ou admin.
+
+#### POST /parking
+Criar uma contribuição (requer `access_token` + `X-CSRF-Token`).
+
+**Request Body:**
+```json
+{
+  "name": "Parque da Oliveira",
+  "description": "Perto do centro",
+  "geometry": { "type": "Point", "coordinates": [-8.291, 41.442] },
+  "parkingType": "SURFACE",
+  "capacityRange": "RANGE_21_50",
+  "isFree": true
+}
+```
+`geometry` aceita `Point` ou `Polygon` (GeoJSON, coordenadas `[lng, lat]`).
+
+**Success (201):** estacionamento criado com `status: "PENDING"` e
+`trustScore: 2`.
+
+**Errors:**
+- `400`: coordenadas fora de Portugal / polígono inválido
+- `409`: já existe um estacionamento a < 30 m (id em `details.existingId` no erro)
+
+#### PATCH /parking/:id
+Editar o próprio estacionamento `PENDING` (ou admin). Mesmos campos de criação,
+todos opcionais.
+
+#### DELETE /parking/:id
+Apagar o próprio estacionamento da comunidade (ou admin, incluindo importados).
+
+#### POST /parking/:id/vote
+Voto da comunidade (requer auth + CSRF). Recalcula `trustScore` e o estado.
+
+**Request Body:**
+```json
+{ "value": 1 }
+```
+ou
+```json
+{ "value": -1, "reason": "Local já não existe" }
+```
+`reason` é obrigatória para votos negativos. Regras de confiança: base por fonte
+(`COMMUNITY`=2, `OVERPASS`/`GEOAPIFY`=6), upvote +1.5, downvote -2, clamp 0-10.
+`PENDING` → `APPROVED` aos 5; `APPROVED` → `FLAGGED` abaixo de 3; `FLAGGED`
+recupera aos 5. `REJECTED` não muda automaticamente.
+
+#### POST /parking/:id/moderate
+Moderação manual (requer role `ADMIN` + CSRF).
+
+**Request Body:**
+```json
+{ "action": "APPROVE" }
+```
+ou
+```json
+{ "action": "REJECT", "reason": "Duplicado do parque X" }
+```
+Regista a ação em `ModerationLog`.
+
+---
+
 ## Error Format
 
 All errors follow this format:

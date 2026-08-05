@@ -15,7 +15,7 @@ describe('CreateUserUseCase', () => {
       findById: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    } as any;
+    } as unknown as IUserRepository;
 
     // Criar o caso de uso com o mock
     createUserUseCase = new CreateUserUseCase(mockUserRepository);
@@ -27,7 +27,7 @@ describe('CreateUserUseCase', () => {
       name: 'João Silva',
       email: 'joao@example.com',
       password: 'senha123',
-      role: 'CLIENT' as const,
+      role: 'USER' as const,
     };
 
     vi.mocked(mockUserRepository.findByEmail).mockResolvedValue(null);
@@ -59,7 +59,7 @@ describe('CreateUserUseCase', () => {
       name: 'João Silva',
       email: 'existente@example.com',
       password: 'senha123',
-      role: 'CLIENT' as const,
+      role: 'USER' as const,
     };
 
     vi.mocked(mockUserRepository.findByEmail).mockResolvedValue({
@@ -67,7 +67,7 @@ describe('CreateUserUseCase', () => {
       name: 'Usuário Existente',
       email: userData.email,
       password: 'hashed',
-      role: 'CLIENT',
+      role: 'USER',
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -86,7 +86,7 @@ describe('CreateUserUseCase', () => {
       name: '',
       email: 'invalido',
       password: '123',
-      role: 'CLIENT' as const,
+      role: 'USER' as const,
     };
 
     // Act & Assert

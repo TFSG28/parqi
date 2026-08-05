@@ -17,6 +17,7 @@ export class UserRepository implements IUserRepository {
             user.name,
             user.email,
             user.password,
+            user.role,
             user.isActive,
             user.createdAt,
             user.updatedAt
@@ -35,6 +36,7 @@ export class UserRepository implements IUserRepository {
             user.name,
             user.email,
             user.password,
+            user.role,
             user.isActive,
             user.createdAt,
             user.updatedAt
@@ -51,6 +53,7 @@ export class UserRepository implements IUserRepository {
             user.name,
             user.email,
             user.password,
+            user.role,
             user.isActive,
             user.createdAt,
             user.updatedAt
@@ -68,6 +71,7 @@ export class UserRepository implements IUserRepository {
             user.name,
             user.email,
             user.password,
+            user.role,
             user.isActive,
             user.createdAt,
             user.updatedAt

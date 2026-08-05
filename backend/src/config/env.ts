@@ -3,22 +3,29 @@ import { z } from 'zod';
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.string().default('3001').transform(Number),
-    
+
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
     DATABASE_USER: z.string().min(1, 'DATABASE_USER é obrigatório'),
     DATABASE_PASSWORD: z.string().min(1, 'DATABASE_PASSWORD é obrigatório'),
     DATABASE_NAME: z.string().min(1, 'DATABASE_NAME é obrigatório'),
     DATABASE_HOST: z.string().min(1, 'DATABASE_HOST é obrigatório'),
-    DATABASE_PORT: z.string().default('3306').transform(Number),
-    
+    DATABASE_PORT: z.string().default('5432').transform(Number),
+
     JWT_SECRET: z.string().min(64, 'JWT_SECRET deve ter pelo menos 64 caracteres'),
     ENCRYPTION_KEY: z.string().length(64, 'ENCRYPTION_KEY deve ter 64 caracteres hexadecimais'),
-    
+
     IP_SERVER: z.string().default('localhost'),
     EMAIL: z.email('EMAIL deve ser um email válido'),
     EMAIL_PASS: z.string().min(1, 'EMAIL_PASS é obrigatório'),
-    
+
     FRONT_URL: z.url('FRONT_URL deve ser uma URL válida'),
+
+    // Parqi
+    GEOAPIFY_API_KEY: z.string().default(''),
+    OVERPASS_API_URL: z
+        .string()
+        .url('OVERPASS_API_URL deve ser uma URL válida')
+        .default('https://overpass-api.de/api/interpreter'),
 });
 
 export type Env = z.infer<typeof envSchema>;

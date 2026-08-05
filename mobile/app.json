@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Parqi",
+    "slug": "parqi",
+    "scheme": "parqi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "pt.parqi.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#272EF5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "pt.parqi.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A Parqi usa a tua localização para encontrar estacionamentos perto de ti."
+        }
+      ]
+    ]
+  }
+}

@@ -1,5 +1,3 @@
-import cron from 'node-cron';
-
 export function initCronJobs() {
     // Example: Run every day at midnight
     // cron.schedule('0 0 * * *', () => {

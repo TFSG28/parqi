@@ -20,7 +20,11 @@ declare global {
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
-        const token = req.cookies?.[ACCESS_TOKEN_COOKIE];
+        // Web: cookie httpOnly. Mobile (app Expo): Authorization: Bearer <jwt>
+        const cookieToken = req.cookies?.[ACCESS_TOKEN_COOKIE];
+        const authHeader = req.headers.authorization;
+        const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+        const token = bearerToken ?? cookieToken;
 
         if (!token) {
             throw new UnauthorizedError('Não autenticado');
@@ -28,6 +32,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
         const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
         req.user = decoded;
+        // Com Bearer não há cookies: o CSRF double-submit não se aplica (csrfMiddleware respeita esta flag).
+        res.locals.authViaBearer = Boolean(bearerToken);
         next();
     } catch (error) {
         if (error instanceof jwt.JsonWebTokenError) {

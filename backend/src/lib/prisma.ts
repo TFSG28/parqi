@@ -1,21 +1,21 @@
 import "dotenv/config";
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from '../generated/prisma/client';
 import { encryptionExtension } from "../shared/middleware/encryptation.middleware";
 
-const adapter = new PrismaMariaDb({
-  host: process.env.DATABASE_HOST,
-  user: process.env.DATABASE_USER,
-  password: process.env.DATABASE_PASSWORD,
-  database: process.env.DATABASE_NAME,
-  connectionLimit: 5
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 10,
 });
 
-const basePrisma = new PrismaClient({ 
-  adapter,
-  log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'error', 'warn'] 
-    : ['error'],
+const adapter = new PrismaPg(pool);
+
+const basePrisma = new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === 'development'
+        ? ['query', 'error', 'warn']
+        : ['error'],
 });
 
 // Aplicar extensión de encriptación

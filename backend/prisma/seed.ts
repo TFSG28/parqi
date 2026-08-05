@@ -1,7 +1,11 @@
+import 'dotenv/config';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 async function main() {
     console.log('Iniciando seed do banco de dados...');
@@ -15,11 +19,12 @@ async function main() {
             email: 'devops@wearemateria.com',
             name: 'Administrador',
             password: hashedPassword,
+            role: 'ADMIN',
             isActive: true,
         },
     });
 
-    console.log('Usuário admin criado:', admin);
+    console.log('Usuário admin criado:', admin.id, admin.role);
 
     const testUser = await prisma.user.upsert({
         where: { email: 'web2@wearemateria.com' },
@@ -28,11 +33,12 @@ async function main() {
             email: 'web2@wearemateria.com',
             name: 'Utilizador Teste',
             password: hashedPassword,
+            role: 'USER',
             isActive: true,
         },
     });
 
-    console.log('Usuário teste criado:', testUser);
+    console.log('Usuário teste criado:', testUser.id, testUser.role);
 
     console.log('Seed concluído!');
 }
@@ -44,4 +50,5 @@ main()
     })
     .finally(async () => {
         await prisma.$disconnect();
+        await pool.end();
     });

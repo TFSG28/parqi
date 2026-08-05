@@ -8,6 +8,7 @@ export class UserFactory {
             overrides?.name || 'Test User',
             overrides?.email || 'test@example.com',
             overrides?.password || bcrypt.hashSync('Test@123', 10),
+            overrides?.role ?? 'USER',
             overrides?.isActive ?? true,
             overrides?.createdAt || new Date(),
             overrides?.updatedAt || new Date()

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from '../../modules/auth/presentation/routes/auth.routes';
 import userRoutes from '../../modules/user/presentation/routes/user.routes';
+import parkingRoutes from '../../modules/parking/presentation/routes/parking.routes';
 
 const router = Router();
 
@@ -10,6 +11,7 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoutes);
 router.use('/user', userRoutes);
+router.use('/parking', parkingRoutes);
 
 router.use((req, res) => {
     res.status(404).json({

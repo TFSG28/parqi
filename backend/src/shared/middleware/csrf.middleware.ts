@@ -20,6 +20,11 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction) 
         return next();
     }
 
+    // Auth via Authorization: Bearer (app mobile) - sem cookies, CSRF não se aplica.
+    if (res.locals?.authViaBearer) {
+        return next();
+    }
+
     const headerToken = req.headers['x-csrf-token'];
     const cookieToken = req.cookies?.[CSRF_COOKIE];
 

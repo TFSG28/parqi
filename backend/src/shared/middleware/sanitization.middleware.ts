@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import xss from 'xss';
 
-const sanitizeValue = (value: any): any => {
+const sanitizeValue = (value: unknown): unknown => {
     if (typeof value === 'string') {
         return xss(value.trim());
     }
@@ -9,10 +9,10 @@ const sanitizeValue = (value: any): any => {
         return value.map(sanitizeValue);
     }
     if (value && typeof value === 'object') {
-        return Object.keys(value).reduce((acc, key) => {
-            acc[key] = sanitizeValue(value[key]);
+        return Object.keys(value).reduce<Record<string, unknown>>((acc, key) => {
+            acc[key] = sanitizeValue((value as Record<string, unknown>)[key]);
             return acc;
-        }, {} as any);
+        }, {});
     }
     return value;
 };
@@ -32,7 +32,7 @@ export const sanitizationMiddleware = (req: Request, res: Response, next: NextFu
         });
     }
     if (req.params) {
-        req.params = sanitizeValue(req.params);
+        req.params = sanitizeValue(req.params) as Request['params'];
     }
     next();
 };

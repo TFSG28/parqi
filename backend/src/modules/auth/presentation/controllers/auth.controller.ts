@@ -34,7 +34,9 @@ export class AuthController {
     login = asyncHandler(async (req: Request, res: Response) => {
         const result = await this.loginUseCase.execute(req.body);
         const csrfToken = this.issueSession(res, result.token);
-        return ApiResponse.success(res, { user: result.user, csrfToken });
+        // `token` no corpo serve a app mobile (Authorization: Bearer); o cookie
+        // continua a ser o mecanismo da web.
+        return ApiResponse.success(res, { user: result.user, csrfToken, token: result.token });
     });
 
     logout = asyncHandler(async (_req: Request, res: Response) => {
@@ -56,14 +58,18 @@ export class AuthController {
             throw new UnauthorizedError('Não autenticado');
         }
 
-        let payload: { userId: string; email: string };
+        let payload: { userId: string; email: string; role?: 'USER' | 'ADMIN' };
         try {
-            payload = this.jwtService.verifyToken(token) as { userId: string; email: string };
+            payload = this.jwtService.verifyToken(token) as { userId: string; email: string; role?: 'USER' | 'ADMIN' };
         } catch {
             throw new UnauthorizedError('Sessão inválida ou expirada');
         }
 
-        const newToken = this.jwtService.generateToken({ userId: payload.userId, email: payload.email });
+        const newToken = this.jwtService.generateToken({
+            userId: payload.userId,
+            email: payload.email,
+            role: payload.role,
+        });
         const csrfToken = this.issueSession(res, newToken);
         return ApiResponse.success(res, { csrfToken });
     });
