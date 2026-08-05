@@ -2,8 +2,10 @@
 
 export const LIGHT = {
     primary: '#272EF5',
-    // Barras/headers: azul da marca (no escuro, uma versão profunda para não encandear)
+    // Barras/headers: azul da marca
     bar: '#272EF5',
+    // Card hero: tom mais profundo e refinado — destaca-se sem gritar
+    heroBg: '#1E2580',
     accent: '#F2A116',
     // Texto/ícones sobre laranja: escuro, porque branco sobre #F2A116 não passa o contraste AA
     onAccent: '#15173A',
@@ -18,9 +20,10 @@ export const LIGHT = {
 } as const;
 
 export const DARK: ThemeColors = {
-    // Azul mais claro: o #272EF5 não tem contraste suficiente sobre fundos escuros
-    primary: '#6A6FF9',
-    bar: '#1B1F71',
+    primary: '#272EF5',
+    bar: '#272EF5',
+    // Card hero: azul mais claro para se destacar do fundo quase preto
+    heroBg: '#2D36C4',
     accent: '#F2A116',
     onAccent: '#15173A',
     white: '#FFFFFF',

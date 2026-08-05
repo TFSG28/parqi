@@ -34,7 +34,8 @@ export class OverpassImporter implements IOverpassImporter {
 
     async importByCity(city: string, areaName?: string): Promise<OverpassImportResult> {
         const query = [
-            '[out:json][timeout:90];',
+            // 180s: concelhos grandes (Cascais, Barreiro) excedem 90s com "out geom"
+            '[out:json][timeout:180];',
             `area["name"="${areaName ?? city}"]->.searchArea;`,
             '(node["amenity"="parking"](area.searchArea);',
             ' way["amenity"="parking"](area.searchArea););',
@@ -45,7 +46,7 @@ export class OverpassImporter implements IOverpassImporter {
 
         const response = await fetch(url, {
             headers: { 'User-Agent': 'parqi/1.0 (api.parqi.pt)' },
-            signal: AbortSignal.timeout(120_000),
+            signal: AbortSignal.timeout(200_000),
         });
 
         if (!response.ok) {

@@ -62,8 +62,6 @@ const createStyles = (colors: ThemeColors) =>
             borderRadius: 14,
             padding: 12,
             gap: 12,
-            borderWidth: 1,
-            borderColor: colors.border,
         },
         pressed: {
             opacity: 0.85,

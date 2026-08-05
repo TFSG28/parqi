@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
@@ -12,8 +13,12 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HeroSection } from '../src/components/HeroSection';
+import { Onboarding } from '../src/components/Onboarding';
 import { OsmMap, type OsmMapHandle } from '../src/components/OsmMap';
+import { SearchBar } from '../src/components/SearchBar';
 import { SpotCard } from '../src/components/SpotCard';
+import { SpotCardSkeleton } from '../src/components/SpotCardSkeleton';
 import { useAuth } from '../src/context/AuthContext';
 import { parkingApi } from '../src/lib/api';
 import { useTheme } from '../src/context/ThemeContext';
@@ -27,6 +32,10 @@ const DEFAULT_REGION: Region = {
     latitudeDelta: 0.06,
     longitudeDelta: 0.06,
 };
+
+/** Placeholder usado para os skeletons durante a primeira carga. */
+const SKELETON_PLACEHOLDER = { _skeleton: true } as const;
+type ListItem = ParkingSpot | typeof SKELETON_PLACEHOLDER;
 
 interface LatLng {
     latitude: number;
@@ -48,6 +57,19 @@ export default function HomeScreen() {
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+    // Verifica se o onboarding já foi visto
+    useEffect(() => {
+        AsyncStorage.getItem('parqi.onboarding_done')
+            .then((val) => {
+                if (val !== '1') setShowOnboarding(true);
+            })
+            .catch(() => {})
+            .finally(() => setOnboardingChecked(true));
+    }, []);
 
     const fetchSpots = useCallback(async (bbox: string) => {
         lastBbox.current = bbox;
@@ -63,6 +85,14 @@ export default function HomeScreen() {
             setLoading(false);
         }
     }, []);
+
+    const verifiedSpots = useMemo(
+        () => spots.filter((s) => s.status === 'APPROVED').length,
+        [spots],
+    );
+
+    // Primeira carga (sem localização) — mostra skeletons logo no arranque
+    const isFirstLoad = loading && spots.length === 0;
 
     // Primeira carga + tentativa de centrar na localização do utilizador
     useEffect(() => {
@@ -83,21 +113,22 @@ export default function HomeScreen() {
         })();
     }, [fetchSpots]);
 
-    // Lista ordenada por distância ao utilizador (quando conhecida)
-    const sortedSpots = useMemo(() => {
-        if (!userLocation) return spots;
-        return [...spots].sort((a, b) => {
-            const da =
-                a.latitude !== null && a.longitude !== null
-                    ? distanceKm(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude)
-                    : Number.POSITIVE_INFINITY;
-            const db =
-                b.latitude !== null && b.longitude !== null
-                    ? distanceKm(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude)
-                    : Number.POSITIVE_INFINITY;
+    // Lista ordenada + filtrada por pesquisa
+    const displayedSpots = useMemo(() => {
+        const base = userLocation ? [...spots].sort((a, b) => {
+            const da = a.latitude !== null && a.longitude !== null
+                ? distanceKm(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude)
+                : Number.POSITIVE_INFINITY;
+            const db = b.latitude !== null && b.longitude !== null
+                ? distanceKm(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude)
+                : Number.POSITIVE_INFINITY;
             return da - db;
-        });
-    }, [spots, userLocation]);
+        }) : spots;
+
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return base;
+        return base.filter((s) => s.name.toLowerCase().includes(q));
+    }, [spots, userLocation, searchQuery]);
 
     // Pins por estado: azul = verificado, laranja = em verificação, vermelho = sinalizado
     const markers = useMemo(
@@ -152,6 +183,20 @@ export default function HomeScreen() {
         </Pressable>
     );
 
+    // ─────────────── A aguardar verificação do onboarding ───────────────
+    if (!onboardingChecked) {
+        return (
+            <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
+    // ─────────────── Onboarding (primeira sessão) ───────────────
+    if (showOnboarding) {
+        return <Onboarding onDone={() => setShowOnboarding(false)} />;
+    }
+
     // ─────────────── Modo lista (ecrã principal) ───────────────
     if (view === 'list') {
         return (
@@ -159,40 +204,60 @@ export default function HomeScreen() {
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <Text style={styles.logo}>Parqi</Text>
                     <View style={styles.topBarActions}>
-                        {loading && <ActivityIndicator color={colors.white} size="small" />}
+                        {loading && !isFirstLoad && <ActivityIndicator color={colors.white} size="small" />}
                         <Pressable onPress={() => router.push('/account')} accessibilityLabel="Conta e preferências" hitSlop={8}>
                             <Ionicons name="person-circle-outline" size={26} color={colors.white} />
                         </Pressable>
                     </View>
                 </View>
 
-                <FlatList
-                    data={sortedSpots}
-                    keyExtractor={(item) => item.id}
+                <FlatList<ListItem>
+                    data={(isFirstLoad ? Array<ListItem>(5).fill(SKELETON_PLACEHOLDER) : displayedSpots) as ListItem[]}
+                    keyExtractor={(item, index) => ('_skeleton' in (item as object) ? `skel-${index}` : (item as ParkingSpot).id)}
                     contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 96 }]}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     refreshControl={
-                        <RefreshControl refreshing={loading} onRefresh={() => fetchSpots(lastBbox.current)} tintColor={colors.primary} />
+                        <RefreshControl refreshing={loading && !isFirstLoad} onRefresh={() => fetchSpots(lastBbox.current)} tintColor={colors.primary} />
                     }
-                    renderItem={({ item }) => (
-                        <SpotCard
-                            spot={item}
-                            distanceKm={
-                                userLocation && item.latitude !== null && item.longitude !== null
-                                    ? distanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
-                                    : undefined
-                            }
-                            onPress={() => router.push(`/parking/${item.id}`)}
-                        />
-                    )}
+                    ListHeaderComponent={
+                        !isFirstLoad ? (
+                            <>
+                                <HeroSection totalSpots={spots.length} verifiedSpots={verifiedSpots} />
+                                {spots.length > 0 && (
+                                    <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+                                )}
+                            </>
+                        ) : null
+                    }
+                    renderItem={({ item }) => {
+                        if ('_skeleton' in (item as object)) {
+                            return <SpotCardSkeleton />;
+                        }
+                        const spot = item as ParkingSpot;
+                        return (
+                            <SpotCard
+                                spot={spot}
+                                distanceKm={
+                                    userLocation && spot.latitude !== null && spot.longitude !== null
+                                        ? distanceKm(userLocation.latitude, userLocation.longitude, spot.latitude, spot.longitude)
+                                        : undefined
+                                }
+                                onPress={() => router.push(`/parking/${spot.id}`)}
+                            />
+                        );
+                    }}
                     ListEmptyComponent={
                         !loading ? (
                             <View style={styles.emptyWrap}>
-                                <Ionicons name="car-outline" size={40} color={colors.textMuted} />
-                                <Text style={styles.emptyTitle}>Sem estacionamentos nesta zona</Text>
-                                <Pressable style={styles.emptyCta} onPress={() => router.push('/contribute')}>
-                                    <Text style={styles.emptyCtaText}>Adicionar o primeiro</Text>
-                                </Pressable>
+                                <Ionicons name={searchQuery ? 'search' : 'car-outline'} size={40} color={colors.textMuted} />
+                                <Text style={styles.emptyTitle}>
+                                    {searchQuery ? 'Nenhum resultado para esta pesquisa' : 'Sem estacionamentos nesta zona'}
+                                </Text>
+                                {!searchQuery && (
+                                    <Pressable style={styles.emptyCta} onPress={() => router.push('/contribute')}>
+                                        <Text style={styles.emptyCtaText}>Adicionar o primeiro</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         ) : null
                     }
@@ -281,10 +346,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         gap: 14,
     },
     logo: {
-        fontSize: 22,
-        fontWeight: '800',
+        fontSize: 20,
+        fontWeight: '700',
         color: colors.white,
-        letterSpacing: 0.5,
     },
     listContent: {
         padding: 16,
