@@ -1,0 +1,222 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - quality
+      - production
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment a fazer deploy"
+        required: true
+        type: choice
+        options:
+          - quality
+          - production
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Quality gates — run on every push and pull request. Deploy jobs depend on
+  # these, so a broken build/test/lint blocks the deploy.
+  # ---------------------------------------------------------------------------
+  quality-backend:
+    name: Backend (lint · test · build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      # Chains: vitest run -> eslint -> prisma generate -> tsc.
+      # vitest is scoped to unit specs; Playwright e2e runs separately.
+      - name: Lint, test & typecheck
+        working-directory: backend
+        run: npm run build
+
+  quality-frontend:
+    name: Frontend (lint · test · build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      # Chains: vitest run -> next build.
+      - name: Test & build
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+
+  # ---------------------------------------------------------------------------
+  # Deploy — only on pushes to quality/production and manual dispatch.
+  # ---------------------------------------------------------------------------
+  set-environment:
+    if: github.event_name != 'pull_request'
+    needs: [quality-backend, quality-frontend]
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{ steps.resolve.outputs.env_name }}
+    steps:
+      - name: Resolver nome do environment
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env_name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "env_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-frontend:
+    if: github.event_name != 'pull_request'
+    needs: set-environment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    env:
+      CPANEL_HOST: ${{ secrets.FRONTEND_CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.FRONTEND_CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.FRONTEND_CPANEL_API_TOKEN }}
+      DEPLOY_PATH: ${{ secrets.FRONTEND_DEPLOY_PATH }}
+      ZIP_FILE: deploy.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Tests already ran in quality-frontend; just produce the build artifact.
+      - name: Build
+        working-directory: frontend
+        run: npx next build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+
+      - name: Preparar standalone bundle
+        working-directory: frontend
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cd .next/standalone
+          zip -rq ../../../deploy.zip .
+
+      - name: Upload zip para cPanel
+        run: bash .github/scripts/cpanel-deploy.sh upload
+
+      - name: Extrair zip no servidor
+        run: bash .github/scripts/cpanel-deploy.sh extract
+
+      - name: Restart Passenger (frontend)
+        run: bash .github/scripts/cpanel-deploy.sh restart
+
+      - name: Limpar zip do servidor
+        if: success()
+        run: bash .github/scripts/cpanel-deploy.sh cleanup
+
+  deploy-backend:
+    if: github.event_name != 'pull_request'
+    needs: set-environment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    env:
+      CPANEL_HOST: ${{ secrets.BACKEND_CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.BACKEND_CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.BACKEND_CPANEL_API_TOKEN }}
+      DEPLOY_PATH: ${{ secrets.BACKEND_DEPLOY_PATH }}
+      ZIP_FILE: deploy.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # Full install first: prisma generate + tsc need devDependencies.
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      # Tests/lint already ran in quality-backend; just compile the artifact.
+      - name: Compile
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx tsc
+
+      # The Prisma client is generated to src/generated (custom output), so it
+      # must be copied next to the compiled code and shipped in the bundle.
+      - name: Copy generated Prisma client into dist
+        working-directory: backend
+        run: cp -r src/generated dist/generated
+
+      # Prune to production dependencies for a smaller, safer runtime bundle.
+      - name: Prune to production dependencies
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Preparar bundle
+        working-directory: backend
+        run: |
+          mkdir -p deploy-staging
+          cp -r dist deploy-staging/dist
+          cp -r node_modules deploy-staging/node_modules
+          cp -r prisma deploy-staging/prisma
+          cp package.json deploy-staging/package.json
+          cp package-lock.json deploy-staging/package-lock.json
+          cd deploy-staging
+          zip -rq ../../deploy.zip .
+
+      - name: Upload zip para cPanel
+        run: bash .github/scripts/cpanel-deploy.sh upload
+
+      - name: Extrair zip no servidor
+        run: bash .github/scripts/cpanel-deploy.sh extract
+
+      - name: Restart Passenger (backend)
+        run: bash .github/scripts/cpanel-deploy.sh restart
+
+      - name: Limpar zip do servidor
+        if: success()
+        run: bash .github/scripts/cpanel-deploy.sh cleanup

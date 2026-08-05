@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@import "react-toastify/dist/ReactToastify.css";
+
+/* Enable class-based dark mode so `dark:` utilities follow the .dark class
+   (set on <html> by ThemeContext), not just prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --bgToggle: #D1D5DC;
+  --bgBtn: #000000;
+}
+
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --bgToggle: #364153;
+  --bgBtn: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-bgToggle: var(--bgToggle);
+  --color-bgBtn: var(--bgBtn);
+  --color-hoverColor: #99a1af;
+  --color-bc: #d1d5dc;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.title {
+  font-size: 44px;
+  line-height: 21px;
+  font-weight: 600;
+}
+
+.title2 {
+  font-size: 30px;
+  line-height: 21px;
+  font-weight: 600;
+}
+
+.title3 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 21px;
+}

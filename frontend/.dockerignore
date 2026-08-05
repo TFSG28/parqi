@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.next
+.env
+.env.local
+.git
+.gitignore
+README.md
+.vscode
+.idea
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
