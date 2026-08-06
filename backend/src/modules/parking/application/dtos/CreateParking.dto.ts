@@ -39,6 +39,15 @@ const polygon = z.object({
     coordinates: z.array(closedRing).min(1, 'O polígono precisa de pelo menos um anel'),
 });
 
+// Estacionamento ao longo de uma estrada (na via): linha com 2+ pontos
+const line = z.object({
+    type: z.literal('LineString'),
+    coordinates: z
+        .array(coordinates)
+        .min(2, 'A linha precisa de pelo menos 2 pontos')
+        .max(100, 'Linha demasiado longa (máximo 100 pontos)'),
+});
+
 export const CreateParkingSchema = z.object({
     body: z.object({
         name: z
@@ -47,10 +56,17 @@ export const CreateParkingSchema = z.object({
             .min(2, 'Nome deve ter pelo menos 2 caracteres')
             .max(120, 'Nome demasiado longo'),
         description: z.string().trim().max(2000, 'Descrição demasiado longa').optional(),
-        geometry: z.discriminatedUnion('type', [position, polygon]),
+        geometry: z.discriminatedUnion('type', [position, polygon, line]),
         parkingType: ParkingTypeEnum,
         capacityRange: CapacityRangeEnum.optional(),
         isFree: z.boolean().optional(),
+        // Detalhes de acessibilidade e serviços
+        hasPregnantSpaces: z.boolean().optional(),
+        hasDisabledSpaces: z.boolean().optional(),
+        hasEvCharging: z.boolean().optional(),
+        isCovered: z.boolean().optional(),
+        // Honeypot anti-bot: campo escondido que bots preenchem; humanos nunca o veem
+        website: z.string().max(200).optional(),
     }),
 });
 

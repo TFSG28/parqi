@@ -43,3 +43,9 @@ export class ConflictError extends AppError {
         super(message, 409);
     }
 }
+
+export class TooManyRequestsError extends AppError {
+    constructor(message: string, details?: Record<string, unknown>) {
+        super(message, 429, true, details);
+    }
+}

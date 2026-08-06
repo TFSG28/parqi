@@ -16,10 +16,15 @@ export interface CreateParkingRepositoryData {
     parkingType: ParkingType;
     capacityRange: CapacityRange | null;
     isFree: boolean | null;
+    hasPregnantSpaces?: boolean | null;
+    hasDisabledSpaces?: boolean | null;
+    hasEvCharging?: boolean | null;
+    isCovered?: boolean | null;
     source: DataSource;
     externalId?: string | null;
     status: ContributionStatus;
     trustScore: number;
+    requiresReview?: boolean;
     contributorId?: string | null;
 }
 
@@ -30,16 +35,40 @@ export interface UpdateParkingRepositoryData {
     parkingType?: ParkingType;
     capacityRange?: CapacityRange | null;
     isFree?: boolean | null;
+    hasPregnantSpaces?: boolean | null;
+    hasDisabledSpaces?: boolean | null;
+    hasEvCharging?: boolean | null;
+    isCovered?: boolean | null;
     trustScore?: number;
     status?: ContributionStatus;
+    requiresReview?: boolean;
 }
 
 export interface ParkingListFilters {
     bbox?: { minLon: number; minLat: number; maxLon: number; maxLat: number } | null;
     parkingType?: ParkingType | null;
     statuses: ContributionStatus[];
+    /** Filtro opcional por fonte (admin / debug). */
+    source?: DataSource | null;
+    /** Requer revisão manual (fila de moderação). */
+    requiresReview?: boolean;
     page: number;
     limit: number;
+}
+
+export interface UserContributionStats {
+    total: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+    flagged: number;
+    /** Votos positivos/negativos recebidos nas contribuições do utilizador. */
+    votesReceivedUp: number;
+    votesReceivedDown: number;
+    /** Votos emitidos pelo utilizador. */
+    votesGiven: number;
+    /** Média de confiança dos aprovados. */
+    avgTrustApproved: number;
 }
 
 export interface IParkingRepository {
@@ -64,7 +93,8 @@ export interface IParkingRepository {
         userId: string,
         parkingSpotId: string,
         value: 1 | -1,
-        reason: string | null
+        reason: string | null,
+        weight?: number
     ): Promise<ParkingVoteEntity>;
     getVoteSummary(parkingSpotId: string): Promise<{ upvotes: number; downvotes: number }>;
 
@@ -74,4 +104,9 @@ export interface IParkingRepository {
         action: 'APPROVE' | 'REJECT',
         reason: string | null
     ): Promise<void>;
+
+    // Anti-spam / métricas
+    countUserContributionsSince(userId: string, since: Date): Promise<number>;
+    countUserVotesSince(userId: string, since: Date): Promise<number>;
+    getContributorStats(userId: string): Promise<UserContributionStats>;
 }

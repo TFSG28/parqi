@@ -23,6 +23,7 @@ export class GetCurrentUserUseCase {
             email: user.email,
             role: user.role,
             isActive: user.isActive,
+            emailVerified: user.emailVerified,
         };
     }
 }

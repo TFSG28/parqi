@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeroSection } from '../src/components/HeroSection';
 import { Onboarding } from '../src/components/Onboarding';
-import { OsmMap, type OsmMapHandle } from '../src/components/OsmMap';
+import { MapLayerPicker } from '../src/components/MapLayerPicker';
+import { OsmMap, type MapLayer, type OsmMapHandle } from '../src/components/OsmMap';
 import { SearchBar } from '../src/components/SearchBar';
 import { SpotCard } from '../src/components/SpotCard';
 import { SpotCardSkeleton } from '../src/components/SpotCardSkeleton';
@@ -53,6 +54,7 @@ export default function HomeScreen() {
 
     const [view, setView] = useState<'list' | 'map'>('list');
     const [center, setCenter] = useState<LatLng>(DEFAULT_REGION);
+    const [mapLayer, setMapLayer] = useState<MapLayer>('standard');
     const [userLocation, setUserLocation] = useState<LatLng | null>(null);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
     const [loading, setLoading] = useState(false);
@@ -292,9 +294,16 @@ export default function HomeScreen() {
                 cluster
                 markers={markers}
                 userLocation={userLocation}
+                layer={mapLayer}
                 onMarkerPress={(id) => router.push(`/parking/${id}`)}
                 onBoundsChange={handleBoundsChange}
                 style={StyleSheet.absoluteFill}
+            />
+
+            {/* Camadas do mapa (satélite, dark, topo...) */}
+            <MapLayerPicker
+                onChange={setMapLayer}
+                style={{ position: 'absolute', right: 12, bottom: insets.bottom + 84 }}
             />
 
             {/* Barra superior */}

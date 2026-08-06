@@ -2,14 +2,14 @@
 name: Parqi
 description: App comunitária para encontrar estacionamento em Portugal
 colors:
-  brand: "#272EF5"
-  brand-deep: "#1A1FAE"
-  brand-night: "#12147A"
-  accent: "#F2A116"
+  brand: "#3B6BFF"
+  brand-deep: "#2A4ED6"
+  brand-night: "#1B2F8A"
+  accent: "#FF7A00"
   ink: "#15173A"
   ink-soft: "#4D5079"
   paper: "#FDFDFF"
-  mist: "#DFE2FF"
+  mist: "#E3E8FF"
   app-background: "#F7F8FA"
   app-card: "#FFFFFF"
   app-text: "#111318"
@@ -22,8 +22,8 @@ colors:
   dark-text: "#F2F3F7"
   dark-text-muted: "#9AA0B4"
   dark-border: "#2A2E3D"
-  dark-primary: "#6A6FF9"
-  dark-bar: "#1B1F71"
+  dark-primary: "#3B6BFF"
+  dark-bar: "#2E46C9"
 typography:
   display:
     fontFamily: "Barlow Semi Condensed, sans-serif"
@@ -90,12 +90,12 @@ Parqi encontra estacionamento em Portugal com dados públicos e comunidade. A id
 
 Estratégia *committed* no site (o azul carrega herói e rodapé; o miolo é branco) e *restrained* na app (neutros claros, azul só em ações primárias e na barra superior).
 
-- `brand` #272EF5 é o azul do sinal de estacionamento: ações primárias, barras, marca.
-- `accent` #F2A116 é a cor de ação: CTAs primários (Rota, Enviar contribuição, FABs de modo), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam `ink` (branco sobre #F2A116 falha o contraste AA).
+- `brand` #3B6BFF é o azul do sinal de estacionamento (versão mais clara e viva): ações primárias, barras, marca.
+- `accent` #FF7A00 é a cor de ação (laranja vivo): CTAs primários (Rota, Enviar contribuição, FABs de modo), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam `ink` (branco sobre laranja vivo falha o contraste AA).
 - Neutros do site (`ink`, `ink-soft`, `paper`, `mist`) são tintados para o azul da marca; os da app (`app-*`) são neutros frios do sistema.
 - Semânticos: `success` verde para confiança alta e "Verificado", `danger` para reportar/sinalizado, `accent` para pendente e confiança média.
 - Sobre azul usa-se branco ou `mist`; nunca cinzento sobre cor.
-- A app tem tema claro/escuro (Sistema/Claro/Escuro em Conta → Preferências, persistido). No escuro, `dark-primary` substitui o azul da marca em elementos interativos (o #272EF5 não contrasta em fundos escuros) e as barras usam `dark-bar`. Semânticos (success/danger) têm variantes mais claras no escuro.
+- A app tem tema claro/escuro (Sistema/Claro/Escuro em Conta → Preferências, persistido). No escuro, `dark-primary` mantém o azul da marca (o #3B6BFF contrasta com texto branco em botões) e as barras usam `dark-bar` #2E46C9. Semânticos (success/danger) têm variantes mais claras no escuro.
 
 ## Typography
 

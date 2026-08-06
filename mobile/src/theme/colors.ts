@@ -1,13 +1,13 @@
-/** Branding Parqi: #272EF5 (azul), #F2A116 (laranja), #FFFFFF. */
+/** Branding Parqi: #3B6BFF (azul mais claro), #FF7A00 (laranja vivo), #FFFFFF. */
 
 export const LIGHT = {
-    primary: '#272EF5',
+    primary: '#3B6BFF',
     // Barras/headers: azul da marca
-    bar: '#272EF5',
-    // Card hero: tom mais profundo e refinado — destaca-se sem gritar
-    heroBg: '#1E2580',
-    accent: '#F2A116',
-    // Texto/ícones sobre laranja: escuro, porque branco sobre #F2A116 não passa o contraste AA
+    bar: '#3B6BFF',
+    // Card hero: tom mais profundo da família — destaca-se sem gritar
+    heroBg: '#2A4ED6',
+    accent: '#FF7A00',
+    // Texto/ícones sobre laranja: escuro, porque branco sobre laranja vivo não passa o contraste AA
     onAccent: '#15173A',
     white: '#FFFFFF',
     background: '#F7F8FA',
@@ -20,11 +20,12 @@ export const LIGHT = {
 } as const;
 
 export const DARK: ThemeColors = {
-    primary: '#272EF5',
-    bar: '#272EF5',
-    // Card hero: azul mais claro para se destacar do fundo quase preto
-    heroBg: '#2D36C4',
-    accent: '#F2A116',
+    primary: '#3B6BFF',
+    // Barras no escuro: azul profundo com texto branco com bom contraste
+    bar: '#2E46C9',
+    // Card hero no escuro: azul mais claro para se destacar do fundo quase preto
+    heroBg: '#3A56D8',
+    accent: '#FF7A00',
     onAccent: '#15173A',
     white: '#FFFFFF',
     background: '#0F1117',

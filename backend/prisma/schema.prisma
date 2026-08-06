@@ -54,11 +54,18 @@ enum ContributionStatus {
 enum GeometryType {
     POINT
     POLYGON
+    LINE
 }
 
 enum ModerationAction {
     APPROVE
     REJECT
+}
+
+enum SuggestionStatus {
+    PENDING
+    APPROVED
+    REJECTED
 }
 
 // ─────────────────────────── Models ───────────────────────────
@@ -74,9 +81,18 @@ model User {
     role     UserRole @default(USER)
     isActive Boolean  @default(true)
 
+    // Verificação de email por código (6 dígitos, sha256, expira em 15 min)
+    emailVerified              Boolean   @default(false)
+    emailVerificationCode      String?
+    emailVerificationExpires   DateTime?
+    emailVerificationAttempts  Int       @default(0)
+    emailVerificationSentAt    DateTime?
+
     contributions  ParkingSpot[]
     votes          ParkingVote[]
     moderationLogs ModerationLog[]
+    suggestions    ParkingSuggestion[] @relation("SuggestionAuthor")
+    reviewedSuggestions ParkingSuggestion[] @relation("SuggestionReviewer")
 
     @@index([id])
     @@index([email])
@@ -91,18 +107,27 @@ model ParkingSpot {
     description   String?
     latitude      Float?
     longitude     Float?
-    // PostGIS: always a point (centroid for polygon spots) + optional polygon boundary
+    // PostGIS: sempre um ponto (centroide/point-on-surface) + polígono opcional + linha opcional (na via)
     geom          Unsupported("geometry(Point, 4326)")?
     boundary      Unsupported("geometry(Polygon, 4326)")?
+    path          Unsupported("geometry(LineString, 4326)")?
     geometryType  GeometryType                            @default(POINT)
     parkingType   ParkingType                             @default(OTHER)
     capacityRange CapacityRange?
     isFree        Boolean?
 
+    // Detalhes de acessibilidade e serviços (contribuição da comunidade/importação)
+    hasPregnantSpaces  Boolean?
+    hasDisabledSpaces  Boolean?
+    hasEvCharging      Boolean?
+    isCovered          Boolean?
+
     source     DataSource         @default(COMMUNITY)
-    externalId String? // e.g. "node:123" (OSM), "geoapify:abc123"
+    externalId String? // e.g. "node:123" (OSM), "geoapify:abc123", "porto-citysdk:<id>"
     status     ContributionStatus @default(PENDING)
     trustScore Float              @default(0)
+    // Novos membros / dados suspeitos: não pode auto-aprovar por votos até revisão manual (admin)
+    requiresReview Boolean        @default(false)
 
     duplicateOfId String?
     duplicateOf   ParkingSpot?  @relation("DuplicateGroup", fields: [duplicateOfId], references: [id], onDelete: SetNull)
@@ -113,6 +138,7 @@ model ParkingSpot {
 
     votes          ParkingVote[]
     moderationLogs ModerationLog[]
+    suggestions    ParkingSuggestion[]
 
     @@unique([source, externalId])
     @@index([status])
@@ -127,6 +153,8 @@ model ParkingVote {
 
     value  Int // 1 = upvote, -1 = downvote
     reason String? // obrigatório em votos negativos (porquê)
+    // Peso do voto consoante a reputação do votante (novos votam com peso 0.5)
+    weight Float @default(1)
 
     parkingSpotId String
     parkingSpot   ParkingSpot @relation(fields: [parkingSpotId], references: [id], onDelete: Cascade)
@@ -152,4 +180,31 @@ model ModerationLog {
     moderator   User?   @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
 
     @@index([parkingSpotId])
+}
+
+// Sugestões da comunidade para complementar/corrigir informação de parques existentes
+model ParkingSuggestion {
+    id        String   @id @default(uuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Campos propostos (diff): { name?, description?, parkingType?, capacityRange?, isFree?, ... }
+    data   Json
+    status SuggestionStatus @default(PENDING)
+    reason String? // motivo dado pelo autor / pelo revisor
+
+    reviewedAt DateTime?
+
+    parkingSpotId String
+    parkingSpot   ParkingSpot @relation(fields: [parkingSpotId], references: [id], onDelete: Cascade)
+
+    suggestedById String
+    suggestedBy   User   @relation("SuggestionAuthor", fields: [suggestedById], references: [id], onDelete: Cascade)
+
+    reviewedById String?
+    reviewedBy   User?  @relation("SuggestionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+    @@index([status])
+    @@index([parkingSpotId])
+    @@index([suggestedById])
 }

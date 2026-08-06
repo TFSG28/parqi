@@ -1,6 +1,9 @@
 import { inject, injectable } from 'tsyringe';
 import { PARKING_TOKENS } from '../../../../shared/container/tokens/parking.tokens';
+import { USER_TOKENS } from '../../../../shared/container/tokens/user.tokens';
+import { IUserRepository } from '../../../user/domain/repositories/IUser.repository';
 import { IParkingRepository, UpdateParkingRepositoryData } from '../../domain/repositories/IParking.repository';
+import { assertEmailVerified } from '../../../auth/application/guards/email-verified.guard';
 import { ParkingSpotEntity } from '../../domain/entities/ParkingSpot.entity';
 import { ParkingNotFoundError } from '../../domain/errors/ParkingNotFound.error';
 import { DuplicateParkingError } from '../../domain/errors/DuplicateParking.error';
@@ -9,7 +12,7 @@ import { InvalidParkingActionError } from '../../domain/errors/InvalidParkingAct
 import { ForbiddenError } from '../../../../shared/errors/AppError';
 import { UpdateParkingDTO } from '../dtos/UpdateParking.dto';
 import { DUPLICATE_RADIUS_METERS } from '../../domain/const';
-import { getReferencePoint, isInsidePortugal } from '../../domain/geo';
+import { getReferencePoint, isGeometryInsidePortugal } from '../../domain/geo';
 
 export interface UpdateParkingInput {
     parkingSpotId: string;
@@ -22,10 +25,15 @@ export interface UpdateParkingInput {
 export class UpdateParkingUseCase {
     constructor(
         @inject(PARKING_TOKENS.IParkingRepository)
-        private readonly parkingRepository: IParkingRepository
+        private readonly parkingRepository: IParkingRepository,
+        @inject(USER_TOKENS.IUserRepository)
+        private readonly userRepository: IUserRepository
     ) {}
 
     async execute(input: UpdateParkingInput): Promise<ParkingSpotEntity> {
+        // A conta tem de ter o email validado (anti-spam)
+        await assertEmailVerified(this.userRepository, input.userId, input.userRole, 'editar estacionamentos');
+
         const spot = await this.parkingRepository.findById(input.parkingSpotId);
         if (!spot) {
             throw new ParkingNotFoundError();
@@ -42,7 +50,7 @@ export class UpdateParkingUseCase {
 
         if (input.data.geometry) {
             const [longitude, latitude] = getReferencePoint(input.data.geometry);
-            if (!isInsidePortugal(latitude, longitude)) {
+            if (!isGeometryInsidePortugal(input.data.geometry)) {
                 throw new InvalidCoordinatesError();
             }
             const nearby = await this.parkingRepository.findNearby(

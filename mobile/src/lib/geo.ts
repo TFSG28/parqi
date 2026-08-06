@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
-import type { CapacityRange, ContributionStatus, ParkingType } from '../types/parking';
+import type { CapacityRange, ContributionStatus, DataSource, ParkingType } from '../types/parking';
 import type { ThemeColors } from '../theme/colors';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -43,6 +43,13 @@ export const TYPE_META: Record<ParkingType, { label: string; icon: IoniconName; 
     MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: '#0EA5E9' },
     STREET: { label: 'Na via', icon: 'car', color: '#64748B' },
     OTHER: { label: 'Outro', icon: 'help', color: '#94A3B8' },
+};
+
+export const SOURCE_META: Record<DataSource, { label: string; icon: IoniconName; color: string }> = {
+    COMMUNITY: { label: 'Comunidade', icon: 'people', color: '#3B6BFF' },
+    MUNICIPAL: { label: 'Câmara municipal', icon: 'business', color: '#16A34A' },
+    OVERPASS: { label: 'OpenStreetMap', icon: 'map', color: '#0EA5E9' },
+    GEOAPIFY: { label: 'Geoapify', icon: 'globe', color: '#7C3AED' },
 };
 
 export const CAPACITY_LABELS: Record<CapacityRange, string> = {

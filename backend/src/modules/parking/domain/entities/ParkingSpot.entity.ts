@@ -9,7 +9,7 @@ export type CapacityRange =
     | 'RANGE_100_PLUS';
 export type DataSource = 'COMMUNITY' | 'OVERPASS' | 'GEOAPIFY' | 'MUNICIPAL';
 export type ContributionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FLAGGED';
-export type GeometryType = 'POINT' | 'POLYGON';
+export type GeometryType = 'POINT' | 'POLYGON' | 'LINE';
 
 export interface ParkingSpotEntity {
     id: string;
@@ -21,10 +21,16 @@ export interface ParkingSpotEntity {
     parkingType: ParkingType;
     capacityRange: CapacityRange | null;
     isFree: boolean | null;
+    // Detalhes de acessibilidade e serviços
+    hasPregnantSpaces: boolean | null;
+    hasDisabledSpaces: boolean | null;
+    hasEvCharging: boolean | null;
+    isCovered: boolean | null;
     source: DataSource;
     externalId: string | null;
     status: ContributionStatus;
     trustScore: number;
+    requiresReview: boolean;
     duplicateOfId: string | null;
     contributorId: string | null;
     createdAt: Date;
@@ -35,17 +41,21 @@ export interface ParkingVoteEntity {
     id: string;
     value: 1 | -1;
     reason: string | null;
+    weight: number;
     createdAt: Date;
 }
 
 /**
  * Geometria enviada pelos clientes (GeoJSON simplificado).
  * Coordenadas na ordem [longitude, latitude], SRID 4326.
+ * `LineString` representa estacionamento ao longo de uma estrada (na via).
  */
 export type ParkingGeometryInput =
     | { type: 'Point'; coordinates: [number, number] }
-    | { type: 'Polygon'; coordinates: [number, number][][] };
+    | { type: 'Polygon'; coordinates: [number, number][][] }
+    | { type: 'LineString'; coordinates: [number, number][] };
 
 export type GeoJSONGeometry =
     | { type: 'Point'; coordinates: [number, number] }
-    | { type: 'Polygon'; coordinates: [number, number][][] };
+    | { type: 'Polygon'; coordinates: [number, number][][] }
+    | { type: 'LineString'; coordinates: [number, number][] };

@@ -1,0 +1,10 @@
+- Melhorar cores de branding (laranja mais vivo e azul mais claro)
+- Fonte de onde vem cada parque (Overpass, Camara, comunidade, etc)
+- Mais detalhes de cada parque (se tem lugar para gravidas ou pessoas de mobilidade reduzida)
+- Melhorar validação de parques da comunidade com graus de confiança e maneiras de prevenir dados falsos e spam
+- Possibilidade de complementar informação de um parque pela comunidade
+- Possibilidade de inserir linhas quando o estacionamento é ao longo de uma estrada
+- Prevenir as pessoas de adicionar estacionamento que são inválidos como bermas da estrada ou sitios que normalmente não se pode estacionar
+- Roles de admin (eu) e membro
+- Métricas para os contribuintes onde vem as suas estatisticas de contribuicoes
+- a pasta data já tem csv e shp para importar e organizar na BD

@@ -19,6 +19,8 @@
     "import:overpass": "tsx src/scripts/import-overpass.ts",
     "import:geoapify": "tsx src/scripts/import-geoapify.ts",
     "import:csv": "tsx src/scripts/import-csv.ts",
+    "import:data": "tsx src/scripts/import-data.ts",
+    "set-admin": "tsx src/scripts/set-admin.ts",
     "update-deps": "npx npm-check-updates -i --format group",
     "prepare": "cd .. && husky backend/.husky || true"
   },

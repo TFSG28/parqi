@@ -10,11 +10,36 @@ import { ParkingIdParamsSchema } from '../../application/dtos/ParkingIdParams.dt
 import { QueryParkingSchema } from '../../application/dtos/QueryParking.dto';
 import { UpdateParkingSchema } from '../../application/dtos/UpdateParking.dto';
 import { VoteParkingSchema } from '../../application/dtos/VoteParking.dto';
+import { SuggestParkingSchema } from '../../application/dtos/SuggestParking.dto';
+import { DecideSuggestionSchema } from '../../application/dtos/DecideSuggestion.dto';
 
 const router = Router();
 
 // Público
 router.get('/', validate(QueryParkingSchema), parkingController.list);
+
+// Admin (rotas estáticas ANTES de /:id para não colidirem com o parâmetro)
+router.get(
+    '/moderation',
+    authMiddleware,
+    requireRole('ADMIN'),
+    parkingController.moderationQueue
+);
+router.get(
+    '/suggestions',
+    authMiddleware,
+    requireRole('ADMIN'),
+    parkingController.listSuggestions
+);
+router.post(
+    '/suggestions/:id/decide',
+    authMiddleware,
+    requireRole('ADMIN'),
+    csrfMiddleware,
+    validate(DecideSuggestionSchema),
+    parkingController.decideSuggestion
+);
+
 router.get('/:id', validate(ParkingIdParamsSchema), parkingController.getById);
 
 // Autenticado (comunidade)
@@ -22,6 +47,13 @@ router.post('/', authMiddleware, csrfMiddleware, validate(CreateParkingSchema), 
 router.patch('/:id', authMiddleware, csrfMiddleware, validate(UpdateParkingSchema), parkingController.update);
 router.delete('/:id', authMiddleware, csrfMiddleware, validate(ParkingIdParamsSchema), parkingController.remove);
 router.post('/:id/vote', authMiddleware, csrfMiddleware, validate(VoteParkingSchema), parkingController.vote);
+router.post(
+    '/:id/suggest',
+    authMiddleware,
+    csrfMiddleware,
+    validate(SuggestParkingSchema),
+    parkingController.suggest
+);
 
 // Admin (moderação manual do modelo híbrido)
 router.post(

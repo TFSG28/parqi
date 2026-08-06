@@ -8,6 +8,11 @@ import { ListParkingUseCase } from '../../application/usecases/ListParking.useca
 import { ModerateParkingUseCase } from '../../application/usecases/ModerateParking.usecase';
 import { UpdateParkingUseCase } from '../../application/usecases/UpdateParking.usecase';
 import { VoteParkingUseCase } from '../../application/usecases/VoteParking.usecase';
+import { SuggestParkingUseCase } from '../../application/usecases/SuggestParking.usecase';
+import { DecideSuggestionUseCase } from '../../application/usecases/DecideSuggestion.usecase';
+import { ListSuggestionsUseCase } from '../../application/usecases/ListSuggestions.usecase';
+import { ListModerationQueueUseCase } from '../../application/usecases/ListModerationQueue.usecase';
+import { GetUserStatsUseCase } from '../../application/usecases/GetUserStats.usecase';
 import { asyncHandler } from '../../../../shared/utils/async-handler';
 import { ApiResponse } from '../../../../shared/utils/api-response';
 
@@ -33,7 +38,17 @@ export class ParkingController {
         @inject(PARKING_TOKENS.VoteParkingUseCase)
         private readonly voteParkingUseCase: VoteParkingUseCase,
         @inject(PARKING_TOKENS.ModerateParkingUseCase)
-        private readonly moderateParkingUseCase: ModerateParkingUseCase
+        private readonly moderateParkingUseCase: ModerateParkingUseCase,
+        @inject(PARKING_TOKENS.SuggestParkingUseCase)
+        private readonly suggestParkingUseCase: SuggestParkingUseCase,
+        @inject(PARKING_TOKENS.DecideSuggestionUseCase)
+        private readonly decideSuggestionUseCase: DecideSuggestionUseCase,
+        @inject(PARKING_TOKENS.ListSuggestionsUseCase)
+        private readonly listSuggestionsUseCase: ListSuggestionsUseCase,
+        @inject(PARKING_TOKENS.ListModerationQueueUseCase)
+        private readonly listModerationQueueUseCase: ListModerationQueueUseCase,
+        @inject(PARKING_TOKENS.GetUserStatsUseCase)
+        private readonly getUserStatsUseCase: GetUserStatsUseCase
     ) {}
 
     list = asyncHandler(async (req: Request, res: Response) => {
@@ -55,9 +70,16 @@ export class ParkingController {
     });
 
     create = asyncHandler(async (req: Request, res: Response) => {
+        // Honeypot anti-bot: campo escondido "website" que bots preenchem.
+        // Respondemos 201 falso sem guardar nada.
+        if (typeof req.body.website === 'string' && req.body.website.trim().length > 0) {
+            return ApiResponse.created(res, { status: 'PENDING', honeypot: true });
+        }
+
         const parking = await this.createParkingUseCase.execute({
             ...req.body,
             userId: req.user!.userId,
+            userRole: req.user?.role,
         });
         return ApiResponse.created(res, parking);
     });
@@ -85,6 +107,7 @@ export class ParkingController {
         const parking = await this.voteParkingUseCase.execute({
             parkingSpotId: routeId(req),
             userId: req.user!.userId,
+            userRole: req.user?.role,
             value: req.body.value,
             reason: req.body.reason,
         });
@@ -99,5 +122,48 @@ export class ParkingController {
             reason: req.body.reason,
         });
         return ApiResponse.success(res, parking);
+    });
+
+    /** Complementar informação de um parque (híbrido: aplica já ou entra na fila). */
+    suggest = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.suggestParkingUseCase.execute({
+            parkingSpotId: routeId(req),
+            userId: req.user!.userId,
+            userRole: req.user?.role,
+            data: req.body,
+        });
+        return ApiResponse.created(res, result);
+    });
+
+    /** Fila de moderação: contribuições de contas novas a decidir pelo admin. */
+    moderationQueue = asyncHandler(async (req: Request, res: Response) => {
+        const page = Number(req.query.page ?? 1);
+        const limit = Number(req.query.limit ?? 20);
+        const result = await this.listModerationQueueUseCase.execute({ page, limit });
+        return ApiResponse.paginated(res, result.items, page, limit, result.total);
+    });
+
+    listSuggestions = asyncHandler(async (req: Request, res: Response) => {
+        const page = Number(req.query.page ?? 1);
+        const limit = Number(req.query.limit ?? 20);
+        const status = typeof req.query.status === 'string' ? req.query.status : 'PENDING';
+        const result = await this.listSuggestionsUseCase.execute({ status, page, limit });
+        return ApiResponse.paginated(res, result.items, page, limit, result.total);
+    });
+
+    decideSuggestion = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.decideSuggestionUseCase.execute({
+            suggestionId: routeId(req),
+            moderatorId: req.user!.userId,
+            action: req.body.action,
+            reason: req.body.reason,
+        });
+        return ApiResponse.success(res, result);
+    });
+
+    /** Estatísticas de contribuições do utilizador autenticado. */
+    myStats = asyncHandler(async (req: Request, res: Response) => {
+        const stats = await this.getUserStatsUseCase.execute({ userId: req.user!.userId });
+        return ApiResponse.success(res, stats);
     });
 }

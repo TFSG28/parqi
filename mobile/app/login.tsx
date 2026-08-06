@@ -40,8 +40,11 @@ export default function LoginScreen() {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
+    // Conta nova ou email ainda não validado -> ecrã do código de verificação
     useEffect(() => {
-        if (user) {
+        if (user && user.emailVerified === false) {
+            router.replace('/verify');
+        } else if (user) {
             goBackSafe();
         }
     }, [user]);
@@ -145,7 +148,8 @@ export default function LoginScreen() {
                 </Pressable>
 
                 <Text style={styles.hint}>
-                    A tua conta permite votar e adicionar estacionamentos. Membro com 5+ contribuições não vê anúncios.
+                    Após criares a conta recebes um código por email para a validares — só assim podes
+                    adicionar, votar e sugerir estacionamentos.
                 </Text>
             </ScrollView>
         </KeyboardAvoidingView>

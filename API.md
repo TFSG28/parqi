@@ -84,6 +84,26 @@ valid. Returns the new `csrfToken`. Responds `401` once the session has expired.
 #### POST /auth/logout
 Clear the auth cookies. Requires `access_token` cookie + `X-CSRF-Token` header.
 
+#### POST /auth/verify-email
+Validate the account with the 6-digit code sent by email (requires auth).
+
+**Request Body:**
+```json
+{ "code": "123456" }
+```
+
+**Success (200):** `{ "emailVerified": true }`
+
+O código é enviado automaticamente no registo (`POST /user`), expira em 15 min,
+permite 5 tentativas e pode ser reenviado 1x/minuto. Enquanto o email não está
+validado, adicionar/votar/sugerir devolve `403`.
+
+#### POST /auth/resend-code
+Re-send the verification code (requires auth; max 1 per minute).
+
+**Success (200):** `{ "resentAt": "...", "waitSeconds": 0 }`
+**Error:** `429` com o tempo de espera em segundos.
+
 ---
 
 ### Users
@@ -107,9 +127,11 @@ Create a new user.
   "name": "User Name",
   "email": "user@example.com",
   "isActive": true,
+  "emailVerified": false,
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
 ```
+Envia automaticamente o código de verificação por email.
 
 **Error Responses:**
 - `400 Bad Request`: User already exists or validation error
@@ -160,18 +182,38 @@ Criar uma contribuição (requer `access_token` + `X-CSRF-Token`).
   "isFree": true
 }
 ```
-`geometry` aceita `Point` ou `Polygon` (GeoJSON, coordenadas `[lng, lat]`).
+`geometry` aceita `Point`, `Polygon` ou `LineString` (GeoJSON, coordenadas `[lng, lat]`; a linha representa estacionamento ao longo da via).
 
-**Success (201):** estacionamento criado com `status: "PENDING"` e
-`trustScore: 2`.
+Campos opcionais de detalhe: `hasPregnantSpaces`, `hasDisabledSpaces`, `hasEvCharging`, `isCovered` (booleanos).
+
+**Sucesso (201):** estacionamento criado com `status: "PENDING"` e `trustScore: 2`. Contas novas (primeiras 3 contribuições) entram com `requiresReview: true` — só o admin aprova.
+
+**Anti-spam / validação:**
+- Email **verificado** obrigatório (rejeitado com `403` caso contrário)
+- Coordenadas **sempre dentro de Portugal** (rejeitado caso contrário)
+- Limite diário de 10 contribuições por utilizador (`429`)
+- Honeypot anti-bot: campo escondido `website` — se preenchido, responde 201 falso sem guardar
+- Validação contra a rede viária (OSM/Overpass): rejeita autoestradas, túneis, rotundas e "bermas" para `STREET`
 
 **Errors:**
-- `400`: coordenadas fora de Portugal / polígono inválido
+- `400`: coordenadas fora de Portugal / local inválido segundo a rede viária
 - `409`: já existe um estacionamento a < 30 m (id em `details.existingId` no erro)
+- `429`: limite diário de contribuições atingido
 
 #### PATCH /parking/:id
-Editar o próprio estacionamento `PENDING` (ou admin). Mesmos campos de criação,
-todos opcionais.
+Editar o próprio estacionamento (autor ou admin). Mesmos campos de criação, todos opcionais (inclui os detalhes e `LineString`). Edições do autor a um parque aprovado voltam a `PENDING` para revalidação.
+
+#### POST /parking/:id/suggest
+**Complementar informação de um parque** (requer auth + CSRF). Modelo híbrido por reputação:
+- admin/membros confiáveis (reputação >= 5): aplica já (parque volta a `PENDING`)
+- restantes: cria `ParkingSuggestion` `PENDING` para o admin decidir
+
+**Request Body** (só os campos alterados + `reason` opcional):
+```json
+{ "hasDisabledSpaces": true, "reason": "Tem 4 lugares para mobilidade reduzida" }
+```
+
+**Success (201):** `{ "applied": true, "spot": {...} }` ou `{ "applied": false, "suggestion": {...} }`.
 
 #### DELETE /parking/:id
 Apagar o próprio estacionamento da comunidade (ou admin, incluindo importados).
@@ -191,6 +233,19 @@ ou
 (`COMMUNITY`=2, `OVERPASS`/`GEOAPIFY`=6), upvote +1.5, downvote -2, clamp 0-10.
 `PENDING` → `APPROVED` aos 5; `APPROVED` → `FLAGGED` abaixo de 3; `FLAGGED`
 recupera aos 5. `REJECTED` não muda automaticamente.
+
+#### GET /parking/moderation
+Fila de moderação do admin: contribuições de contas novas (`requiresReview`) ainda pendentes/sinalizadas. Requer role `ADMIN`.
+
+#### GET /parking/suggestions?status=PENDING
+Lista sugestões da comunidade (admin). `status`: `PENDING` | `APPROVED` | `REJECTED`.
+
+#### POST /parking/suggestions/:id/decide
+Decisão do admin sobre uma sugestão. `{ "action": "APPROVE" | "REJECT", "reason"?: string }`. Aprovar aplica o diff ao parque (volta a `PENDING`).
+
+#### GET /user/me/stats
+Estatísticas de contribuições do utilizador autenticado:
+`total`, `approved`, `pending`, `rejected`, `flagged`, `approvedRate`, `avgTrustApproved`, `votesGiven`, `votesReceivedUp`, `votesReceivedDown` e `reputation` (`score` 0-10, `isTrusted`, `isNew`, `voteWeight`).
 
 #### POST /parking/:id/moderate
 Moderação manual (requer role `ADMIN` + CSRF).
@@ -225,6 +280,8 @@ All errors follow this format:
 - `401 Unauthorized`: Missing or invalid authentication
 - `403 Forbidden`: Insufficient permissions
 - `404 Not Found`: Resource not found
+- `409 Conflict`: Duplicate resource
+- `429 Too Many Requests`: Daily contribution/vote limit reached
 - `500 Internal Server Error`: Server error
 
 ## Rate Limiting

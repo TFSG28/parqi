@@ -62,7 +62,7 @@ function MapScene({ className }: { className?: string }) {
       <path
         d="M14 330 H96 V196 H222 V108"
         fill="none"
-        stroke="#f2a116"
+        stroke="#ff7a00"
         strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -70,7 +70,7 @@ function MapScene({ className }: { className?: string }) {
       />
       {/* destino: sinal P */}
       <g transform="translate(222 108)">
-        <circle r="30" fill="#f2a116" opacity="0.25" />
+        <circle r="30" fill="#ff7a00" opacity="0.25" />
         <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#ffffff" />
         <text
           y="12"
@@ -78,7 +78,7 @@ function MapScene({ className }: { className?: string }) {
           fontFamily="var(--font-display)"
           fontWeight="800"
           fontSize="34"
-          fill="#272ef5"
+          fill="#3b6bff"
         >
           P
         </text>

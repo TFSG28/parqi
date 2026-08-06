@@ -38,7 +38,12 @@ export class ModerateParkingUseCase {
             input.reason ?? null
         );
 
-        const updated = await this.parkingRepository.update(input.parkingSpotId, { status, trustScore });
+        // Decisão tomada: sai da fila de revisão manual
+        const updated = await this.parkingRepository.update(input.parkingSpotId, {
+            status,
+            trustScore,
+            requiresReview: false,
+        });
         if (!updated) {
             throw new ParkingNotFoundError();
         }

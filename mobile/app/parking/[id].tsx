@@ -19,9 +19,20 @@ import { TrustBar } from '../../src/components/TrustBar';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
-import { CAPACITY_LABELS, directionsUrl, TYPE_META } from '../../src/lib/geo';
+import { CAPACITY_LABELS, directionsUrl, SOURCE_META, TYPE_META } from '../../src/lib/geo';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot } from '../../src/types/parking';
+
+const DETAIL_ROWS: {
+    key: 'hasPregnantSpaces' | 'hasDisabledSpaces' | 'hasEvCharging' | 'isCovered';
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+    { key: 'hasPregnantSpaces', label: 'Lugares para grávidas', icon: 'woman' },
+    { key: 'hasDisabledSpaces', label: 'Mobilidade reduzida', icon: 'accessibility' },
+    { key: 'hasEvCharging', label: 'Carregamento elétrico', icon: 'flash' },
+    { key: 'isCovered', label: 'Coberto', icon: 'umbrella' },
+];
 
 export default function ParkingDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -96,6 +107,11 @@ export default function ParkingDetailScreen() {
         }
     };
 
+    const openSuggest = () => {
+        if (!requireAuth()) return;
+        router.push(`/suggest/${spot!.id}`);
+    };
+
     if (loading) {
         return (
             <View style={styles.center}>
@@ -116,15 +132,22 @@ export default function ParkingDetailScreen() {
     }
 
     const type = TYPE_META[spot.parkingType];
+    const source = SOURCE_META[spot.source];
+    const isOwner = user?.id === spot.contributorId;
     // Leaflet usa pares [lat, lng]; o GeoJSON vem [lng, lat]
     const polygonRing: [number, number][] =
         spot.geometry?.type === 'Polygon'
             ? spot.geometry.coordinates[0].map((c) => [c[1], c[0]] as [number, number])
             : [];
+    const linePoints: [number, number][] =
+        spot.geometry?.type === 'LineString'
+            ? spot.geometry.coordinates.map((c) => [c[1], c[0]] as [number, number])
+            : [];
     const mapCenter = {
         latitude: spot.latitude ?? 41.4426,
         longitude: spot.longitude ?? -8.2914,
     };
+    const knownDetails = DETAIL_ROWS.filter((row) => spot[row.key] === true);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -135,7 +158,16 @@ export default function ParkingDetailScreen() {
                 </View>
                 <View style={styles.headerText}>
                     <Text style={styles.name}>{spot.name}</Text>
-                    <Text style={styles.typeLabel}>{type.label}</Text>
+                    <View style={styles.metaRow}>
+                        <Text style={styles.typeLabel}>{type.label}</Text>
+                        <View style={[styles.sourceBadge, { backgroundColor: source.color + '1A' }]}>
+                            <Ionicons name={source.icon} size={11} color={source.color} />
+                            <Text style={[styles.sourceLabel, { color: source.color }]}>{source.label}</Text>
+                        </View>
+                    </View>
+                    {spot.requiresReview && (
+                        <Text style={styles.reviewHint}>A aguardar revisão manual</Text>
+                    )}
                 </View>
                 <StatusBadge status={spot.status} />
             </View>
@@ -159,12 +191,17 @@ export default function ParkingDetailScreen() {
                         {spot.isFree === true ? 'Gratuito' : spot.isFree === false ? 'Pago' : 'Custo desconhecido'}
                     </Text>
                 </View>
-                <View style={styles.detailRow}>
-                    <Ionicons name="location" size={18} color={colors.textMuted} />
-                    <Text style={styles.detailText}>
-                        {spot.latitude !== null ? `${spot.latitude.toFixed(5)}, ${spot.longitude?.toFixed(5)}` : 'Sem coordenadas'}
-                    </Text>
-                </View>
+                {knownDetails.length > 0 && (
+                    <View style={styles.detailsDivider}>
+                        {knownDetails.map((row) => (
+                            <View key={row.key} style={styles.detailRow}>
+                                <Ionicons name={row.icon} size={18} color={colors.success} />
+                                <Text style={styles.detailText}>{row.label}</Text>
+                                <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                            </View>
+                        ))}
+                    </View>
+                )}
                 {spot.description ? (
                     <Text style={styles.description}>{spot.description}</Text>
                 ) : null}
@@ -177,6 +214,7 @@ export default function ParkingDetailScreen() {
                     zoom={16}
                     interactive={false}
                     polygon={polygonRing}
+                    polyline={linePoints}
                     markers={
                         spot.latitude !== null && spot.longitude !== null
                             ? [{ id: spot.id, latitude: spot.latitude, longitude: spot.longitude, color: type.color }]
@@ -201,6 +239,14 @@ export default function ParkingDetailScreen() {
                     <Text style={styles.routeText}>Rota</Text>
                 </Pressable>
             </View>
+
+            {/* Complementar informação */}
+            <Pressable style={styles.suggestButton} onPress={openSuggest}>
+                <Ionicons name={isOwner ? 'create-outline' : 'git-compare-outline'} size={18} color={colors.primary} />
+                <Text style={styles.suggestText}>
+                    {isOwner ? 'Editar este estacionamento' : 'Sugerir alteração ou informação'}
+                </Text>
+            </Pressable>
             {!user && (
                 <Text style={styles.authHint}>Inicia sessão para votar ou adicionar estacionamentos.</Text>
             )}
@@ -278,16 +324,39 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     headerText: {
         flex: 1,
-        gap: 2,
+        gap: 4,
     },
     name: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.text,
     },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
     typeLabel: {
         fontSize: 13,
         color: colors.textMuted,
+    },
+    sourceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 999,
+    },
+    sourceLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    reviewHint: {
+        fontSize: 11,
+        color: colors.accent,
+        fontWeight: '600',
     },
     card: {
         backgroundColor: colors.card,
@@ -306,6 +375,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 14,
         color: colors.text,
         flex: 1,
+    },
+    detailsDivider: {
+        gap: 8,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        paddingTop: 10,
     },
     description: {
         fontSize: 14,
@@ -373,6 +448,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     routeText: {
         color: colors.onAccent,
         fontWeight: '700',
+    },
+    suggestButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 13,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.primary,
+        backgroundColor: colors.card,
+    },
+    suggestText: {
+        color: colors.primary,
+        fontWeight: '600',
     },
     authHint: {
         textAlign: 'center',

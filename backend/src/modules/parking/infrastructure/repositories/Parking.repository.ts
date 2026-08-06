@@ -6,6 +6,7 @@ import type {
     IParkingRepository,
     ParkingListFilters,
     UpdateParkingRepositoryData,
+    UserContributionStats,
 } from '../../domain/repositories/IParking.repository';
 import type {
     ContributionStatus,
@@ -27,10 +28,15 @@ const SPOT_SELECT = {
     parkingType: true,
     capacityRange: true,
     isFree: true,
+    hasPregnantSpaces: true,
+    hasDisabledSpaces: true,
+    hasEvCharging: true,
+    isCovered: true,
     source: true,
     externalId: true,
     status: true,
     trustScore: true,
+    requiresReview: true,
     duplicateOfId: true,
     contributorId: true,
     createdAt: true,
@@ -56,10 +62,15 @@ function toEntity(row: SpotRow): ParkingSpotEntity {
         parkingType: row.parkingType,
         capacityRange: row.capacityRange,
         isFree: row.isFree,
+        hasPregnantSpaces: row.hasPregnantSpaces,
+        hasDisabledSpaces: row.hasDisabledSpaces,
+        hasEvCharging: row.hasEvCharging,
+        isCovered: row.isCovered,
         source: row.source,
         externalId: row.externalId,
         status: row.status,
         trustScore: row.trustScore,
+        requiresReview: row.requiresReview,
         duplicateOfId: row.duplicateOfId,
         contributorId: row.contributorId,
         createdAt: row.createdAt,
@@ -67,7 +78,7 @@ function toEntity(row: SpotRow): ParkingSpotEntity {
     };
 }
 
-/** Escreve a geometria (point/polygon) nas colunas PostGIS e atualiza lat/lng. */
+/** Escreve a geometria (point/polygon/line) nas colunas PostGIS e atualiza lat/lng. */
 async function applyGeometry(
     tx: GeometryTransaction,
     id: string,
@@ -79,6 +90,7 @@ async function applyGeometry(
             UPDATE "ParkingSpot"
             SET "geom" = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326),
                 "boundary" = NULL,
+                "path" = NULL,
                 "latitude" = ${latitude},
                 "longitude" = ${longitude}
             WHERE "id" = ${id}
@@ -88,18 +100,47 @@ async function applyGeometry(
 
     const geojson = JSON.stringify(geometry);
     // Validação no PostGIS: polígonos auto-intersecionados/degenerados dariam 500
-    // na coluna geometry(Polygon,4326) - rejeitamos com 400 ("não há lixo na BD").
-    const validation = await tx.$queryRaw<{ valid: boolean; hasArea: boolean }[]>`
+    // na coluna geometry(...,4326) - rejeitamos com 400 ("não há lixo na BD").
+    const validation = await tx.$queryRaw<{ valid: boolean; simple: boolean; hasArea: boolean; length: number }[]>`
         SELECT ST_IsValid(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))) AS valid,
-               ST_Area(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))) > 0 AS "hasArea"
+               ST_IsSimple(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))) AS simple,
+               ST_Area(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))) > 0 AS "hasArea",
+               ST_Length(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))::geography) AS length
     `;
-    if (!validation[0]?.valid || !validation[0]?.hasArea) {
-        throw new InvalidParkingActionError('Polígono inválido (auto-intersecionado ou sem área)');
+    if (!validation[0]?.valid) {
+        throw new InvalidParkingActionError('Geometria inválida (auto-intersecionada ou degenerada)');
+    }
+    if (geometry.type === 'Polygon' && !validation[0]?.hasArea) {
+        throw new InvalidParkingActionError('Polígono inválido (sem área)');
+    }
+    if (geometry.type === 'LineString') {
+        if (!validation[0]?.simple) {
+            throw new InvalidParkingActionError('A linha não pode cruzar-se a si própria');
+        }
+        // ST_Length numa geometria 4326 devolve graus; ::geography devolve metros.
+        const lengthMeters = (validation[0]?.length ?? 0);
+        if (lengthMeters < 3) {
+            throw new InvalidParkingActionError('A linha é demasiado curta (mínimo 3 metros)');
+        }
+        if (lengthMeters > 2000) {
+            throw new InvalidParkingActionError('A linha é demasiado longa (máximo 2 km)');
+        }
+        await tx.$executeRaw`
+            UPDATE "ParkingSpot"
+            SET "path" = ST_Force2D(ST_GeomFromGeoJSON(${geojson})),
+                "boundary" = NULL,
+                "geom" = ST_PointOnSurface(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))),
+                "latitude" = ST_Y(ST_PointOnSurface(ST_Force2D(ST_GeomFromGeoJSON(${geojson})))),
+                "longitude" = ST_X(ST_PointOnSurface(ST_Force2D(ST_GeomFromGeoJSON(${geojson}))))
+            WHERE "id" = ${id}
+        `;
+        return;
     }
 
     await tx.$executeRaw`
         UPDATE "ParkingSpot"
         SET "boundary" = sub.boundary,
+            "path" = NULL,
             "geom" = ST_PointOnSurface(sub.boundary),
             "latitude" = ST_Y(ST_PointOnSurface(sub.boundary)),
             "longitude" = ST_X(ST_PointOnSurface(sub.boundary))
@@ -118,14 +159,19 @@ export class ParkingRepository implements IParkingRepository {
                 data: {
                     name: data.name,
                     description: data.description,
-                    geometryType: data.geometry.type === 'Point' ? 'POINT' : 'POLYGON',
+                    geometryType: data.geometry.type === 'Point' ? 'POINT' : data.geometry.type === 'LineString' ? 'LINE' : 'POLYGON',
                     parkingType: data.parkingType,
                     capacityRange: data.capacityRange,
                     isFree: data.isFree,
+                    hasPregnantSpaces: data.hasPregnantSpaces ?? null,
+                    hasDisabledSpaces: data.hasDisabledSpaces ?? null,
+                    hasEvCharging: data.hasEvCharging ?? null,
+                    isCovered: data.isCovered ?? null,
                     source: data.source,
                     externalId: data.externalId ?? null,
                     status: data.status,
                     trustScore: data.trustScore,
+                    requiresReview: data.requiresReview ?? false,
                     contributorId: data.contributorId ?? null,
                     latitude: null,
                     longitude: null,
@@ -193,6 +239,12 @@ export class ParkingRepository implements IParkingRepository {
         if (filters.parkingType) {
             conditions.push(Prisma.sql`"parkingType" = ${filters.parkingType}`);
         }
+        if (filters.source) {
+            conditions.push(Prisma.sql`"source" = ${filters.source}`);
+        }
+        if (filters.requiresReview !== undefined) {
+            conditions.push(Prisma.sql`"requiresReview" = ${filters.requiresReview}`);
+        }
 
         const where = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
         const skip = (filters.page - 1) * filters.limit;
@@ -214,6 +266,7 @@ export class ParkingRepository implements IParkingRepository {
             const geoRows = await prisma.$queryRaw<{ id: string; geojson: string | null }[]>`
                 SELECT "id", COALESCE(
                     CASE WHEN "boundary" IS NOT NULL THEN ST_AsGeoJSON("boundary") END,
+                    CASE WHEN "path" IS NOT NULL THEN ST_AsGeoJSON("path") END,
                     CASE WHEN "geom" IS NOT NULL THEN ST_AsGeoJSON("geom") END
                 ) AS "geojson"
                 FROM "ParkingSpot"
@@ -241,6 +294,7 @@ export class ParkingRepository implements IParkingRepository {
         const rows = await prisma.$queryRaw<{ geojson: string | null }[]>`
             SELECT COALESCE(
                 CASE WHEN "boundary" IS NOT NULL THEN ST_AsGeoJSON("boundary") END,
+                CASE WHEN "path" IS NOT NULL THEN ST_AsGeoJSON("path") END,
                 CASE WHEN "geom" IS NOT NULL THEN ST_AsGeoJSON("geom") END
             ) AS "geojson"
             FROM "ParkingSpot"
@@ -270,8 +324,17 @@ export class ParkingRepository implements IParkingRepository {
                         ...(rest.parkingType !== undefined && { parkingType: rest.parkingType }),
                         ...(rest.capacityRange !== undefined && { capacityRange: rest.capacityRange }),
                         ...(rest.isFree !== undefined && { isFree: rest.isFree }),
+                        ...(rest.hasPregnantSpaces !== undefined && {
+                            hasPregnantSpaces: rest.hasPregnantSpaces,
+                        }),
+                        ...(rest.hasDisabledSpaces !== undefined && {
+                            hasDisabledSpaces: rest.hasDisabledSpaces,
+                        }),
+                        ...(rest.hasEvCharging !== undefined && { hasEvCharging: rest.hasEvCharging }),
+                        ...(rest.isCovered !== undefined && { isCovered: rest.isCovered }),
                         ...(rest.trustScore !== undefined && { trustScore: rest.trustScore }),
                         ...(rest.status !== undefined && { status: rest.status }),
+                        ...(rest.requiresReview !== undefined && { requiresReview: rest.requiresReview }),
                     },
                 });
             }
@@ -290,7 +353,7 @@ export class ParkingRepository implements IParkingRepository {
     async getVote(userId: string, parkingSpotId: string): Promise<ParkingVoteEntity | null> {
         const vote = await prisma.parkingVote.findUnique({
             where: { userId_parkingSpotId: { userId, parkingSpotId } },
-            select: { id: true, value: true, reason: true, createdAt: true },
+            select: { id: true, value: true, reason: true, weight: true, createdAt: true },
         });
         return vote ? { ...vote, value: vote.value as 1 | -1 } : null;
     }
@@ -299,21 +362,22 @@ export class ParkingRepository implements IParkingRepository {
         userId: string,
         parkingSpotId: string,
         value: 1 | -1,
-        reason: string | null
+        reason: string | null,
+        weight = 1
     ): Promise<ParkingVoteEntity> {
         const vote = await prisma.parkingVote.upsert({
             where: { userId_parkingSpotId: { userId, parkingSpotId } },
-            create: { userId, parkingSpotId, value, reason },
-            update: { value, reason },
-            select: { id: true, value: true, reason: true, createdAt: true },
+            create: { userId, parkingSpotId, value, reason, weight },
+            update: { value, reason, weight },
+            select: { id: true, value: true, reason: true, weight: true, createdAt: true },
         });
         return { ...vote, value: vote.value as 1 | -1 };
     }
 
     async getVoteSummary(parkingSpotId: string): Promise<{ upvotes: number; downvotes: number }> {
         const rows = await prisma.$queryRaw<{ upvotes: number; downvotes: number }[]>`
-            SELECT COUNT(*) FILTER (WHERE "value" = 1)::int AS upvotes,
-                   COUNT(*) FILTER (WHERE "value" = -1)::int AS downvotes
+            SELECT COALESCE(SUM("weight") FILTER (WHERE "value" = 1), 0)::float AS upvotes,
+                   COALESCE(SUM("weight") FILTER (WHERE "value" = -1), 0)::float AS downvotes
             FROM "ParkingVote"
             WHERE "parkingSpotId" = ${parkingSpotId}
         `;
@@ -330,6 +394,55 @@ export class ParkingRepository implements IParkingRepository {
         await prisma.moderationLog.create({
             data: { parkingSpotId, moderatorId, action, reason },
         });
+    }
+
+    async countUserContributionsSince(userId: string, since: Date): Promise<number> {
+        return prisma.parkingSpot.count({
+            where: { contributorId: userId, createdAt: { gte: since } },
+        });
+    }
+
+    async countUserVotesSince(userId: string, since: Date): Promise<number> {
+        return prisma.parkingVote.count({
+            where: { userId, createdAt: { gte: since } },
+        });
+    }
+
+    async getContributorStats(userId: string): Promise<UserContributionStats> {
+        const [byStatus, received, votesGiven, avgTrust] = await Promise.all([
+            prisma.parkingSpot.groupBy({
+                by: ['status'],
+                where: { contributorId: userId },
+                _count: { _all: true },
+            }),
+            prisma.$queryRaw<{ upvotes: number; downvotes: number }[]>`
+                SELECT COALESCE(COUNT(*) FILTER (WHERE v."value" = 1), 0)::int AS upvotes,
+                       COALESCE(COUNT(*) FILTER (WHERE v."value" = -1), 0)::int AS downvotes
+                FROM "ParkingVote" v
+                INNER JOIN "ParkingSpot" s ON s."id" = v."parkingSpotId"
+                WHERE s."contributorId" = ${userId} AND v."userId" <> ${userId}
+            `,
+            prisma.parkingVote.count({ where: { userId } }),
+            prisma.parkingSpot.aggregate({
+                where: { contributorId: userId, status: 'APPROVED' },
+                _avg: { trustScore: true },
+            }),
+        ]);
+
+        const count = (status: string) =>
+            byStatus.find((row) => row.status === status)?._count._all ?? 0;
+
+        return {
+            total: byStatus.reduce((acc, row) => acc + row._count._all, 0),
+            approved: count('APPROVED'),
+            pending: count('PENDING'),
+            rejected: count('REJECTED'),
+            flagged: count('FLAGGED'),
+            votesReceivedUp: received[0]?.upvotes ?? 0,
+            votesReceivedDown: received[0]?.downvotes ?? 0,
+            votesGiven,
+            avgTrustApproved: Math.round((avgTrust._avg.trustScore ?? 0) * 10) / 10,
+        };
     }
 
     private async findByIds(ids: string[]): Promise<ParkingSpotEntity[]> {

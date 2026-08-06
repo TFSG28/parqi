@@ -21,6 +21,7 @@ async function main() {
             password: hashedPassword,
             role: 'ADMIN',
             isActive: true,
+            emailVerified: true,
         },
     });
 
@@ -35,6 +36,7 @@ async function main() {
             password: hashedPassword,
             role: 'USER',
             isActive: true,
+            emailVerified: true,
         },
     });
 

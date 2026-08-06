@@ -2,11 +2,14 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import type {
+    ContributorStats,
     Geometry,
     LoginResult,
     ParkingSpot,
+    ParkingSuggestion,
     ParkingType,
     CapacityRange,
+    SuggestResult,
     User,
 } from '../types/parking';
 
@@ -117,6 +120,27 @@ export interface CreateParkingInput {
     parkingType: ParkingType;
     capacityRange?: CapacityRange;
     isFree?: boolean;
+    hasPregnantSpaces?: boolean;
+    hasDisabledSpaces?: boolean;
+    hasEvCharging?: boolean;
+    isCovered?: boolean;
+}
+
+/** Campos editáveis de um parque (edição própria ou sugestão à comunidade). */
+export interface SpotFields {
+    name?: string;
+    description?: string | null;
+    parkingType?: ParkingType;
+    capacityRange?: CapacityRange | null;
+    isFree?: boolean | null;
+    hasPregnantSpaces?: boolean | null;
+    hasDisabledSpaces?: boolean | null;
+    hasEvCharging?: boolean | null;
+    isCovered?: boolean | null;
+}
+
+export interface SuggestInput extends SpotFields {
+    reason?: string;
 }
 
 export const authApi = {
@@ -132,6 +156,9 @@ export const authApi = {
             // limpeza local independente do resultado
         }
     },
+    verifyEmail: (code: string) =>
+        api.post<{ emailVerified: true }>('/auth/verify-email', { code }),
+    resendCode: () => api.post<{ resentAt: string; waitSeconds: number }>('/auth/resend-code'),
 };
 
 export const parkingApi = {
@@ -139,6 +166,19 @@ export const parkingApi = {
         api.get<ParkingSpot[]>(`/parking?bbox=${encodeURIComponent(bbox)}&limit=100`),
     get: (id: string) => api.get<ParkingSpot>(`/parking/${id}`),
     create: (data: CreateParkingInput) => api.post<ParkingSpot>('/parking', data),
+    update: (id: string, data: SpotFields) => api.patch<ParkingSpot>(`/parking/${id}`, data),
     vote: (id: string, value: 1 | -1, reason?: string) =>
         api.post<ParkingSpot>(`/parking/${id}/vote`, { value, reason }),
+    suggest: (id: string, data: SuggestInput) =>
+        api.post<SuggestResult>(`/parking/${id}/suggest`, data),
+    stats: () => api.get<ContributorStats>('/user/me/stats'),
+    // Admin
+    moderationQueue: (page = 1, limit = 50) =>
+        api.get<ParkingSpot[]>(`/parking/moderation?page=${page}&limit=${limit}`),
+    moderate: (id: string, action: 'APPROVE' | 'REJECT', reason?: string) =>
+        api.post<ParkingSpot>(`/parking/${id}/moderate`, { action, reason }),
+    listSuggestions: (status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING', page = 1, limit = 50) =>
+        api.get<ParkingSuggestion[]>(`/parking/suggestions?status=${status}&page=${page}&limit=${limit}`),
+    decideSuggestion: (id: string, action: 'APPROVE' | 'REJECT', reason?: string) =>
+        api.post<ParkingSuggestion>(`/parking/suggestions/${id}/decide`, { action, reason }),
 };

@@ -49,6 +49,9 @@ describe('OverpassImporter', () => {
             upsertVote: vi.fn(),
             getVoteSummary: vi.fn(),
             createModerationLog: vi.fn(),
+            countUserContributionsSince: vi.fn(),
+            countUserVotesSince: vi.fn(),
+            getContributorStats: vi.fn(),
         } as unknown as IParkingRepository;
 
         vi.mocked(mockRepository.findByExternalId).mockResolvedValue(null);
@@ -63,10 +66,15 @@ describe('OverpassImporter', () => {
             parkingType: 'OTHER',
             capacityRange: null,
             isFree: null,
+            hasPregnantSpaces: null,
+            hasDisabledSpaces: null,
+            hasEvCharging: null,
+            isCovered: null,
             source: 'OVERPASS',
             externalId: '',
             status: 'APPROVED',
             trustScore: 6,
+            requiresReview: false,
             duplicateOfId: null,
             contributorId: null,
             createdAt: new Date(),

@@ -4,6 +4,8 @@ import { randomBytes } from 'node:crypto';
 import { AUTH_TOKENS } from '../../../../shared/container/tokens/auth.tokens';
 import { LoginUseCase } from '../../application/usecases/Login.usecase';
 import { GetCurrentUserUseCase } from '../../application/usecases/GetCurrentUser.usecase';
+import { VerifyEmailUseCase } from '../../application/usecases/VerifyEmail.usecase';
+import { ResendCodeUseCase } from '../../application/usecases/ResendCode.usecase';
 import { IJwtService } from '../../domain/services/IJwt.service';
 import { asyncHandler } from '../../../../shared/utils/async-handler';
 import { ApiResponse } from '../../../../shared/utils/api-response';
@@ -21,6 +23,8 @@ export class AuthController {
     constructor(
         @inject(AUTH_TOKENS.LoginUseCase) private readonly loginUseCase: LoginUseCase,
         @inject(AUTH_TOKENS.GetCurrentUserUseCase) private readonly getCurrentUserUseCase: GetCurrentUserUseCase,
+        @inject(AUTH_TOKENS.VerifyEmailUseCase) private readonly verifyEmailUseCase: VerifyEmailUseCase,
+        @inject(AUTH_TOKENS.ResendCodeUseCase) private readonly resendCodeUseCase: ResendCodeUseCase,
         @inject(AUTH_TOKENS.IJwtService) private readonly jwtService: IJwtService
     ) {}
 
@@ -48,6 +52,21 @@ export class AuthController {
     me = asyncHandler(async (req: Request, res: Response) => {
         const user = await this.getCurrentUserUseCase.execute(req.user!.userId);
         return ApiResponse.success(res, user);
+    });
+
+    /** Valida o email com o código de 6 dígitos recebido. */
+    verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.verifyEmailUseCase.execute({
+            userId: req.user!.userId,
+            code: req.body.code,
+        });
+        return ApiResponse.success(res, result);
+    });
+
+    /** Reenvia o código de verificação (máx. 1 por minuto). */
+    resendCode = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.resendCodeUseCase.execute({ userId: req.user!.userId });
+        return ApiResponse.success(res, result);
     });
 
     // Re-issues the access token + CSRF token while the current session is still

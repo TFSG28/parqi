@@ -120,6 +120,10 @@ export class OverpassImporter implements IOverpassImporter {
             parkingType: this.mapParkingType(tags.parking),
             capacityRange: this.mapCapacity(tags.capacity),
             isFree: this.mapIsFree(tags.fee),
+            hasPregnantSpaces: this.mapBooleanTag(tags['capacity:pregnant']),
+            hasDisabledSpaces: this.mapBooleanTag(tags['capacity:disabled']),
+            hasEvCharging: tags.charging_station === 'yes' ? true : null,
+            isCovered: this.mapBooleanTag(tags.covered),
         };
     }
 
@@ -177,6 +181,17 @@ export class OverpassImporter implements IOverpassImporter {
     private mapIsFree(fee?: string): boolean | null {
         if (fee === 'no') return true;
         if (fee === 'yes') return false;
+        return null;
+    }
+
+    /** Mapeia tags como "covered=yes/no" ou "capacity:disabled=2" para booleano. */
+    private mapBooleanTag(value?: string): boolean | null {
+        if (!value) return null;
+        const v = value.trim().toLowerCase();
+        if (v === 'no' || v === '0' || v === 'false') return false;
+        if (v === 'yes' || v === '1' || v === 'true') return true;
+        // número positivo (ex.: capacity:disabled=4) conta como "tem"
+        if (/^\d+$/.test(v) && Number.parseInt(v, 10) > 0) return true;
         return null;
     }
 

@@ -15,10 +15,15 @@ function makeSpot(overrides: Partial<ParkingSpotEntity> = {}): ParkingSpotEntity
         parkingType: 'SURFACE',
         capacityRange: null,
         isFree: null,
+        hasPregnantSpaces: null,
+        hasDisabledSpaces: null,
+        hasEvCharging: null,
+        isCovered: null,
         source: 'COMMUNITY',
         externalId: null,
         status: 'FLAGGED',
         trustScore: 1.5,
+        requiresReview: true,
         duplicateOfId: null,
         contributorId: 'user-2',
         createdAt: new Date(),
@@ -45,6 +50,9 @@ describe('ModerateParkingUseCase', () => {
             upsertVote: vi.fn(),
             getVoteSummary: vi.fn(),
             createModerationLog: vi.fn(),
+            countUserContributionsSince: vi.fn(),
+            countUserVotesSince: vi.fn(),
+            getContributorStats: vi.fn(),
         } as unknown as IParkingRepository;
 
         useCase = new ModerateParkingUseCase(mockRepository);
@@ -63,7 +71,7 @@ describe('ModerateParkingUseCase', () => {
 
         expect(mockRepository.update).toHaveBeenCalledWith(
             'spot-1',
-            expect.objectContaining({ status: 'APPROVED', trustScore: 5 })
+            expect.objectContaining({ status: 'APPROVED', trustScore: 5, requiresReview: false })
         );
         expect(mockRepository.createModerationLog).toHaveBeenCalledWith(
             'spot-1',

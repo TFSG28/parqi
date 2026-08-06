@@ -9,6 +9,8 @@ interface AuthContextValue {
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
+    verifyEmail: (code: string) => Promise<void>;
+    resendCode: () => Promise<number>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -49,9 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     }, []);
 
+    /** Valida o email com o código de 6 dígitos recebido. */
+    const verifyEmail = useCallback(async (code: string) => {
+        await authApi.verifyEmail(code);
+        setUser((current) => (current ? { ...current, emailVerified: true } : current));
+    }, []);
+
+    /** Reenvia o código; devolve os segundos a aguardar até ao próximo envio. */
+    const resendCode = useCallback(async (): Promise<number> => {
+        const result = await authApi.resendCode();
+        return result.waitSeconds ?? 0;
+    }, []);
+
     const value = useMemo(
-        () => ({ user, loading, login, register, logout }),
-        [user, loading, login, register, logout]
+        () => ({ user, loading, login, register, logout, verifyEmail, resendCode }),
+        [user, loading, login, register, logout, verifyEmail, resendCode]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

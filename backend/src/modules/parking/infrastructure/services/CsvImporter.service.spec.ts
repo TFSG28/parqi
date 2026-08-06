@@ -42,6 +42,9 @@ describe('CsvImporter', () => {
             upsertVote: vi.fn(),
             getVoteSummary: vi.fn(),
             createModerationLog: vi.fn(),
+            countUserContributionsSince: vi.fn(),
+            countUserVotesSince: vi.fn(),
+            getContributorStats: vi.fn(),
         } as unknown as IParkingRepository;
 
         vi.mocked(mockRepository.findByExternalId).mockResolvedValue(null);

@@ -6,7 +6,11 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
  * Mapa OpenStreetMap via Leaflet num WebView.
  * Substitui o react-native-maps enquanto o Google Maps não funciona no Expo Go
  * (o SDK Google renderiza preto em alguns dispositivos com a chave partilhada).
+ *
+ * Suporta várias camadas de tiles: Padrão, Satélite, Dark, Light e Topo.
  */
+
+export type MapLayer = 'standard' | 'satellite' | 'dark' | 'light' | 'topo';
 
 export interface OsmMarker {
     id: string;
@@ -31,14 +35,49 @@ interface OsmMapProps {
     cluster?: boolean;
     /** Anel do polígono, pares [latitude, longitude]. */
     polygon?: [number, number][];
+    /** Linha de estacionamento na via (estacionamento ao longo da estrada). */
+    polyline?: [number, number][];
     userLocation?: { latitude: number; longitude: number } | null;
     interactive?: boolean;
+    /** Camada de tiles (default: Padrão/OSM). */
+    layer?: MapLayer;
     onMarkerPress?: (id: string) => void;
     onMapPress?: (coordinate: { latitude: number; longitude: number }) => void;
     /** bbox "minLon,minLat,maxLon,maxLat" após mover/zoom. */
     onBoundsChange?: (bbox: string) => void;
     style?: StyleProp<ViewStyle>;
 }
+
+const TILE_PRESETS = {
+    standard: {
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+    satellite: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        maxZoom: 19,
+        attribution:
+            'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    },
+    dark: {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+    light: {
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+    topo: {
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        maxZoom: 19,
+        maxNativeZoom: 17,
+        attribution:
+            'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    },
+} as const;
 
 function buildHtml(
     center: OsmMapProps['center'],
@@ -47,7 +86,9 @@ function buildHtml(
     cluster: boolean,
     markers: OsmMarker[],
     polygon: [number, number][],
-    userLocation: OsmMapProps['userLocation']
+    polyline: [number, number][],
+    userLocation: OsmMapProps['userLocation'],
+    layer: MapLayer
 ): string {
     return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -70,10 +111,22 @@ const map = L.map('map', {
     boxZoom: false,
     keyboard: false,
 }).setView([${center.latitude}, ${center.longitude}], ${zoom});
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-}).addTo(map);
+
+const LAYERS = {
+    standard: { url: '${TILE_PRESETS.standard.url}', maxZoom: ${TILE_PRESETS.standard.maxZoom}, attr: '${TILE_PRESETS.standard.attribution}' },
+    satellite: { url: '${TILE_PRESETS.satellite.url}', maxZoom: ${TILE_PRESETS.satellite.maxZoom}, attr: '${TILE_PRESETS.satellite.attribution}' },
+    dark: { url: '${TILE_PRESETS.dark.url}', maxZoom: ${TILE_PRESETS.dark.maxZoom}, attr: '${TILE_PRESETS.dark.attribution}' },
+    light: { url: '${TILE_PRESETS.light.url}', maxZoom: ${TILE_PRESETS.light.maxZoom}, attr: '${TILE_PRESETS.light.attribution}' },
+    topo: { url: '${TILE_PRESETS.topo.url}', maxZoom: ${TILE_PRESETS.topo.maxZoom}, maxNativeZoom: ${TILE_PRESETS.topo.maxNativeZoom}, attr: '${TILE_PRESETS.topo.attribution}' },
+};
+
+let tile = null;
+function switchLayer(name) {
+    const cfg = LAYERS[name] || LAYERS.standard;
+    if (tile) { map.removeLayer(tile); }
+    tile = L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, maxNativeZoom: cfg.maxNativeZoom || cfg.maxZoom, attribution: cfg.attr, subdomains: 'abc' }).addTo(map);
+}
+switchLayer('${layer}');
 
 function pinIcon(m) {
     const text = m.textColor || '#FFFFFF';
@@ -104,7 +157,7 @@ const markerLayer = ${cluster}
               const size = n < 10 ? 38 : n < 100 ? 44 : 52;
               return L.divIcon({
                   className: 'parqi-cluster',
-                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#272EF5;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
+                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#3B6BFF;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
                   iconSize: [size, size],
               });
           },
@@ -113,6 +166,7 @@ const markerLayer = ${cluster}
 markerLayer.addTo(map);
 
 let poly = null;
+let line = null;
 let userDot = null;
 
 function post(payload) {
@@ -134,7 +188,14 @@ function updateMarkers(list) {
 function setPolygon(ring) {
     if (poly) { poly.remove(); poly = null; }
     if (ring && ring.length > 1) {
-        poly = L.polygon(ring, { color: '#272EF5', weight: 2, fillColor: '#272EF5', fillOpacity: 0.2 }).addTo(map);
+        poly = L.polygon(ring, { color: '#3B6BFF', weight: 2, fillColor: '#3B6BFF', fillOpacity: 0.2 }).addTo(map);
+    }
+}
+
+function setPolyline(pts) {
+    if (line) { line.remove(); line = null; }
+    if (pts && pts.length > 1) {
+        line = L.polyline(pts, { color: '#FF7A00', weight: 5, opacity: 0.9, dashArray: '1 8', lineCap: 'round' }).addTo(map);
     }
 }
 
@@ -142,7 +203,7 @@ function setUser(u) {
     if (userDot) { userDot.remove(); userDot = null; }
     if (u) {
         userDot = L.circleMarker([u.latitude, u.longitude], {
-            radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#272EF5', fillOpacity: 1,
+            radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#3B6BFF', fillOpacity: 1,
         }).addTo(map);
     }
 }
@@ -159,6 +220,7 @@ if (interactive) {
 
 updateMarkers(${JSON.stringify(markers)});
 setPolygon(${JSON.stringify(polygon)});
+setPolyline(${JSON.stringify(polyline)});
 setUser(${JSON.stringify(userLocation ?? null)});
 </script></body></html>`;
 }
@@ -170,8 +232,10 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
         markers = [],
         cluster = false,
         polygon = [],
+        polyline = [],
         userLocation = null,
         interactive = true,
+        layer = 'standard',
         onMarkerPress,
         onMapPress,
         onBoundsChange,
@@ -181,7 +245,9 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
 ) {
     const webRef = useRef<WebView>(null);
     // HTML construído uma vez; atualizações seguem por injectJavaScript (sem recarregar o mapa)
-    const html = useRef(buildHtml(center, zoom, interactive, cluster, markers, polygon, userLocation)).current;
+    const html = useRef(
+        buildHtml(center, zoom, interactive, cluster, markers, polygon, polyline, userLocation, layer)
+    ).current;
 
     useImperativeHandle(ref, () => ({
         centerOn: (latitude, longitude, z) => {
@@ -190,12 +256,20 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
     }));
 
     useEffect(() => {
+        webRef.current?.injectJavaScript(`switchLayer('${layer}'); true;`);
+    }, [layer]);
+
+    useEffect(() => {
         webRef.current?.injectJavaScript(`updateMarkers(${JSON.stringify(markers)}); true;`);
     }, [markers]);
 
     useEffect(() => {
         webRef.current?.injectJavaScript(`setPolygon(${JSON.stringify(polygon)}); true;`);
     }, [polygon]);
+
+    useEffect(() => {
+        webRef.current?.injectJavaScript(`setPolyline(${JSON.stringify(polyline)}); true;`);
+    }, [polyline]);
 
     useEffect(() => {
         webRef.current?.injectJavaScript(`setUser(${JSON.stringify(userLocation ?? null)}); true;`);

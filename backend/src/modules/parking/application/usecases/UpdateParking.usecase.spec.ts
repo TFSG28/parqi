@@ -5,6 +5,7 @@ import { DuplicateParkingError } from '../../domain/errors/DuplicateParking.erro
 import { InvalidCoordinatesError } from '../../domain/errors/InvalidCoordinates.error';
 import { ForbiddenError } from '../../../../shared/errors/AppError';
 import type { IParkingRepository } from '../../domain/repositories/IParking.repository';
+import type { IUserRepository } from '../../../user/domain/repositories/IUser.repository';
 import type { ParkingSpotEntity } from '../../domain/entities/ParkingSpot.entity';
 
 function makeSpot(overrides: Partial<ParkingSpotEntity> = {}): ParkingSpotEntity {
@@ -18,10 +19,15 @@ function makeSpot(overrides: Partial<ParkingSpotEntity> = {}): ParkingSpotEntity
         parkingType: 'SURFACE',
         capacityRange: null,
         isFree: null,
+        hasPregnantSpaces: null,
+        hasDisabledSpaces: null,
+        hasEvCharging: null,
+        isCovered: null,
         source: 'COMMUNITY',
         externalId: null,
         status: 'APPROVED',
         trustScore: 6,
+        requiresReview: false,
         duplicateOfId: null,
         contributorId: 'user-2',
         createdAt: new Date(),
@@ -33,8 +39,16 @@ function makeSpot(overrides: Partial<ParkingSpotEntity> = {}): ParkingSpotEntity
 describe('UpdateParkingUseCase', () => {
     let useCase: UpdateParkingUseCase;
     let mockRepository: IParkingRepository;
+    let mockUserRepository: IUserRepository;
 
     beforeEach(() => {
+        mockUserRepository = {
+            findById: vi.fn().mockResolvedValue({ id: 'user-2', emailVerified: true }),
+            findByEmail: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn(),
+        } as unknown as IUserRepository;
         mockRepository = {
             create: vi.fn(),
             findById: vi.fn(),
@@ -48,9 +62,29 @@ describe('UpdateParkingUseCase', () => {
             upsertVote: vi.fn(),
             getVoteSummary: vi.fn(),
             createModerationLog: vi.fn(),
+            countUserContributionsSince: vi.fn(),
+            countUserVotesSince: vi.fn(),
+            getContributorStats: vi.fn(),
         } as unknown as IParkingRepository;
 
-        useCase = new UpdateParkingUseCase(mockRepository);
+        useCase = new UpdateParkingUseCase(mockRepository, mockUserRepository);
+    });
+
+    it('bloqueia edição de conta com email não verificado', async () => {
+        vi.mocked(mockUserRepository.findById).mockResolvedValue({
+            id: 'user-2',
+            emailVerified: false,
+        } as never);
+        vi.mocked(mockRepository.findById).mockResolvedValue(makeSpot());
+
+        await expect(
+            useCase.execute({
+                parkingSpotId: 'spot-1',
+                userId: 'user-2',
+                data: { name: 'Novo' },
+            })
+        ).rejects.toThrow(ForbiddenError);
+        expect(mockRepository.update).not.toHaveBeenCalled();
     });
 
     it('não permite que terceiros editem', async () => {

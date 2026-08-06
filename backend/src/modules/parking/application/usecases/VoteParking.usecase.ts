@@ -1,14 +1,21 @@
 import { inject, injectable } from 'tsyringe';
 import { PARKING_TOKENS } from '../../../../shared/container/tokens/parking.tokens';
+import { USER_TOKENS } from '../../../../shared/container/tokens/user.tokens';
+import { IUserRepository } from '../../../user/domain/repositories/IUser.repository';
 import { IParkingRepository } from '../../domain/repositories/IParking.repository';
 import { ITrustCalculator } from '../../domain/services/ITrustCalculator.service';
+import { IReputationService } from '../../domain/services/IReputation.service';
+import { assertEmailVerified } from '../../../auth/application/guards/email-verified.guard';
 import { ParkingSpotEntity } from '../../domain/entities/ParkingSpot.entity';
 import { ParkingNotFoundError } from '../../domain/errors/ParkingNotFound.error';
 import { InvalidParkingActionError } from '../../domain/errors/InvalidParkingAction.error';
+import { TooManyRequestsError } from '../../../../shared/errors/AppError';
+import { CONTRIBUTION_LIMITS } from '../../domain/const';
 
 export interface VoteParkingInput {
     parkingSpotId: string;
     userId: string;
+    userRole?: string;
     value: 1 | -1;
     reason?: string;
 }
@@ -16,6 +23,9 @@ export interface VoteParkingInput {
 /**
  * Voto da comunidade (1 ou -1). Após cada voto, a confiança é recalculada
  * e o TrustCalculator decide a transição de estado (aprovação/flag automática).
+ *  - limite diário de votos (anti-spam)
+ *  - o peso do voto depende da reputação do votante
+ *  - spots em revisão manual (contas novas) nunca auto-aprovam
  */
 @injectable()
 export class VoteParkingUseCase {
@@ -23,10 +33,17 @@ export class VoteParkingUseCase {
         @inject(PARKING_TOKENS.IParkingRepository)
         private readonly parkingRepository: IParkingRepository,
         @inject(PARKING_TOKENS.ITrustCalculator)
-        private readonly trustCalculator: ITrustCalculator
+        private readonly trustCalculator: ITrustCalculator,
+        @inject(PARKING_TOKENS.IReputationService)
+        private readonly reputationService: IReputationService,
+        @inject(USER_TOKENS.IUserRepository)
+        private readonly userRepository: IUserRepository
     ) {}
 
     async execute(input: VoteParkingInput): Promise<ParkingSpotEntity> {
+        // A conta tem de ter o email validado (anti-spam)
+        await assertEmailVerified(this.userRepository, input.userId, input.userRole, 'votar');
+
         const spot = await this.parkingRepository.findById(input.parkingSpotId);
         if (!spot) {
             throw new ParkingNotFoundError();
@@ -38,15 +55,32 @@ export class VoteParkingUseCase {
             throw new InvalidParkingActionError('Não podes votar na tua própria contribuição');
         }
 
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const votesToday = await this.parkingRepository.countUserVotesSince(input.userId, since);
+        if (votesToday >= CONTRIBUTION_LIMITS.maxVotesPerDay) {
+            throw new TooManyRequestsError(
+                `Atingiste o limite diário de ${CONTRIBUTION_LIMITS.maxVotesPerDay} votos. Volta amanhã.`
+            );
+        }
+
+        const reputation = await this.reputationService.getForUser(input.userId);
         await this.parkingRepository.upsertVote(
             input.userId,
             input.parkingSpotId,
             input.value,
-            input.reason ?? null
+            input.reason ?? null,
+            reputation.voteWeight
         );
 
         const summary = await this.parkingRepository.getVoteSummary(input.parkingSpotId);
-        const { trustScore, status } = this.trustCalculator.apply(spot.source, spot.status, summary);
+        const { trustScore, status: computedStatus } = this.trustCalculator.apply(
+            spot.source,
+            spot.status,
+            summary
+        );
+
+        // Em fila de revisão manual: só o admin decide a aprovação
+        const status = spot.requiresReview && computedStatus === 'APPROVED' ? 'PENDING' : computedStatus;
 
         const updated = await this.parkingRepository.update(input.parkingSpotId, { trustScore, status });
         if (!updated) {

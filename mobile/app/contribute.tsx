@@ -16,7 +16,8 @@ import {
     View,
 } from 'react-native';
 import { Chip } from '../src/components/Chip';
-import { OsmMap, type OsmMapHandle } from '../src/components/OsmMap';
+import { MapLayerPicker } from '../src/components/MapLayerPicker';
+import { OsmMap, type MapLayer, type OsmMapHandle } from '../src/components/OsmMap';
 import { useAuth } from '../src/context/AuthContext';
 import { useTheme } from '../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../src/lib/api';
@@ -29,6 +30,8 @@ interface LatLng {
     longitude: number;
 }
 
+type DrawMode = 'point' | 'polygon' | 'line';
+
 const TYPE_OPTIONS: ParkingType[] = ['SURFACE', 'UNDERGROUND', 'MULTI_STORY', 'STREET', 'OTHER'];
 const CAPACITY_OPTIONS: CapacityRange[] = [
     'RANGE_1_5',
@@ -40,21 +43,39 @@ const CAPACITY_OPTIONS: CapacityRange[] = [
 
 const GUIMARAES: LatLng = { latitude: 41.4426, longitude: -8.2914 };
 
+const DETAIL_FIELDS: {
+    key: 'hasPregnantSpaces' | 'hasDisabledSpaces' | 'hasEvCharging' | 'isCovered';
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+    { key: 'hasPregnantSpaces', label: 'Lugares para grávidas', icon: 'woman' },
+    { key: 'hasDisabledSpaces', label: 'Mobilidade reduzida', icon: 'accessibility' },
+    { key: 'hasEvCharging', label: 'Carregamento elétrico', icon: 'flash' },
+    { key: 'isCovered', label: 'Coberto', icon: 'umbrella' },
+];
+
 export default function ContributeScreen() {
     const { user, loading } = useAuth();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const mapRef = useRef<OsmMapHandle>(null);
 
-    const [mode, setMode] = useState<'point' | 'polygon'>('point');
+    const [mode, setMode] = useState<DrawMode>('point');
     const [point, setPoint] = useState<LatLng | null>(null);
     const [vertices, setVertices] = useState<LatLng[]>([]);
+    const [mapLayer, setMapLayer] = useState<MapLayer>('standard');
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [parkingType, setParkingType] = useState<ParkingType>('SURFACE');
     const [capacityRange, setCapacityRange] = useState<CapacityRange | null>(null);
     const [isFree, setIsFree] = useState(false);
+    const [details, setDetails] = useState({
+        hasPregnantSpaces: false,
+        hasDisabledSpaces: false,
+        hasEvCharging: false,
+        isCovered: false,
+    });
     const [submitting, setSubmitting] = useState(false);
 
     // Guarda de autenticação
@@ -82,6 +103,27 @@ export default function ContributeScreen() {
         })();
     }, []);
 
+    // Na via (STREET) desenha-se uma linha ao longo da estrada
+    const selectType = (type: ParkingType) => {
+        setParkingType(type);
+        if (type === 'STREET') {
+            setMode('line');
+        } else if (mode === 'line') {
+            setMode('point');
+            setVertices([]);
+        }
+    };
+
+    const selectMode = (next: DrawMode) => {
+        setMode(next);
+        setVertices([]);
+        if (next === 'line') {
+            setParkingType('STREET');
+        } else if (parkingType === 'STREET') {
+            setParkingType('SURFACE');
+        }
+    };
+
     const handleMapPress = (coordinate: LatLng) => {
         if (mode === 'point') {
             setPoint(coordinate);
@@ -96,6 +138,13 @@ export default function ContributeScreen() {
         if (mode === 'point') {
             if (!point) return null;
             return { type: 'Point', coordinates: [point.longitude, point.latitude] };
+        }
+        if (mode === 'line') {
+            if (vertices.length < 2) return null;
+            return {
+                type: 'LineString',
+                coordinates: vertices.map((v) => [v.longitude, v.latitude] as [number, number]),
+            };
         }
         if (vertices.length < 4) return null;
         const ring = vertices.map((v) => [v.longitude, v.latitude] as [number, number]);
@@ -114,7 +163,9 @@ export default function ContributeScreen() {
                 'Geometria incompleta',
                 mode === 'point'
                     ? 'Toca no mapa para marcar o local.'
-                    : 'Adiciona pelo menos 4 vértices (toca no mapa).'
+                    : mode === 'line'
+                      ? 'Toca no mapa para desenhar a linha ao longo da estrada (2 pontos ou mais).'
+                      : 'Adiciona pelo menos 4 vértices (toca no mapa).'
             );
             return;
         }
@@ -128,10 +179,16 @@ export default function ContributeScreen() {
                 parkingType,
                 capacityRange: capacityRange ?? undefined,
                 isFree,
+                hasPregnantSpaces: details.hasPregnantSpaces || undefined,
+                hasDisabledSpaces: details.hasDisabledSpaces || undefined,
+                hasEvCharging: details.hasEvCharging || undefined,
+                isCovered: details.isCovered || undefined,
             });
             Alert.alert(
                 'Contribuição enviada',
-                'O estacionamento entra em verificação pela comunidade.',
+                parkingType === 'STREET'
+                    ? 'O estacionamento na via entra em verificação pela comunidade.'
+                    : 'O estacionamento entra em verificação pela comunidade.',
                 [{ text: 'OK', onPress: () => router.back() }]
             );
         } catch (error) {
@@ -157,6 +214,7 @@ export default function ContributeScreen() {
     // Leaflet usa pares [lat, lng]
     const polygonRing: [number, number][] =
         vertices.length > 1 ? [...vertices, vertices[0]].map((v) => [v.latitude, v.longitude]) : [];
+    const linePoints: [number, number][] = vertices.map((v) => [v.latitude, v.longitude]);
 
     const mapMarkers =
         mode === 'point'
@@ -171,6 +229,8 @@ export default function ContributeScreen() {
                   kind: 'dot' as const,
               }));
 
+    const minVertices = mode === 'line' ? 2 : 4;
+
     return (
         <KeyboardAvoidingView
             style={styles.flex}
@@ -179,8 +239,9 @@ export default function ContributeScreen() {
             <ScrollView style={styles.container} contentContainerStyle={styles.content}>
                 {/* Seletor de modo */}
                 <View style={styles.modeRow}>
-                    <Chip label="Ponto" selected={mode === 'point'} onPress={() => setMode('point')} />
-                    <Chip label="Polígono (área)" selected={mode === 'polygon'} onPress={() => setMode('polygon')} />
+                    <Chip label="Ponto" selected={mode === 'point'} onPress={() => selectMode('point')} />
+                    <Chip label="Área" selected={mode === 'polygon'} onPress={() => selectMode('polygon')} />
+                    <Chip label="Na via (linha)" selected={mode === 'line'} onPress={() => selectMode('line')} />
                 </View>
 
                 {/* Mapa de desenho */}
@@ -191,11 +252,14 @@ export default function ContributeScreen() {
                         zoom={15}
                         markers={mapMarkers}
                         polygon={mode === 'polygon' ? polygonRing : []}
+                        polyline={mode === 'line' ? linePoints : []}
+                        layer={mapLayer}
                         onMapPress={handleMapPress}
                         style={styles.map}
                     />
+                    <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
 
-                    {mode === 'polygon' && (
+                    {mode !== 'point' && (
                         <View style={styles.polygonControls}>
                             <Pressable
                                 style={[styles.polygonButton, vertices.length === 0 && styles.polygonButtonDisabled]}
@@ -214,17 +278,20 @@ export default function ContributeScreen() {
                                 <Text style={styles.polygonButtonText}>Limpar</Text>
                             </Pressable>
                             <Text style={styles.polygonCount}>
-                                {vertices.length < 4
-                                    ? `${vertices.length}/4 vértices mínimos`
-                                    : `${vertices.length} vértices`}
+                                {vertices.length < minVertices
+                                    ? `${vertices.length}/${minVertices} pontos mínimos`
+                                    : `${vertices.length} pontos`}
                             </Text>
                         </View>
                     )}
-                    {mode === 'point' && (
-                        <View style={styles.pointHint}>
-                            <Text style={styles.pointHintText}>Toca no mapa para marcar ou ajustar a localização.</Text>
-                        </View>
-                    )}
+                    <View style={styles.pointHint}>
+                        <Text style={styles.pointHintText}>
+                            {mode === 'point' && 'Toca no mapa para marcar ou ajustar a localização.'}
+                            {mode === 'polygon' && 'Toca no mapa para adicionar vértices da área.'}
+                            {mode === 'line' &&
+                                'Toca no mapa ao longo da estrada para desenhar a linha de estacionamento.'}
+                        </Text>
+                    </View>
                 </View>
 
                 {/* Formulário */}
@@ -245,7 +312,7 @@ export default function ContributeScreen() {
                             key={type}
                             label={TYPE_META[type].label}
                             selected={parkingType === type}
-                            onPress={() => setParkingType(type)}
+                            onPress={() => selectType(type)}
                         />
                     ))}
                 </View>
@@ -265,6 +332,24 @@ export default function ContributeScreen() {
                 <View style={styles.switchRow}>
                     <Text style={styles.label}>Gratuito</Text>
                     <Switch value={isFree} onValueChange={setIsFree} trackColor={{ true: colors.primary }} />
+                </View>
+
+                {/* Detalhes de acessibilidade e serviços */}
+                <Text style={styles.label}>Detalhes (opcional)</Text>
+                <View style={styles.detailsCard}>
+                    {DETAIL_FIELDS.map((field) => (
+                        <View key={field.key} style={styles.switchRow}>
+                            <View style={styles.detailLabelRow}>
+                                <Ionicons name={field.icon} size={17} color={colors.textMuted} />
+                                <Text style={styles.detailLabel}>{field.label}</Text>
+                            </View>
+                            <Switch
+                                value={details[field.key]}
+                                onValueChange={(value) => setDetails((current) => ({ ...current, [field.key]: value }))}
+                                trackColor={{ true: colors.primary }}
+                            />
+                        </View>
+                    ))}
                 </View>
 
                 <Text style={styles.label}>Descrição (opcional)</Text>
@@ -355,6 +440,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 12,
         color: colors.textMuted,
     },
+    layerPicker: {
+        position: 'absolute',
+        top: 196,
+        right: 8,
+    },
     pointHint: {
         padding: 10,
         backgroundColor: colors.card,
@@ -394,6 +484,24 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         marginTop: 4,
+    },
+    detailsCard: {
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 16,
+        padding: 12,
+        marginTop: 4,
+        gap: 2,
+    },
+    detailLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    detailLabel: {
+        fontSize: 14,
+        color: colors.text,
     },
     submitButton: {
         flexDirection: 'row',

@@ -28,7 +28,19 @@ function ThemedStack() {
                     options={{ title: 'Adicionar estacionamento', presentation: 'modal' }}
                 />
                 <Stack.Screen name="login" options={{ title: 'Entrar', headerBackButtonDisplayMode: 'minimal' }} />
+                <Stack.Screen
+                    name="verify"
+                    options={{ title: 'Confirmar email', headerBackButtonDisplayMode: 'minimal' }}
+                />
                 <Stack.Screen name="account" options={{ title: 'Conta', headerBackButtonDisplayMode: 'minimal' }} />
+                <Stack.Screen
+                    name="suggest/[id]"
+                    options={{ title: 'Sugerir alteração', presentation: 'modal' }}
+                />
+                <Stack.Screen
+                    name="admin"
+                    options={{ title: 'Administração', headerBackButtonDisplayMode: 'minimal' }}
+                />
             </Stack>
         </>
     );

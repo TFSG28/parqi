@@ -4,9 +4,12 @@ export const PARKING_TOKENS = {
     IOverpassImporter: Symbol.for('IOverpassImporter'),
     IGeoapifyImporter: Symbol.for('IGeoapifyImporter'),
     ICsvImporter: Symbol.for('ICsvImporter'),
+    IReputationService: Symbol.for('IReputationService'),
+    IRoadValidator: Symbol.for('IRoadValidator'),
 
     // Repositories
     IParkingRepository: Symbol.for('IParkingRepository'),
+    ISuggestionRepository: Symbol.for('ISuggestionRepository'),
 
     // Use Cases
     CreateParkingUseCase: Symbol.for('CreateParkingUseCase'),
@@ -16,6 +19,11 @@ export const PARKING_TOKENS = {
     VoteParkingUseCase: Symbol.for('VoteParkingUseCase'),
     ModerateParkingUseCase: Symbol.for('ModerateParkingUseCase'),
     DeleteParkingUseCase: Symbol.for('DeleteParkingUseCase'),
+    SuggestParkingUseCase: Symbol.for('SuggestParkingUseCase'),
+    DecideSuggestionUseCase: Symbol.for('DecideSuggestionUseCase'),
+    ListSuggestionsUseCase: Symbol.for('ListSuggestionsUseCase'),
+    ListModerationQueueUseCase: Symbol.for('ListModerationQueueUseCase'),
+    GetUserStatsUseCase: Symbol.for('GetUserStatsUseCase'),
 
     // Controllers
     ParkingController: Symbol.for('ParkingController'),
