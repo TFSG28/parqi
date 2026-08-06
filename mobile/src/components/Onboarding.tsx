@@ -50,16 +50,31 @@ export function Onboarding({ onDone }: OnboardingProps) {
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [current, setCurrent] = useState(0);
-    const fade = useRef(new Animated.Value(0)).current;
+    const fade = useRef(new Animated.Value(1)).current;
+    const slideAnim = useRef(new Animated.Value(1)).current;
     const listRef = useRef<FlatList<Step>>(null);
 
+    // Animação de entrada apenas na primeira montagem
     useEffect(() => {
-        Animated.timing(fade, {
+        slideAnim.setValue(0);
+        Animated.spring(slideAnim, {
             toValue: 1,
-            duration: 300,
+            tension: 80,
+            friction: 12,
             useNativeDriver: true,
         }).start();
-    }, [fade]);
+    }, []);
+
+    // Reinicia a animação de entrada quando muda de slide
+    useEffect(() => {
+        slideAnim.setValue(0);
+        Animated.spring(slideAnim, {
+            toValue: 1,
+            tension: 80,
+            friction: 12,
+            useNativeDriver: true,
+        }).start();
+    }, [current]);
 
     const finish = useCallback(async () => {
         await AsyncStorage.setItem(STORAGE_KEY, '1');
@@ -93,15 +108,22 @@ export function Onboarding({ onDone }: OnboardingProps) {
                     setCurrent(idx);
                 }}
                 keyExtractor={(_, i) => String(i)}
-                renderItem={({ item }) => (
-                    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
-                        <View style={styles.iconCircle}>
-                            <Ionicons name={item.icon} size={36} color={colors.primary} />
+                renderItem={({ item, index }) => {
+                    const isActive = index === current;
+                    const translateY = isActive ? slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [16, 0],
+                    }) : 0;
+                    return (
+                        <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+                            <Animated.View style={[styles.iconCircle, { transform: [{ translateY }] }]}>
+                                <Ionicons name={item.icon} size={36} color={colors.primary} />
+                            </Animated.View>
+                            <Animated.Text style={[styles.title, { transform: [{ translateY }] }]}>{item.title}</Animated.Text>
+                            <Animated.Text style={[styles.desc, { transform: [{ translateY }] }]}>{item.description}</Animated.Text>
                         </View>
-                        <Text style={styles.title}>{item.title}</Text>
-                        <Text style={styles.desc}>{item.description}</Text>
-                    </View>
-                )}
+                    );
+                }}
             />
 
             {/* Dots + CTA */}
@@ -166,7 +188,9 @@ const createStyles = (colors: ThemeColors) =>
             width: 88,
             height: 88,
             borderRadius: 24,
-            backgroundColor: colors.primary + '12',
+            backgroundColor: colors.primary + '20',
+            borderWidth: 1.5,
+            borderColor: colors.primary + '30',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 8,

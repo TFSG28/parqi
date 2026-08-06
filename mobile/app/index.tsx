@@ -218,8 +218,10 @@ export default function HomeScreen() {
                     keyExtractor={(item, index) => ('_skeleton' in (item as object) ? `skel-${index}` : (item as ParkingSpot).id)}
                     contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 96 }]}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    accessibilityLabel="Lista de estacionamentos"
+                    accessibilityRole="list"
                     refreshControl={
-                        <RefreshControl refreshing={loading && !isFirstLoad} onRefresh={() => fetchSpots(lastBbox.current)} tintColor={colors.primary} />
+                        <RefreshControl refreshing={loading && !isFirstLoad} onRefresh={() => fetchSpots(lastBbox.current)} tintColor={colors.primary} accessibilityLabel="Atualizar lista" />
                     }
                     ListHeaderComponent={
                         !isFirstLoad ? (
@@ -290,7 +292,12 @@ export default function HomeScreen() {
             {/* Barra superior */}
             <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                 <Text style={styles.logo}>Parqi</Text>
-                {loading && <ActivityIndicator color={colors.white} size="small" />}
+                <View style={styles.topBarActions}>
+                    {loading && <ActivityIndicator color={colors.white} size="small" />}
+                    <Pressable onPress={() => router.push('/account')} accessibilityLabel="Conta e preferências" hitSlop={8}>
+                        <Ionicons name="person-circle-outline" size={26} color={colors.white} />
+                    </Pressable>
+                </View>
             </View>
 
             <OsmMap

@@ -29,7 +29,13 @@ export function SpotCard({ spot, onPress, distanceKm }: SpotCardProps) {
         .join(' · ');
 
     return (
-        <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.card,
+                pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 },
+            ]}
+        >
             <View style={[styles.iconWrap, { backgroundColor: type.color + '22' }]}>
                 <Ionicons name={type.icon} size={20} color={type.color} />
             </View>
@@ -62,9 +68,6 @@ const createStyles = (colors: ThemeColors) =>
             borderRadius: 14,
             padding: 12,
             gap: 12,
-        },
-        pressed: {
-            opacity: 0.85,
         },
         iconWrap: {
             width: 40,

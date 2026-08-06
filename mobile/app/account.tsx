@@ -57,8 +57,8 @@ export default function AccountScreen() {
         stats && stats.reputation.score >= 5
             ? colors.success
             : stats && stats.reputation.score >= 3
-              ? colors.accent
-              : colors.danger;
+                ? colors.accent
+                : colors.danger;
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -218,9 +218,9 @@ export default function AccountScreen() {
                 </Pressable>
             )}
 
-            <Text style={styles.hint}>
+            {/* <Text style={styles.hint}>
                 Quem contribui com lugares validados fica sem anúncios, para sempre.
-            </Text>
+            </Text> */}
         </ScrollView>
     );
 }

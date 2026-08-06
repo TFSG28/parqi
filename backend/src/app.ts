@@ -4,8 +4,10 @@ import express, { Application } from 'express';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { corsMiddleware } from './config';
 import { helmetConfig, securityHeaders } from './config/security.config';
+import { swaggerSpec } from './config/swagger.config';
 import routes from './shared/routes';
 import { initCronJobs } from './cron';
 import { errorHandler } from './shared/middleware/error-handler.middleware';
@@ -14,6 +16,7 @@ import { metricsMiddleware } from './shared/middleware/metrics.middleware';
 import { sanitizationMiddleware } from './shared/middleware/sanitization.middleware';
 import { healthCheck, readinessCheck, livenessCheck } from './shared/utils/health';
 import { metricsHandler } from './config/metrics.config';
+import { initCache } from './config/cache.config';
 
 
 const app: Application = express();
@@ -52,6 +55,18 @@ app.get('/metrics', metricsHandler);
 
 app.use('/api/v1', routes);
 
+// Documentação Swagger
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Parqi API Docs',
+}));
+app.get('/api/docs.json', (_req, res) => {
+    res.json(swaggerSpec);
+});
+
 app.use(errorHandler);
+
+// Inicializa cache in-memory
+initCache();
 
 export default app;

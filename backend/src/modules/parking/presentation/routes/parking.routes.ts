@@ -4,6 +4,7 @@ import { validate } from '../../../../shared/middleware/validation.middleware';
 import { authMiddleware } from '../../../../shared/middleware/auth.middleware';
 import { requireRole } from '../../../../shared/middleware/role.middleware';
 import { csrfMiddleware } from '../../../../shared/middleware/csrf.middleware';
+import { cacheMiddleware } from '../../../../shared/middleware/cache.middleware';
 import { CreateParkingSchema } from '../../application/dtos/CreateParking.dto';
 import { ModerateParkingSchema } from '../../application/dtos/ModerateParking.dto';
 import { ParkingIdParamsSchema } from '../../application/dtos/ParkingIdParams.dto';
@@ -15,8 +16,8 @@ import { DecideSuggestionSchema } from '../../application/dtos/DecideSuggestion.
 
 const router = Router();
 
-// Público
-router.get('/', validate(QueryParkingSchema), parkingController.list);
+// Público (com cache: 120s para lista, 60s para detalhe)
+router.get('/', cacheMiddleware(120), validate(QueryParkingSchema), parkingController.list);
 
 // Admin (rotas estáticas ANTES de /:id para não colidirem com o parâmetro)
 router.get(
@@ -40,7 +41,7 @@ router.post(
     parkingController.decideSuggestion
 );
 
-router.get('/:id', validate(ParkingIdParamsSchema), parkingController.getById);
+router.get('/:id', cacheMiddleware(60), validate(ParkingIdParamsSchema), parkingController.getById);
 
 // Autenticado (comunidade)
 router.post('/', authMiddleware, csrfMiddleware, validate(CreateParkingSchema), parkingController.create);

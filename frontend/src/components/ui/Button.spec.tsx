@@ -51,14 +51,14 @@ describe('Button Component', () => {
     render(<Button>Clique aqui</Button>);
     
     const button = screen.getByText('Clique aqui');
-    expect(button).toHaveClass('bg-verde');
+    expect(button).toHaveClass('bg-accent');
   });
 
   it('deve aplicar variante secondary quando especificado', () => {
     render(<Button variant="secondary">Clique aqui</Button>);
     
     const button = screen.getByText('Clique aqui');
-    expect(button).toHaveClass('bg-gray-200');
+    expect(button).toHaveClass('bg-mist');
   });
 
   it('deve aplicar tamanho medium por padrão', () => {

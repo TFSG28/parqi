@@ -1,3 +1,5 @@
+import ScrollReveal from "@/components/feature/ScrollReveal";
+
 const PILLARS = [
   {
     glyph: "P",
@@ -22,9 +24,8 @@ const PILLARS = [
 function ParkingSign({ className, inverted }: { className?: string; inverted?: boolean }) {
   return (
     <span
-      className={`inline-flex select-none items-center justify-center rounded-[22%] font-display font-bold ${
-        inverted ? "bg-white text-brand" : "bg-brand text-white"
-      } ${className ?? ""}`}
+      className={`inline-flex select-none items-center justify-center rounded-[22%] font-display font-bold ${inverted ? "bg-white text-brand" : "bg-brand text-white"
+        } ${className ?? ""}`}
       aria-hidden
     >
       P
@@ -68,8 +69,8 @@ function MapScene({ className }: { className?: string }) {
         strokeLinejoin="round"
         className="route-draw"
       />
-      {/* destino: sinal P */}
-      <g transform="translate(222 108)">
+      {/* destino: sinal P com pulso */}
+      <g className="pulse-target">
         <circle r="30" fill="#ff7a00" opacity="0.25" />
         <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#ffffff" />
         <text
@@ -87,9 +88,35 @@ function MapScene({ className }: { className?: string }) {
   );
 }
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Parqi',
+  applicationCategory: 'TravelApplication',
+  operatingSystem: 'Android, iOS',
+  description:
+    'App comunitária gratuita para encontrar estacionamento em Portugal. Dados públicos + comunidade.',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'EUR',
+  },
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '4.5',
+    ratingCount: '1',
+  },
+};
+
 export default function Home() {
   return (
     <main>
+      {/* JSON-LD Structured Data para SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Herói: a página abre como um sinal de estacionamento */}
       <section className="bg-brand text-white">
         <div className="mx-auto max-w-5xl px-6">
@@ -112,10 +139,10 @@ export default function Home() {
               </p>
               <p className="rise rise-3 mt-10 flex flex-wrap items-center gap-3 text-sm">
                 <span className="text-mist">Brevemente em</span>
-                <span className="rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
+                <span className="store-badge rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
                   App Store
                 </span>
-                <span className="rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
+                <span className="store-badge rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
                   Google Play
                 </span>
               </p>
@@ -127,14 +154,16 @@ export default function Home() {
 
       {/* Como funciona */}
       <section className="mx-auto max-w-3xl px-6 pt-[clamp(3.5rem,9vh,6rem)] pb-[clamp(4rem,10vh,7rem)]">
-        <h2 className="font-display text-4xl font-bold tracking-tight">Como funciona</h2>
-        <div className="mt-14 space-y-14">
+        <ScrollReveal>
+          <h2 className="sr-solo font-display text-4xl font-bold tracking-tight">Como funciona</h2>
+        </ScrollReveal>
+
+        <ScrollReveal className="mt-14 space-y-14">
           {PILLARS.map((pillar) => (
-            <article key={pillar.title} className="grid grid-cols-[auto_1fr] gap-x-6">
+            <article key={pillar.title} className="sr-item grid grid-cols-[auto_1fr] gap-x-6">
               <span
-                className={`inline-flex h-12 w-12 select-none items-center justify-center rounded-[22%] font-display text-2xl font-bold ${
-                  pillar.accent ? "bg-accent text-ink" : "bg-brand text-white"
-                }`}
+                className={`inline-flex h-12 w-12 select-none items-center justify-center rounded-[22%] font-display text-2xl font-bold ${pillar.accent ? "bg-accent text-ink" : "bg-brand text-white"
+                  }`}
                 aria-hidden
               >
                 {pillar.glyph}
@@ -145,30 +174,35 @@ export default function Home() {
               </div>
             </article>
           ))}
-        </div>
+        </ScrollReveal>
 
-        <div className="road-line mt-[clamp(3.5rem,9vh,6rem)]" />
+        <ScrollReveal threshold={0.3}>
+          <div className="road-line sr-solo mt-[clamp(3.5rem,9vh,6rem)]" />
+        </ScrollReveal>
 
-        <p className="mt-10 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
-          A app é grátis e feita pela comunidade. Quem contribui com lugares
-          validados fica sem anúncios, para sempre.
-        </p>
+        <ScrollReveal threshold={0.3}>
+          <p className="sr-solo mt-10 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
+            A app é grátis e feita pela comunidade.
+          </p>
+        </ScrollReveal>
       </section>
 
       {/* Rodapé: fecho em azul, como o herói */}
       <footer className="bg-brand text-white">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 px-6 py-12">
-          <span className="flex items-center gap-3">
-            <ParkingSign inverted className="h-6 w-6 text-sm" />
-            <span className="font-medium">© {new Date().getFullYear()} Parqi</span>
-          </span>
-          <a
-            href="mailto:ola@parqi.pt"
-            className="text-mist underline underline-offset-4 transition-colors hover:text-white"
-          >
-            ola@parqi.pt
-          </a>
-        </div>
+        <ScrollReveal threshold={0.2}>
+          <div className="sr-solo mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 px-6 py-12">
+            <span className="flex items-center gap-3">
+              <ParkingSign inverted className="h-6 w-6 text-sm" />
+              <span className="font-medium">© {new Date().getFullYear()} Parqi</span>
+            </span>
+            <a
+              href="mailto:ola@parqi.pt"
+              className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+            >
+              ola@parqi.pt
+            </a>
+          </div>
+        </ScrollReveal>
       </footer>
     </main>
   );

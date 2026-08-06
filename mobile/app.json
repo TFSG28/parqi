@@ -10,7 +10,11 @@
     "backgroundColor": "#FFFFFF",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "pt.parqi.app"
+      "bundleIdentifier": "pt.parqi.app",
+      "associatedDomains": ["applinks:parqi.pt"],
+      "infoPlist": {
+        "UIUserInterfaceStyle": "Light"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +24,21 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "pt.parqi.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "parqi",
+              "host": "*",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +52,14 @@
         {
           "locationWhenInUsePermission": "A Parqi usa a tua localização para encontrar estacionamentos perto de ti."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#3B6BFF"
+        }
+      ],
     ]
   }
 }

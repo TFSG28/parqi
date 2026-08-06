@@ -1,56 +1,81 @@
-import 'dotenv/config';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma';
-import bcrypt from 'bcryptjs';
+import { PrismaClient } from '../src/generated/prisma/client';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+const prisma = new PrismaClient();
 
 async function main() {
-    console.log('Iniciando seed do banco de dados...');
+    console.log('🌱 A semeear a base de dados...');
 
-    const hashedPassword = await bcrypt.hash('!QAZ2wsx', 10);
+    // Verifica se já existem dados
+    const userCount = await prisma.user.count();
+    if (userCount > 0) {
+        console.log(`⚠️  Base já contém ${userCount} utilizadores — seed ignorado.`);
+        await prisma.$disconnect();
+        return;
+    }
 
-    const admin = await prisma.user.upsert({
-        where: { email: 'devops@wearemateria.com' },
-        update: {},
-        create: {
-            email: 'devops@wearemateria.com',
-            name: 'Administrador',
-            password: hashedPassword,
+    // Admin
+    const admin = await prisma.user.create({
+        data: {
+            name: 'Admin Parqi',
+            email: 'admin@parqi.pt',
+            password: '$2a$10$placeholder', // substituir com hash real via set-admin.ts
             role: 'ADMIN',
-            isActive: true,
             emailVerified: true,
+            isActive: true,
         },
     });
+    console.log(`✅ Admin criado: ${admin.email}`);
 
-    console.log('Usuário admin criado:', admin.id, admin.role);
-
-    const testUser = await prisma.user.upsert({
-        where: { email: 'web2@wearemateria.com' },
-        update: {},
-        create: {
-            email: 'web2@wearemateria.com',
-            name: 'Utilizador Teste',
-            password: hashedPassword,
+    // Utilizador de teste
+    const tester = await prisma.user.create({
+        data: {
+            name: 'Condutor Teste',
+            email: 'teste@parqi.pt',
+            password: '$2a$10$placeholder',
             role: 'USER',
-            isActive: true,
             emailVerified: true,
+            isActive: true,
         },
     });
+    console.log(`✅ Utilizador de teste criado: ${tester.email}`);
 
-    console.log('Usuário teste criado:', testUser.id, testUser.role);
+    // Parque de exemplo — Guimarães, Toural
+    const spot = await prisma.parkingSpot.create({
+        data: {
+            name: 'Parque do Toural',
+            description: 'Parque subterrâneo no centro histórico de Guimarães.',
+            latitude: 41.4426,
+            longitude: -8.2914,
+            geometryType: 'POINT',
+            parkingType: 'UNDERGROUND',
+            capacityRange: 'RANGE_51_100',
+            isFree: false,
+            hasDisabledSpaces: true,
+            hasEvCharging: true,
+            source: 'COMMUNITY',
+            status: 'APPROVED',
+            trustScore: 8.5,
+            contributorId: admin.id,
+        },
+    });
+    console.log(`✅ Parque de exemplo criado: ${spot.name}`);
 
-    console.log('Seed concluído!');
+    // Geometria PostGIS
+    await prisma.$executeRawUnsafe(`
+        UPDATE "ParkingSpot"
+        SET "geom" = ST_SetSRID(ST_MakePoint(-8.2914, 41.4426), 4326)
+        WHERE "id" = '${spot.id}'
+    `);
+    console.log('✅ Geometria PostGIS aplicada ao parque de exemplo');
+
+    const totalSpots = await prisma.parkingSpot.count();
+    console.log(`\n🎉 Seed concluído! ${totalSpots} parques na BD.`);
+
+    await prisma.$disconnect();
 }
 
-main()
-    .catch((e) => {
-        console.error('Erro durante seed:', e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-        await pool.end();
-    });
+main().catch(async (error) => {
+    console.error('❌ Erro no seed:', error);
+    await prisma.$disconnect();
+    process.exit(1);
+});

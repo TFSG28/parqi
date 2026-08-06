@@ -94,12 +94,12 @@ export function LoginForm({ onSuccess, className = '' }: Readonly<LoginFormProps
             />
 
             {formError && (
-                <p role="alert" className="text-sm text-red-600">
+                <p role="alert" className="text-sm text-danger">
                     {formError}
                 </p>
             )}
 
-            <Button type="submit" isLoading={loading} className="w-full">
+            <Button type="submit" isLoading={loading} className="w-full mt-2">
                 Entrar
             </Button>
         </form>

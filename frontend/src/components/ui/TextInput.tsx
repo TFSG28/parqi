@@ -16,8 +16,8 @@ const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
         return (
             <div className="flex flex-col gap-1 w-full">
                 {label && (
-                    <label className="text-sm font-medium text-gray-700">
-                        {label}{required && <span className='text-gray-400 ml-1'>*</span>}
+                    <label className="text-sm font-medium text-ink">
+                        {label}{required && <span className='text-muted ml-1'>*</span>}
                     </label>
                 )}
                 <div className='flex gap-2 items-center'>
@@ -25,13 +25,14 @@ const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
                         ref={ref}
                         type={inputType||"text"}
                         className={`
-                        px-3 py-2 border rounded transition-colors w-full
-                        focus:outline-none focus:ring-2 focus:ring-foreground focus:border-transparent
+                        px-3 py-2 border rounded-md transition-colors w-full
+                        bg-[var(--color-surface)] text-ink
+                        focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand
                         ${error
-                                ? 'border-red-500 focus:ring-red-500'
-                                : 'border-gray-300 hover:border-gray-400'
+                                ? 'border-danger focus:ring-danger/50 focus:border-danger'
+                                : 'border-[var(--color-border)] hover:border-ink-soft/30'
                             }
-                        ${className}
+                        ${className ?? ''}
                         `}
                         {...props}
                     />
@@ -44,11 +45,11 @@ const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
                 </div>
 
                 {error && (
-                    <span className="text-sm text-red-600">{error}</span>
+                    <span className="text-sm text-danger">{error}</span>
                 )}
 
                 {helperText && !error && (
-                    <span className="text-sm text-gray-500">{helperText}</span>
+                    <span className="text-sm text-muted">{helperText}</span>
                 )}
             </div>
         );

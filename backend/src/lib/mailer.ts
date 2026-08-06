@@ -36,7 +36,7 @@ export const baseEmailTemplate = (content: string, subject: string) => {
                 border: 1px solid #eaeaea;
             }
             .header {
-                background: #000000;
+                background: #3B6BFF;
                 padding: 30px 20px;
                 text-align: center;
                 color: white;
@@ -63,7 +63,7 @@ export const baseEmailTemplate = (content: string, subject: string) => {
                 ${content}
             </div>
             <div class="footer">
-                <p>© ${new Date().getFullYear()} Perfect Template. Todos os direitos reservados.</p>
+                <p>© ${new Date().getFullYear()} Parqi. Todos os direitos reservados.</p>
             </div>
         </div>
     </body>

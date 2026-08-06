@@ -16,10 +16,54 @@ const display = Barlow_Semi_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Parqi · Encontra estacionamento",
+  title: "Parqi · Encontra estacionamento em Portugal",
   description:
-    "O Parqi junta dados públicos e uma comunidade de condutores para te mostrar onde estacionar em Portugal.",
+    "O Parqi junta dados públicos das câmaras municipais, OpenStreetMap e contribuições da comunidade para te mostrar onde estacionar em Portugal. App gratuita com mapa, confiança da comunidade e rota direta no Google Maps.",
   metadataBase: new URL("https://parqi.pt"),
+  keywords: [
+    "estacionamento",
+    "Portugal",
+    "parque",
+    "parking",
+    "mapa",
+    "comunidade",
+    "estacionar",
+    "Parqi",
+  ],
+  authors: [{ name: "Parqi" }],
+  creator: "Parqi",
+  publisher: "Parqi",
+  openGraph: {
+    title: "Parqi · Encontra estacionamento em Portugal",
+    description:
+      "App comunitária gratuita para encontrar estacionamento em Portugal. Dados públicos + comunidade. Rota no Google Maps a um toque.",
+    url: "https://parqi.pt",
+    siteName: "Parqi",
+    locale: "pt_PT",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Parqi — Encontra estacionamento em Portugal",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Parqi · Encontra estacionamento em Portugal",
+    description:
+      "App comunitária gratuita para encontrar estacionamento em Portugal.",
+    images: ["/og-image.png"],
+  },
+  alternates: {
+    canonical: "https://parqi.pt",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

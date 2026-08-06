@@ -9,13 +9,33 @@
   --color-ink-soft: #4d5079;
   --color-paper: #fdfdff;
   --color-mist: #e3e8ff;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-muted: #6b7280;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
   --font-display: var(--font-display);
   --font-sans: var(--font-body);
+}
+
+.dark {
+  --color-brand: #3b6bff;
+  --color-brand-deep: #2e46c9;
+  --color-ink: #f2f3f7;
+  --color-ink-soft: #9aa0b4;
+  --color-paper: #0f1117;
+  --color-mist: #1e2440;
+  --color-surface: #1a1d27;
+  --color-border: #2a2e3d;
+  --color-muted: #9aa0b4;
+  --color-danger: #f87171;
+  --color-success: #34d27b;
 }
 
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1,
@@ -34,6 +54,8 @@ h3 {
   );
   border-radius: 2px;
 }
+
+/* ===== Animações ===== */
 
 /* Entrada do herói: revela conteúdo já visível por defeito (sem JS). */
 @keyframes rise {
@@ -56,6 +78,52 @@ h3 {
   }
 }
 
+/* Reveal on scroll: fade + slight rise. Conteúdo visível por defeito. */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulso subtil no destino do mapa — chama a atenção sem agitar. */
+@keyframes pulse-destination {
+  0%, 100% {
+    transform: translate(222px, 108px) scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate(222px, 108px) scale(1.15);
+    opacity: 0.4;
+  }
+}
+
+/* A linha de estrada desenha-se no scroll. */
+@keyframes draw-line {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Shimmer horizontal para os badges "brevemente". */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+
+/* ===== Classes de animação ===== */
+
 .rise {
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -73,9 +141,84 @@ h3 {
   animation: draw-route 2.4s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
 }
 
+/* Scroll reveal wrapper. Filhos com .sr-item ganham stagger automático.
+   Só esconde após js-ready — sem JS o conteúdo permanece visível. */
+.scroll-reveal {
+  /* Estado inicial: visível por defeito. */
+}
+
+.scroll-reveal.js-ready:not(.revealed) > .sr-item {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.scroll-reveal.revealed > .sr-item {
+  animation: reveal-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger delays para até 4 itens. */
+.scroll-reveal.revealed > .sr-item:nth-child(1) { animation-delay: 0.05s; }
+.scroll-reveal.revealed > .sr-item:nth-child(2) { animation-delay: 0.15s; }
+.scroll-reveal.revealed > .sr-item:nth-child(3) { animation-delay: 0.25s; }
+.scroll-reveal.revealed > .sr-item:nth-child(4) { animation-delay: 0.35s; }
+
+/* Single element reveal (heading, footer). */
+.scroll-reveal.revealed > .sr-solo {
+  animation: reveal-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Pulso no destino (inicia após o trajeto ser desenhado). */
+.pulse-target {
+  animation: pulse-destination 3s ease-in-out 2.8s infinite both;
+}
+
+/* Linha de estrada desenha-se no scroll (animada pelo pai .scroll-reveal.revealed). */
+.road-line {
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-brand) 0 48px,
+    transparent 48px 80px
+  );
+  border-radius: 2px;
+  transform-origin: left;
+}
+
+.scroll-reveal.revealed .road-line {
+  animation: draw-line 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Badges das lojas: efeito hover. */
+.store-badge {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.store-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
+  border-color: var(--color-accent);
+}
+
+/* ===== Reduced motion ===== */
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .route-draw {
+  .route-draw,
+  .scroll-reveal.revealed > .sr-item,
+  .scroll-reveal.revealed > .sr-solo,
+  .scroll-reveal.revealed .road-line,
+  .pulse-target,
+  .road-line.revealed {
     animation: none;
+  }
+
+  .scroll-reveal.js-ready:not(.revealed) > .sr-item {
+    opacity: 1;
+    transform: none;
+  }
+
+  .store-badge:hover {
+    transform: none;
+    box-shadow: none;
   }
 }

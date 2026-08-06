@@ -1,11 +1,19 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
+import { OfflineProvider } from '../src/context/OfflineContext';
+import { registerForPushNotifications } from '../src/services/notifications';
 
-function ThemedStack() {
+function AppContent() {
     const { colors } = useTheme();
+
+    useEffect(() => {
+        registerForPushNotifications();
+    }, []);
+
     return (
         <>
             <StatusBar style="light" />
@@ -18,10 +26,16 @@ function ThemedStack() {
                     contentStyle: { backgroundColor: colors.background },
                 }}
             >
-                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen
+                    name="index"
+                    options={{ headerShown: false }}
+                />
                 <Stack.Screen
                     name="parking/[id]"
-                    options={{ title: 'Estacionamento', headerBackButtonDisplayMode: 'minimal' }}
+                    options={{
+                        title: 'Estacionamento',
+                        headerBackButtonDisplayMode: 'minimal',
+                    }}
                 />
                 <Stack.Screen
                     name="contribute"
@@ -50,9 +64,11 @@ export default function RootLayout() {
     return (
         <SafeAreaProvider>
             <ThemeProvider>
-                <AuthProvider>
-                    <ThemedStack />
-                </AuthProvider>
+                <OfflineProvider>
+                    <AuthProvider>
+                        <AppContent />
+                    </AuthProvider>
+                </OfflineProvider>
             </ThemeProvider>
         </SafeAreaProvider>
     );
