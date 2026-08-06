@@ -69,7 +69,7 @@ export default function HomeScreen() {
             .then((val) => {
                 if (val !== '1') setShowOnboarding(true);
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setOnboardingChecked(true));
     }, []);
 
@@ -145,8 +145,8 @@ export default function HomeScreen() {
                         s.status === 'PENDING'
                             ? colors.accent
                             : s.status === 'FLAGGED'
-                              ? colors.danger
-                              : colors.primary,
+                                ? colors.danger
+                                : colors.primary,
                     textColor: s.status === 'PENDING' ? colors.onAccent : colors.white,
                 })),
         [spots]
@@ -287,6 +287,12 @@ export default function HomeScreen() {
     // ─────────────── Modo mapa (OpenStreetMap) ───────────────
     return (
         <View style={styles.container}>
+            {/* Barra superior */}
+            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+                <Text style={styles.logo}>Parqi</Text>
+                {loading && <ActivityIndicator color={colors.white} size="small" />}
+            </View>
+
             <OsmMap
                 ref={mapRef}
                 center={center}
@@ -306,11 +312,7 @@ export default function HomeScreen() {
                 style={{ position: 'absolute', right: 12, bottom: insets.bottom + 84 }}
             />
 
-            {/* Barra superior */}
-            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                <Text style={styles.logo}>Parqi</Text>
-                {loading && <ActivityIndicator color={colors.white} size="small" />}
-            </View>
+
 
             {/* Botões flutuantes */}
             <View style={[styles.fabColumn, { top: insets.top + 56 }]}>

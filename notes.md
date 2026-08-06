@@ -8,3 +8,5 @@
 - Roles de admin (eu) e membro
 - Métricas para os contribuintes onde vem as suas estatisticas de contribuicoes
 - a pasta data já tem csv e shp para importar e organizar na BD
+
+- Pedir autorização de localização e centrar na localização do utilizador

@@ -10,3 +10,5 @@ build/
 .next/
 out/
 data/
+.vscode/
+notes.md
