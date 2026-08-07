@@ -41,7 +41,7 @@ const CAPACITY_OPTIONS: CapacityRange[] = [
     'RANGE_100_PLUS',
 ];
 
-const GUIMARAES: LatLng = { latitude: 41.4426, longitude: -8.2914 };
+const DEFAULT_LOCATION: LatLng = { latitude: 38.7369, longitude: -9.1427 };
 
 const DETAIL_FIELDS: {
     key: 'hasPregnantSpaces' | 'hasDisabledSpaces' | 'hasEvCharging' | 'isCovered';
@@ -85,11 +85,14 @@ export default function ContributeScreen() {
         }
     }, [user, loading]);
 
-    // Posição inicial = localização do utilizador (fallback Guimarães)
+    // Posição inicial = localização do utilizador (fallback Lisboa)
     useEffect(() => {
         (async () => {
             try {
-                const { status } = await Location.requestForegroundPermissionsAsync();
+                const perm = await Location.getForegroundPermissionsAsync();
+                const status = perm.status === 'granted'
+                    ? 'granted'
+                    : (await Location.requestForegroundPermissionsAsync()).status;
                 if (status === 'granted') {
                     const loc = await Location.getCurrentPositionAsync({});
                     setPoint({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
@@ -99,7 +102,7 @@ export default function ContributeScreen() {
             } catch {
                 // ignora
             }
-            setPoint(GUIMARAES);
+            setPoint(DEFAULT_LOCATION);
         })();
     }, []);
 
@@ -248,7 +251,7 @@ export default function ContributeScreen() {
                 <View style={styles.mapCard}>
                     <OsmMap
                         ref={mapRef}
-                        center={GUIMARAES}
+                        center={DEFAULT_LOCATION}
                         zoom={15}
                         markers={mapMarkers}
                         polygon={mode === 'polygon' ? polygonRing : []}

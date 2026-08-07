@@ -20,7 +20,6 @@ import { OsmMap, type MapLayer, type OsmMapHandle } from '../src/components/OsmM
 import { SearchBar } from '../src/components/SearchBar';
 import { SpotCard } from '../src/components/SpotCard';
 import { SpotCardSkeleton } from '../src/components/SpotCardSkeleton';
-import { useAuth } from '../src/context/AuthContext';
 import { parkingApi } from '../src/lib/api';
 import { useTheme } from '../src/context/ThemeContext';
 import { distanceKm, regionToBbox, type Region } from '../src/lib/geo';
@@ -28,8 +27,8 @@ import type { ThemeColors } from '../src/theme/colors';
 import type { ParkingSpot } from '../src/types/parking';
 
 const DEFAULT_REGION: Region = {
-    latitude: 41.4426,
-    longitude: -8.2914,
+    latitude: 38.7369,
+    longitude: -9.1427,
     latitudeDelta: 0.06,
     longitudeDelta: 0.06,
 };
@@ -45,7 +44,6 @@ interface LatLng {
 
 export default function HomeScreen() {
     const insets = useSafeAreaInsets();
-    const { user } = useAuth();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const mapRef = useRef<OsmMapHandle>(null);
@@ -101,7 +99,10 @@ export default function HomeScreen() {
         fetchSpots(regionToBbox(DEFAULT_REGION));
         (async () => {
             try {
-                const { status } = await Location.requestForegroundPermissionsAsync();
+                const perm = await Location.getForegroundPermissionsAsync();
+                const status = perm.status === 'granted'
+                    ? 'granted'
+                    : (await Location.requestForegroundPermissionsAsync()).status;
                 if (status === 'granted') {
                     const loc = await Location.getCurrentPositionAsync({});
                     const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
@@ -161,7 +162,10 @@ export default function HomeScreen() {
 
     const centerOnUser = async () => {
         try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
+            const perm = await Location.getForegroundPermissionsAsync();
+            const status = perm.status === 'granted'
+                ? 'granted'
+                : (await Location.requestForegroundPermissionsAsync()).status;
             if (status !== 'granted') {
                 return;
             }
@@ -214,7 +218,7 @@ export default function HomeScreen() {
                 </View>
 
                 <FlatList<ListItem>
-                    data={(isFirstLoad ? Array<ListItem>(5).fill(SKELETON_PLACEHOLDER) : displayedSpots) as ListItem[]}
+                    data={(isFirstLoad ? new Array<ListItem>(5).fill(SKELETON_PLACEHOLDER) : displayedSpots) as ListItem[]}
                     keyExtractor={(item, index) => ('_skeleton' in (item as object) ? `skel-${index}` : (item as ParkingSpot).id)}
                     contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 96 }]}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}

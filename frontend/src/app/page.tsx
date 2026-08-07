@@ -21,7 +21,7 @@ const PILLARS = [
   },
 ];
 
-function ParkingSign({ className, inverted }: { className?: string; inverted?: boolean }) {
+function ParkingSign({ className, inverted }: Readonly<{ className?: string; inverted?: boolean }>) {
   return (
     <span
       className={`inline-flex select-none items-center justify-center rounded-[22%] font-display font-bold ${inverted ? "bg-white text-brand" : "bg-brand text-white"
@@ -34,7 +34,7 @@ function ParkingSign({ className, inverted }: { className?: string; inverted?: b
 }
 
 /* Cena de mapa: ruas esquematizadas e um trajeto que termina no sinal P. */
-function MapScene({ className }: { className?: string }) {
+function MapScene({ className }: Readonly<{ className?: string }>) {
   return (
     <svg
       viewBox="0 0 320 340"
