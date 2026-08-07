@@ -136,6 +136,10 @@ model ParkingSpot {
     contributorId String?
     contributor   User?   @relation(fields: [contributorId], references: [id], onDelete: SetNull)
 
+    // Concelho (CAOP) onde o parque se localiza — preenchido automaticamente na criação
+    municipalityId String?
+    municipality   Municipality? @relation(fields: [municipalityId], references: [id], onDelete: SetNull)
+
     votes          ParkingVote[]
     moderationLogs ModerationLog[]
     suggestions    ParkingSuggestion[]
@@ -145,6 +149,7 @@ model ParkingSpot {
     @@index([source])
     @@index([latitude, longitude])
     @@index([duplicateOfId])
+    @@index([municipalityId])
 }
 
 model ParkingVote {
@@ -180,6 +185,33 @@ model ModerationLog {
     moderator   User?   @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
 
     @@index([parkingSpotId])
+}
+
+// Concelhos de Portugal (CAOP) — fronteiras oficiais para associar cada parque à sua área administrativa
+model Municipality {
+    id        String   @id @default(uuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Código DIC (ex.: 1106 = Lisboa, 3103 = Funchal, 4203 = Ponta Delgada)
+    dic          String?
+    name         String
+    distritoIlha String?
+    nuts1        String?
+    nuts2        String?
+    nuts3        String?
+    nuts3Cod     String?
+    areaHa       Float?
+    perimetroKm  Int?
+    nFreguesias  Int?
+
+    // PostGIS: geometria MultiPolygon dos limites do concelho (CAOP, WGS84)
+    geom Unsupported("geometry(MultiPolygon, 4326)")?
+
+    parkingSpots ParkingSpot[]
+
+    @@unique([dic])
+    @@index([name])
 }
 
 // Sugestões da comunidade para complementar/corrigir informação de parques existentes

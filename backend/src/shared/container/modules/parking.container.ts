@@ -4,12 +4,15 @@ import { PARKING_TOKENS } from '../tokens/parking.tokens';
 // Repositories
 import { ParkingRepository } from '../../../modules/parking/infrastructure/repositories/Parking.repository';
 import { SuggestionRepository } from '../../../modules/parking/infrastructure/repositories/Suggestion.repository';
+import { MunicipalityRepository } from '../../../modules/parking/infrastructure/repositories/Municipality.repository';
 
 // Services
 import { TrustCalculator } from '../../../modules/parking/infrastructure/services/TrustCalculator.service';
 import { OverpassImporter } from '../../../modules/parking/infrastructure/services/OverpassImporter.service';
+import { OsmImporter } from '../../../modules/parking/infrastructure/services/OsmImporter.service';
 import { GeoapifyImporter } from '../../../modules/parking/infrastructure/services/GeoapifyImporter.service';
 import { CsvImporter } from '../../../modules/parking/infrastructure/services/CsvImporter.service';
+import { CaopImporter } from '../../../modules/parking/infrastructure/services/CaopImporter.service';
 import { ReputationService } from '../../../modules/parking/infrastructure/services/Reputation.service';
 import { RoadValidator } from '../../../modules/parking/infrastructure/services/RoadValidator.service';
 
@@ -35,9 +38,12 @@ export function setupParkingContainer() {
     container.registerSingleton(PARKING_TOKENS.ITrustCalculator, TrustCalculator);
     container.registerSingleton(PARKING_TOKENS.IParkingRepository, ParkingRepository);
     container.registerSingleton(PARKING_TOKENS.ISuggestionRepository, SuggestionRepository);
+    container.registerSingleton(PARKING_TOKENS.IMunicipalityRepository, MunicipalityRepository);
     container.registerSingleton(PARKING_TOKENS.IOverpassImporter, OverpassImporter);
+    container.registerSingleton(PARKING_TOKENS.IOsmImporter, OsmImporter);
     container.registerSingleton(PARKING_TOKENS.IGeoapifyImporter, GeoapifyImporter);
     container.registerSingleton(PARKING_TOKENS.ICsvImporter, CsvImporter);
+    container.registerSingleton(PARKING_TOKENS.ICaopImporter, CaopImporter);
     container.registerSingleton(PARKING_TOKENS.IReputationService, ReputationService);
     container.registerSingleton(PARKING_TOKENS.IRoadValidator, RoadValidator);
 

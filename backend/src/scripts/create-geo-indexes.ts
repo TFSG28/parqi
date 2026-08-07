@@ -24,6 +24,9 @@ async function main() {
         await pool.query(
             'CREATE INDEX IF NOT EXISTS "ParkingSpot_boundary_gist" ON "ParkingSpot" USING GIST ("boundary");'
         );
+        await pool.query(
+            'CREATE INDEX IF NOT EXISTS "Municipality_geom_gist" ON "Municipality" USING GIST ("geom");'
+        );
         console.log('✅ Índices espaciais GiST criados/verificados');
     } catch (error) {
         // As tabelas podem ainda não existir (primeira execução antes do db push)

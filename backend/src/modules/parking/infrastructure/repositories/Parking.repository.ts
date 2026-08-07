@@ -39,6 +39,7 @@ const SPOT_SELECT = {
     requiresReview: true,
     duplicateOfId: true,
     contributorId: true,
+    municipalityId: true,
     createdAt: true,
     updatedAt: true,
 } as const;
@@ -73,6 +74,7 @@ function toEntity(row: SpotRow): ParkingSpotEntity {
         requiresReview: row.requiresReview,
         duplicateOfId: row.duplicateOfId,
         contributorId: row.contributorId,
+        municipalityId: row.municipalityId,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -180,6 +182,7 @@ export class ParkingRepository implements IParkingRepository {
             });
 
             await applyGeometry(tx, spot.id, data.geometry);
+            await this.assignMunicipality(tx, spot.id);
 
             const updated = await tx.parkingSpot.findUniqueOrThrow({
                 where: { id: spot.id },
@@ -443,6 +446,38 @@ export class ParkingRepository implements IParkingRepository {
             votesGiven,
             avgTrustApproved: Math.round((avgTrust._avg.trustScore ?? 0) * 10) / 10,
         };
+    }
+
+    /**
+     * Associa o parque ao seu concelho (CAOP) por point-in-polygon.
+     * Best-effort: se a tabela ainda não existir / não houver municípios, ignora.
+     */
+    private async assignMunicipality(
+        tx: GeometryTransaction,
+        id: string
+    ): Promise<void> {
+        try {
+            const loc = await tx.$queryRaw<{ latitude: number | null; longitude: number | null }[]>`
+                SELECT "latitude", "longitude" FROM "ParkingSpot" WHERE "id" = ${id}
+            `;
+            const { latitude, longitude } = loc[0] ?? {};
+            if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+                return;
+            }
+            const muni = await tx.$queryRaw<{ id: string }[]>`
+                SELECT m."id"
+                FROM "Municipality" m
+                WHERE ST_Contains(m."geom", ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
+                LIMIT 1
+            `;
+            if (muni[0]) {
+                await tx.$executeRaw`
+                    UPDATE "ParkingSpot" SET "municipalityId" = ${muni[0].id} WHERE "id" = ${id}
+                `;
+            }
+        } catch {
+            // Sem tabela Municipality (CAOP não importada) → parque fica sem concelho
+        }
     }
 
     private async findByIds(ids: string[]): Promise<ParkingSpotEntity[]> {

@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { env } from '../../../../config/env';
 import { PARKING_TOKENS } from '../../../../shared/container/tokens/parking.tokens';
 import { IParkingRepository } from '../../domain/repositories/IParking.repository';
+import { isInsidePortugal } from '../../domain/geo';
 import type { ParkingType } from '../../domain/entities/ParkingSpot.entity';
 import type {
     GeoapifyImportOptions,
@@ -76,6 +77,13 @@ export class GeoapifyImporter implements IGeoapifyImporter {
                     }
 
                     const [longitude, latitude] = feature.geometry.coordinates;
+
+                    // Rejeitar pontos fora de Portugal (continente + Açores + Madeira)
+                    if (!isInsidePortugal(latitude, longitude)) {
+                        skipped++;
+                        continue;
+                    }
+
                     // Dedup cross-source (dados repetidos entre fontes)
                     const nearby = await this.parkingRepository.findNearby(latitude, longitude, 25);
                     if (nearby.some((spot) => spot.source !== 'GEOAPIFY')) {

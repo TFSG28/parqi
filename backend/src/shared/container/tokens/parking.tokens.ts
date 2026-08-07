@@ -2,12 +2,16 @@ export const PARKING_TOKENS = {
     // Services
     ITrustCalculator: Symbol.for('ITrustCalculator'),
     IOverpassImporter: Symbol.for('IOverpassImporter'),
+    IOsmImporter: Symbol.for('IOsmImporter'),
     IGeoapifyImporter: Symbol.for('IGeoapifyImporter'),
     ICsvImporter: Symbol.for('ICsvImporter'),
+    ICaopImporter: Symbol.for('ICaopImporter'),
+
+    // Repositories
+    IMunicipalityRepository: Symbol.for('IMunicipalityRepository'),
     IReputationService: Symbol.for('IReputationService'),
     IRoadValidator: Symbol.for('IRoadValidator'),
 
-    // Repositories
     IParkingRepository: Symbol.for('IParkingRepository'),
     ISuggestionRepository: Symbol.for('ISuggestionRepository'),
 

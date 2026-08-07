@@ -30,6 +30,8 @@ export interface ParkingSpotEntity {
     externalId: string | null;
     status: ContributionStatus;
     trustScore: number;
+    /** Concelho (CAOP) onde o parque se localiza, quando determinado. */
+    municipalityId?: string | null;
     requiresReview: boolean;
     duplicateOfId: string | null;
     contributorId: string | null;

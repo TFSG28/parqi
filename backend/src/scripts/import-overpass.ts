@@ -22,6 +22,43 @@ function getArg(args: string[], name: string): string | undefined {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Verifica se o erro do Overpass é retryable (504 timeout / 429 rate-limit). */
+function isRetryable(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    return /respondeu 504/.test(msg) || /respondeu 429/.test(msg);
+}
+
+const BASE_DELAY_MS = 5_000; // 5s entre concelhos (overpass public tier)
+const MAX_RETRIES = 4;
+
+/**
+ * Importa um concelho com retry exponencial se der 504/429.
+ * Backoff: 5s, 10s, 20s, 40s (+ jitter 0-2s).
+ */
+async function importWithRetry(
+    importer: IOverpassImporter,
+    concelho: string,
+    areaName?: string
+): Promise<{ imported: number; skipped: number; errors: number }> {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            return await importer.importByCity(concelho, areaName);
+        } catch (error) {
+            if (attempt < MAX_RETRIES && isRetryable(error)) {
+                const delay = 5_000 * 2 ** attempt + Math.floor(Math.random() * 2000);
+                console.warn(
+                    `  ⚠️  ${concelho}: tentativa ${attempt + 1} falhou (${isRetryable(error) ? '504/429' : 'erro'}),` +
+                    ` nova tentativa em ${(delay / 1000).toFixed(1)}s...`
+                );
+                await sleep(delay);
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('unreachable');
+}
+
 /** Lista os concelhos de Portugal (admin_level=7) a partir do próprio OSM. */
 async function fetchConcelhos(): Promise<string[]> {
     const query =
@@ -59,7 +96,7 @@ async function main(): Promise<void> {
 
     if (!all) {
         console.log(`Importando estacionamentos de OSM para "${city}"...`);
-        const result = await importer.importByCity(city!, area);
+        const result = await importWithRetry(importer, city!, area);
         console.log('Resultado:', JSON.stringify(result));
         return;
     }
@@ -70,7 +107,7 @@ async function main(): Promise<void> {
     const totals = { imported: 0, skipped: 0, errors: 0, failed: 0 };
     for (const [index, concelho] of concelhos.entries()) {
         try {
-            const result = await importer.importByCity(concelho);
+            const result = await importWithRetry(importer, concelho);
             totals.imported += result.imported;
             totals.skipped += result.skipped;
             totals.errors += result.errors;
@@ -79,8 +116,7 @@ async function main(): Promise<void> {
             totals.failed++;
             console.error(`[${index + 1}/${concelhos.length}] ${concelho}: FALHOU -`, error);
         }
-        // ponytail: pausa fixa de 3s para o rate limit do Overpass; backoff exponencial se começar a dar 429
-        await sleep(3000);
+        await sleep(BASE_DELAY_MS);
     }
     console.log('Total:', JSON.stringify(totals));
 }

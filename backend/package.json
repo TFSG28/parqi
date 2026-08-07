@@ -17,10 +17,13 @@
     "db-indexes": "tsx src/scripts/create-geo-indexes.ts",
     "db-seed": "tsx prisma/seed.ts",
     "import:overpass": "tsx src/scripts/import-overpass.ts",
+    "import:osm": "tsx src/scripts/import-osm.ts",
     "import:geoapify": "tsx src/scripts/import-geoapify.ts",
     "import:csv": "tsx src/scripts/import-csv.ts",
     "import:data": "tsx src/scripts/import-data.ts",
+    "import:caop": "tsx src/scripts/import-caop.ts",
     "set-admin": "tsx src/scripts/set-admin.ts",
+    "clean:outside-portugal": "tsx src/scripts/clean-outside-portugal.ts",
     "update-deps": "npx npm-check-updates -i --format group",
     "prepare": "cd .. && husky backend/.husky || true"
   },

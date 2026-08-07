@@ -19,6 +19,7 @@ import { PARKING_TOKENS } from '../shared/container/tokens/parking.tokens';
 import type { IParkingRepository } from '../modules/parking/domain/repositories/IParking.repository';
 import type { CapacityRange, ParkingGeometryInput } from '../modules/parking/domain/entities/ParkingSpot.entity';
 import { getReferencePoint } from '../modules/parking/domain/geo';
+import { datum73ToWgs84 } from '../modules/parking/domain/projection';
 import { prisma } from '../lib/prisma';
 
 const DATA_DIR = process.env.PARQI_DATA_DIR ?? path.resolve(__dirname, '../../../data');
@@ -190,82 +191,7 @@ export function readShpPoints(file: string): [number, number][] {
 }
 
 // ─────── Datum 73 / Modified Portuguese Grid → WGS84 ───────
-
-const A_73 = 6378388.0;
-const F_73 = 1 / 297.0;
-const E2_73 = 2 * F_73 - F_73 * F_73;
-const EP2_73 = E2_73 / (1 - E2_73);
-const LAT0 = (39.66666666666666 * Math.PI) / 180;
-const LON0 = (-8.131906111111112 * Math.PI) / 180;
-const K0 = 1.0;
-const FE = 180.598;
-const FN = -86.99;
-const DX = 223.289;
-const DY = 49.853;
-const DZ = 223.89;
-const A_WGS = 6378137.0;
-const F_WGS = 1 / 298.257223563;
-const E2_WGS = 2 * F_WGS - F_WGS * F_WGS;
-const EP2_WGS = E2_WGS / (1 - E2_WGS);
-
-function meridianArc(phi: number, a: number, e2: number): number {
-    return (
-        a *
-        ((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * phi -
-            ((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * phi) +
-            ((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * phi) -
-            ((35 * e2 ** 3) / 3072) * Math.sin(6 * phi))
-    );
-}
-
-function tmInverse(E: number, N: number): { lat: number; lon: number } {
-    const x = E - FE;
-    const y = N - FN;
-    const M = meridianArc(LAT0, A_73, E2_73) + y / K0;
-    const e1 = (1 - Math.sqrt(1 - E2_73)) / (1 + Math.sqrt(1 - E2_73));
-    const mu = M / (A_73 * (1 - E2_73 / 4 - (3 * E2_73 ** 2) / 64 - (5 * E2_73 ** 3) / 256));
-    const phi1 =
-        mu +
-        ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) +
-        ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) +
-        ((151 * e1 ** 3) / 96) * Math.sin(6 * mu);
-    const sinP = Math.sin(phi1);
-    const N_ = A_73 / Math.sqrt(1 - E2_73 * sinP * sinP);
-    const R = (A_73 * (1 - E2_73)) / (1 - E2_73 * sinP * sinP) ** 1.5;
-    const T = Math.tan(phi1) ** 2;
-    const C = EP2_73 * Math.cos(phi1) ** 2;
-    const A_ = x / K0 / N_;
-    const phi =
-        phi1 -
-        ((N_ * Math.tan(phi1)) / R) *
-            (A_ ** 2 / 2 -
-                ((5 + 3 * T + 10 * C - 4 * C ** 2 - 9 * EP2_73) * A_ ** 4) / 24 +
-                ((61 + 90 * T + 298 * C + 45 * T ** 2 - 252 * EP2_73 - 3 * C ** 2) * A_ ** 6) / 720);
-    const lam =
-        LON0 +
-        (A_ - ((1 + 2 * T + C) * A_ ** 3) / 6 + ((5 - 2 * C + 28 * T - 3 * C ** 2 + 8 * EP2_73 + 24 * T ** 2) * A_ ** 5) / 120) /
-            Math.cos(phi1);
-    return { lat: (phi * 180) / Math.PI, lon: (lam * 180) / Math.PI };
-}
-
-export function datum73ToWgs84(E: number, N: number): { lat: number; lon: number } {
-    const { lat, lon } = tmInverse(E, N);
-    const phi = (lat * Math.PI) / 180;
-    const lam = (lon * Math.PI) / 180;
-    const N73 = A_73 / Math.sqrt(1 - E2_73 * Math.sin(phi) ** 2);
-    const X = N73 * Math.cos(phi) * Math.cos(lam);
-    const Y = N73 * Math.cos(phi) * Math.sin(lam);
-    const Z = N73 * (1 - E2_73) * Math.sin(phi);
-    const p = Math.sqrt((X + DX) ** 2 + (Y + DY) ** 2);
-    const b = A_WGS * Math.sqrt(1 - E2_WGS);
-    const theta = Math.atan2((Z + DZ) * A_WGS, p * b);
-    const phiW = Math.atan2(
-        Z + DZ + EP2_WGS * b * Math.sin(theta) ** 3,
-        p - E2_WGS * A_WGS * Math.cos(theta) ** 3
-    );
-    const lamW = Math.atan2(Y + DY, X + DX);
-    return { lat: (phiW * 180) / Math.PI, lon: (lamW * 180) / Math.PI };
-}
+// (implementação em modules/parking/domain/projection.ts)
 
 // ─────────────────────── Importação ───────────────────────
 

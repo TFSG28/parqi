@@ -10,3 +10,7 @@
 - a pasta data já tem csv e shp para importar e organizar na BD
 
 - Pedir autorização de localização e centrar na localização do utilizador
+- importer do OSM e da CAOP
+  - import:osm → país inteiro por bbox (Continente + Madeira + Açores), 3 queries Overpass
+  - import:caop → concelhos dos gpkg (node:sqlite, sem GDAL; TM06/UTM→WGS84 em Node) + associa parques ao concelho
+  - novo modelo Municipality (CAOP 2025) e ParkingSpot.municipalityId
