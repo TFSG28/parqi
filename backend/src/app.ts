@@ -43,8 +43,9 @@ app.use(limiter);
 app.use(correlationIdMiddleware);
 app.use(metricsMiddleware);
 app.use(corsMiddleware);
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// 200kb chega para qualquer geometria da app (LineString máx. 100 pontos).
+app.use(express.json({ limit: '200kb' }));
+app.use(express.urlencoded({ extended: true, limit: '200kb' }));
 app.use(cookieParser());
 app.use(sanitizationMiddleware);
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     Pressable,
     ScrollView,
@@ -147,6 +148,20 @@ export default function LoginScreen() {
                     )}
                 </Pressable>
 
+                {mode === 'register' && (
+                    <Text style={styles.hint}>
+                        Ao criares conta aceitas os{' '}
+                        <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/termos')}>
+                            Termos e Condições
+                        </Text>{' '}
+                        e a{' '}
+                        <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/privacidade')}>
+                            Política de Privacidade
+                        </Text>
+                        .
+                    </Text>
+                )}
+
                 <Text style={styles.hint}>
                     Após criares a conta recebes um código por email para a validares — só assim podes
                     adicionar, votar e sugerir estacionamentos.
@@ -226,5 +241,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         textAlign: 'center',
         marginTop: 16,
         lineHeight: 18,
+    },
+    link: {
+        color: colors.primary,
+        textDecorationLine: 'underline',
     },
 });

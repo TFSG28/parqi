@@ -171,7 +171,14 @@ export default function SuggestScreen() {
     }
 
     if (!spot) {
-        return null;
+        return (
+            <View style={styles.center}>
+                <Text style={styles.notFound}>Estacionamento não encontrado.</Text>
+                <Pressable onPress={() => router.back()}>
+                    <Text style={styles.notFoundLink}>Voltar</Text>
+                </Pressable>
+            </View>
+        );
     }
 
     return (
@@ -296,6 +303,16 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             alignItems: 'center',
             justifyContent: 'center',
+        },
+        notFound: {
+            fontSize: 14,
+            color: colors.textMuted,
+        },
+        notFoundLink: {
+            marginTop: 10,
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.primary,
         },
         intro: {
             fontSize: 14,

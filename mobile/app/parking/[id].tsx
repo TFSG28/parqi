@@ -13,10 +13,11 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { OsmMap } from '../../src/components/OsmMap';
+import { AppMap } from '../../src/components/AppMap';
 import { StatusBadge } from '../../src/components/StatusBadge';
 import { TrustBar } from '../../src/components/TrustBar';
 import { useAuth } from '../../src/context/AuthContext';
+import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
 import { CAPACITY_LABELS, directionsUrl, SOURCE_META, TYPE_META } from '../../src/lib/geo';
@@ -37,6 +38,7 @@ const DETAIL_ROWS: {
 export default function ParkingDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { user } = useAuth();
+    const { isFavorite, toggleFavorite, refreshFavorite } = useFavorites();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -51,7 +53,9 @@ export default function ParkingDetailScreen() {
         if (!id) return;
         setLoading(true);
         try {
-            setSpot(await parkingApi.get(id));
+            const fresh = await parkingApi.get(id);
+            setSpot(fresh);
+            refreshFavorite(fresh);
             setNotFound(false);
         } catch (error) {
             if (error instanceof ApiError && error.status === 404) {
@@ -62,7 +66,7 @@ export default function ParkingDetailScreen() {
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [id, refreshFavorite]);
 
     useEffect(() => {
         load();
@@ -169,7 +173,23 @@ export default function ParkingDetailScreen() {
                         <Text style={styles.reviewHint}>A aguardar revisão manual</Text>
                     )}
                 </View>
-                <StatusBadge status={spot.status} />
+                <View style={styles.headerRight}>
+                    <StatusBadge status={spot.status} />
+                    <Pressable
+                        onPress={() => toggleFavorite(spot)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                            isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+                        }
+                    >
+                        <Ionicons
+                            name={isFavorite(spot.id) ? 'heart' : 'heart-outline'}
+                            size={24}
+                            color={isFavorite(spot.id) ? colors.accent : colors.textMuted}
+                        />
+                    </Pressable>
+                </View>
             </View>
 
             {/* Confiança */}
@@ -209,7 +229,7 @@ export default function ParkingDetailScreen() {
 
             {/* Pré-visualização no mapa */}
             <View style={styles.mapCard}>
-                <OsmMap
+                <AppMap
                     center={mapCenter}
                     zoom={16}
                     interactive={false}
@@ -325,6 +345,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     headerText: {
         flex: 1,
         gap: 4,
+    },
+    headerRight: {
+        alignItems: 'center',
+        gap: 10,
     },
     name: {
         fontSize: 18,

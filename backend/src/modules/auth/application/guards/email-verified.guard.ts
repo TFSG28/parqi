@@ -19,4 +19,8 @@ export async function assertEmailVerified(
     if (!user || !user.emailVerified) {
         throw new ForbiddenError(`Verifica o teu email para poderes ${action}.`);
     }
+    // Conta suspensa não pode agir, mesmo com JWT ainda válido.
+    if (user.isActive === false) {
+        throw new ForbiddenError('A tua conta está suspensa. Contacta geral@parqi.pt.');
+    }
 }

@@ -6,6 +6,7 @@ import { UserRepository } from '../../../modules/user/infrastructure/repositorie
 
 // Use Cases
 import { CreateUserUseCase } from '../../../modules/user/application/usecases/CreateUser.usecase';
+import { SetUserActiveUseCase } from '../../../modules/user/application/usecases/SetUserActive.usecase';
 
 // Controllers
 import { UserController } from '../../../modules/user/presentation/controllers/user.controller';
@@ -16,6 +17,7 @@ export function setupUserContainer() {
 
     // Use Cases (Transient)
     container.register(USER_TOKENS.CreateUserUseCase, CreateUserUseCase);
+    container.register(USER_TOKENS.SetUserActiveUseCase, SetUserActiveUseCase);
 
     // Controllers (Transient)
     container.register(USER_TOKENS.UserController, UserController);

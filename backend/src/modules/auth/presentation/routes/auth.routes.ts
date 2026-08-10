@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { authController } from '../../../../shared/container/controllers';
 import { validate } from '../../../../shared/middleware/validation.middleware';
 import { authMiddleware } from '../../../../shared/middleware/auth.middleware';
@@ -9,8 +10,18 @@ import { ResendCodeSchema } from '../../application/dtos/ResendCode.dto';
 
 const router = Router();
 
+// Anti brute-force: limite apertado só no login.
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === 'test',
+    message: { error: 'Demasiadas tentativas de login. Tenta novamente mais tarde.' },
+});
+
 // Public
-router.post('/login', validate(LoginSchema), authController.login);
+router.post('/login', loginLimiter, validate(LoginSchema), authController.login);
 router.post('/refresh', authController.refresh);
 
 // Authenticated

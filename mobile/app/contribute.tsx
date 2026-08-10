@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Chip } from '../src/components/Chip';
 import { MapLayerPicker } from '../src/components/MapLayerPicker';
-import { OsmMap, type MapLayer, type OsmMapHandle } from '../src/components/OsmMap';
+import { AppMap, type AppMapHandle, type MapLayer } from '../src/components/AppMap';
 import { useAuth } from '../src/context/AuthContext';
 import { useTheme } from '../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../src/lib/api';
@@ -58,7 +58,7 @@ export default function ContributeScreen() {
     const { user, loading } = useAuth();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
-    const mapRef = useRef<OsmMapHandle>(null);
+    const mapRef = useRef<AppMapHandle>(null);
 
     const [mode, setMode] = useState<DrawMode>('point');
     const [point, setPoint] = useState<LatLng | null>(null);
@@ -240,6 +240,16 @@ export default function ContributeScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+                {/* Regras da comunidade: educar antes de submeter poupa moderação depois */}
+                <View style={styles.rulesCard}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                    <Text style={styles.rulesText}>
+                        Só lugares reais e na posição exata. Se já existir no mapa a menos de 30 m,
+                        sugere uma edição em vez de criar outro. As primeiras contribuições passam por
+                        revisão.
+                    </Text>
+                </View>
+
                 {/* Seletor de modo */}
                 <View style={styles.modeRow}>
                     <Chip label="Ponto" selected={mode === 'point'} onPress={() => selectMode('point')} />
@@ -249,7 +259,7 @@ export default function ContributeScreen() {
 
                 {/* Mapa de desenho */}
                 <View style={styles.mapCard}>
-                    <OsmMap
+                    <AppMap
                         ref={mapRef}
                         center={DEFAULT_LOCATION}
                         zoom={15}
@@ -397,6 +407,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         padding: 16,
         gap: 8,
         paddingBottom: 40,
+    },
+    rulesCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 12,
+        padding: 12,
+    },
+    rulesText: {
+        flex: 1,
+        fontSize: 12,
+        lineHeight: 18,
+        color: colors.textMuted,
     },
     modeRow: {
         flexDirection: 'row',

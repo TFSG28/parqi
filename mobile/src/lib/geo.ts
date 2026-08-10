@@ -38,7 +38,7 @@ export function directionsUrl(latitude: number, longitude: number): string {
 }
 
 export const TYPE_META: Record<ParkingType, { label: string; icon: IoniconName; color: string }> = {
-    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: '#3B82F6' },
+    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: '#3B6BFF' },
     UNDERGROUND: { label: 'Subterrâneo', icon: 'water', color: '#7C3AED' },
     MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: '#0EA5E9' },
     STREET: { label: 'Na via', icon: 'car', color: '#64748B' },

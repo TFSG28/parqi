@@ -27,7 +27,7 @@ export interface OsmMapHandle {
     centerOn: (latitude: number, longitude: number, zoom?: number) => void;
 }
 
-interface OsmMapProps {
+export interface OsmMapProps {
     center: { latitude: number; longitude: number };
     zoom?: number;
     markers?: OsmMarker[];
@@ -244,36 +244,60 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
     ref
 ) {
     const webRef = useRef<WebView>(null);
+    const loaded = useRef(false);
     // HTML construído uma vez; atualizações seguem por injectJavaScript (sem recarregar o mapa)
     const html = useRef(
         buildHtml(center, zoom, interactive, cluster, markers, polygon, polyline, userLocation, layer)
     ).current;
 
+    // injectJavaScript antes do WebView carregar perde-se; onLoadEnd resincroniza tudo
+    const inject = (js: string) => {
+        if (loaded.current) webRef.current?.injectJavaScript(`${js} true;`);
+    };
+
     useImperativeHandle(ref, () => ({
         centerOn: (latitude, longitude, z) => {
-            webRef.current?.injectJavaScript(`centerOn(${latitude}, ${longitude}${z ? `, ${z}` : ''}); true;`);
+            inject(`centerOn(${latitude}, ${longitude}${z ? `, ${z}` : ''});`);
         },
     }));
 
     useEffect(() => {
-        webRef.current?.injectJavaScript(`switchLayer('${layer}'); true;`);
+        inject(`centerOn(${center.latitude}, ${center.longitude});`);
+    }, [center.latitude, center.longitude]);
+
+    useEffect(() => {
+        inject(`switchLayer('${layer}');`);
     }, [layer]);
 
     useEffect(() => {
-        webRef.current?.injectJavaScript(`updateMarkers(${JSON.stringify(markers)}); true;`);
+        inject(`updateMarkers(${JSON.stringify(markers)});`);
     }, [markers]);
 
     useEffect(() => {
-        webRef.current?.injectJavaScript(`setPolygon(${JSON.stringify(polygon)}); true;`);
+        inject(`setPolygon(${JSON.stringify(polygon)});`);
     }, [polygon]);
 
     useEffect(() => {
-        webRef.current?.injectJavaScript(`setPolyline(${JSON.stringify(polyline)}); true;`);
+        inject(`setPolyline(${JSON.stringify(polyline)});`);
     }, [polyline]);
 
     useEffect(() => {
-        webRef.current?.injectJavaScript(`setUser(${JSON.stringify(userLocation ?? null)}); true;`);
+        inject(`setUser(${JSON.stringify(userLocation ?? null)});`);
     }, [userLocation]);
+
+    // Aplica o estado mais recente das props quando o mapa fica pronto
+    // (corrige o mapa preso no centro inicial quando a localização chega antes do load)
+    const handleLoadEnd = () => {
+        loaded.current = true;
+        inject(
+            `centerOn(${center.latitude}, ${center.longitude});` +
+            `switchLayer('${layer}');` +
+            `updateMarkers(${JSON.stringify(markers)});` +
+            `setPolygon(${JSON.stringify(polygon)});` +
+            `setPolyline(${JSON.stringify(polyline)});` +
+            `setUser(${JSON.stringify(userLocation ?? null)});`
+        );
+    };
 
     const handleMessage = (event: WebViewMessageEvent) => {
         try {
@@ -294,6 +318,7 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
             ref={webRef}
             source={{ html }}
             style={[styles.map, style]}
+            onLoadEnd={handleLoadEnd}
             onMessage={handleMessage}
             javaScriptEnabled
             domStorageEnabled

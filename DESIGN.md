@@ -91,7 +91,7 @@ Parqi encontra estacionamento em Portugal com dados públicos e comunidade. A id
 Estratégia *committed* no site (o azul carrega herói e rodapé; o miolo é branco) e *restrained* na app (neutros claros, azul só em ações primárias e na barra superior).
 
 - `brand` #3B6BFF é o azul do sinal de estacionamento (versão mais clara e viva): ações primárias, barras, marca.
-- `accent` #FF7A00 é a cor de ação (laranja vivo): CTAs primários (Rota, Enviar contribuição, FABs de modo), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam `ink` (branco sobre laranja vivo falha o contraste AA).
+- `accent` #FF7A00 é a cor de ação (laranja vivo): CTAs primários (Rota, Enviar contribuição, FAB de adicionar), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam `ink` (branco sobre laranja vivo falha o contraste AA).
 - Neutros do site (`ink`, `ink-soft`, `paper`, `mist`) são tintados para o azul da marca; os da app (`app-*`) são neutros frios do sistema.
 - Semânticos: `success` verde para confiança alta e "Verificado", `danger` para reportar/sinalizado, `accent` para pendente e confiança média.
 - Sobre azul usa-se branco ou `mist`; nunca cinzento sobre cor.
@@ -115,7 +115,8 @@ Estratégia *committed* no site (o azul carrega herói e rodapé; o miolo é bra
 - **app-card**: cartão branco, borda 1px, raio 16. Nunca aninhar cartões.
 - **TrustBar**: barra de confiança 0–10; cor por faixa (≥5 verde, ≥3 laranja, <3 vermelho).
 - **StatusBadge**: pílula com ponto colorido; Verificado/Em verificação/Sinalizado/Rejeitado.
-- **FABs do mapa**: círculos brancos de 48px com ícone azul, sombra discreta.
+- **tab bar**: navegação principal da app no rodapé (Parques / Mapa / Conta); fundo `app-card`, hairline `app-border`, ativo a azul com ícone preenchido, inativo `app-text-muted` com ícone outline.
+- **FABs do mapa**: círculos brancos de 48px com ícone azul, sombra discreta; o FAB de adicionar na lista é laranja (`accent`) com ícone `ink`.
 - **road-line** (site): separador com traço descontínuo de estrada, uso único por página.
 - Botões: verbo + objeto ("Enviar contribuição"), estados disabled a opacity 0.45–0.6, loading com `ActivityIndicator` inline.
 

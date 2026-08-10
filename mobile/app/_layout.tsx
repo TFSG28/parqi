@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Image, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
+import { FavoritesProvider } from '../src/context/FavoritesContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { OfflineProvider } from '../src/context/OfflineContext';
 import { registerForPushNotifications } from '../src/services/notifications';
@@ -41,7 +42,7 @@ function AppContent() {
                 }}
             >
                 <Stack.Screen
-                    name="index"
+                    name="(tabs)"
                     options={{ headerShown: false }}
                 />
                 <Stack.Screen
@@ -60,7 +61,6 @@ function AppContent() {
                     name="verify"
                     options={{ title: 'Confirmar email', headerBackButtonDisplayMode: 'minimal' }}
                 />
-                <Stack.Screen name="account" options={{ title: 'Conta', headerBackButtonDisplayMode: 'minimal' }} />
                 <Stack.Screen
                     name="suggest/[id]"
                     options={{ title: 'Sugerir alteração', presentation: 'modal' }}
@@ -80,7 +80,9 @@ export default function RootLayout() {
             <ThemeProvider>
                 <OfflineProvider>
                     <AuthProvider>
-                        <AppContent />
+                        <FavoritesProvider>
+                            <AppContent />
+                        </FavoritesProvider>
                     </AuthProvider>
                 </OfflineProvider>
             </ThemeProvider>

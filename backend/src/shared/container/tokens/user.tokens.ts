@@ -4,6 +4,7 @@ export const USER_TOKENS = {
 
     // Use Cases
     CreateUserUseCase: Symbol.for('CreateUserUseCase'),
+    SetUserActiveUseCase: Symbol.for('SetUserActiveUseCase'),
 
     // Controllers
     UserController: Symbol.for('UserController'),

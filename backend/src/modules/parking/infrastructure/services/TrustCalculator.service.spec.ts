@@ -48,6 +48,18 @@ describe('TrustCalculator', () => {
             expect(result.status).toBe('REJECTED');
         });
 
+        it('rejeição automática com 2 downvotes líquidos (raw <= -2)', () => {
+            // 2 (base) - 2 downvotes * 2 = -2
+            const result = calculator.apply('COMMUNITY', 'PENDING', { upvotes: 0, downvotes: 2 });
+            expect(result.status).toBe('REJECTED');
+        });
+
+        it('um único downvote não rejeita automaticamente', () => {
+            // 2 (base) - 1 downvote * 2 = 0 > -2
+            const result = calculator.apply('COMMUNITY', 'PENDING', { upvotes: 0, downvotes: 1 });
+            expect(result.status).toBe('PENDING');
+        });
+
         it('dados importados só são flagados com votos negativos suficientes', () => {
             // 6 (base) - 2 downvotes * 2 = 2 < 3
             const result = calculator.apply('OVERPASS', 'APPROVED', { upvotes: 0, downvotes: 2 });

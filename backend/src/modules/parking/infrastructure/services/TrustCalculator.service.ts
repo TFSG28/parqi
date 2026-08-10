@@ -13,6 +13,8 @@ import type {
  *  - PENDING  -> APPROVED quando confiança >= 5
  *  - APPROVED -> FLAGGED  quando confiança < 3 (entra em fila de moderação manual)
  *  - FLAGGED  -> APPROVED quando a comunidade recupera a confiança >= 5
+ *  - Qualquer estado -> REJECTED quando a pontuação bruta cai a -2 ou menos
+ *    (>= 2 downvotes líquidos de peso total; a comunidade rejeita sozinha, sem admin)
  *  - REJECTED nunca muda automaticamente (só admin)
  */
 @injectable()
@@ -27,6 +29,7 @@ export class TrustCalculator implements ITrustCalculator {
     private readonly DOWNVOTE_WEIGHT = -2;
     private readonly APPROVE_THRESHOLD = 5;
     private readonly FLAG_THRESHOLD = 3;
+    private readonly REJECT_RAW_THRESHOLD = -2;
     private readonly MAX = 10;
     private readonly MIN = 0;
 
@@ -45,6 +48,12 @@ export class TrustCalculator implements ITrustCalculator {
 
         if (currentStatus === 'REJECTED') {
             return { trustScore, status: currentStatus };
+        }
+
+        // Rejeição automática pela comunidade: usa a pontuação bruta (sem clamp)
+        // para exigir sinal negativo real, não apenas um downvote num spot novo.
+        if (raw <= this.REJECT_RAW_THRESHOLD) {
+            return { trustScore, status: 'REJECTED' };
         }
 
         let status = currentStatus;

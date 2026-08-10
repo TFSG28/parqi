@@ -6,19 +6,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pt.parqi.app",
-      "associatedDomains": ["applinks:parqi.pt"],
-      "infoPlist": {
-        "UIUserInterfaceStyle": "Light"
-      }
+      "associatedDomains": ["applinks:parqi.pt"]
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#272EF5",
+        "backgroundColor": "#3B6BFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

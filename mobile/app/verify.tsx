@@ -104,7 +104,7 @@ export default function VerifyScreen() {
         >
             <View style={styles.content}>
                 <View style={styles.iconWrap}>
-                    <Ionicons name="mail-open" size={34} color={colors.primary} />
+                    <Ionicons name="mail-open" size={34} color={colors.white} />
                 </View>
                 <Text style={styles.title}>Confirma o teu email</Text>
                 <Text style={styles.subtitle}>

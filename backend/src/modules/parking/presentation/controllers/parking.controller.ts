@@ -22,6 +22,13 @@ function routeId(req: Request): string {
     return Array.isArray(id) ? id[0] : id;
 }
 
+/** Paginação saneada: impede limit=999999 de despejar a tabela inteira. */
+function pageParams(req: Request): { page: number; limit: number } {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    return { page, limit };
+}
+
 @injectable()
 export class ParkingController {
     constructor(
@@ -53,8 +60,7 @@ export class ParkingController {
 
     list = asyncHandler(async (req: Request, res: Response) => {
         const { bbox, type } = req.query as { bbox?: string; type?: string };
-        const page = Number(req.query.page ?? 1);
-        const limit = Number(req.query.limit ?? 20);
+        const { page, limit } = pageParams(req);
 
         const result = await this.listParkingUseCase.execute({ bbox, parkingType: type, page, limit });
         return ApiResponse.paginated(res, result.items, page, limit, result.total);
@@ -137,15 +143,13 @@ export class ParkingController {
 
     /** Fila de moderação: contribuições de contas novas a decidir pelo admin. */
     moderationQueue = asyncHandler(async (req: Request, res: Response) => {
-        const page = Number(req.query.page ?? 1);
-        const limit = Number(req.query.limit ?? 20);
+        const { page, limit } = pageParams(req);
         const result = await this.listModerationQueueUseCase.execute({ page, limit });
         return ApiResponse.paginated(res, result.items, page, limit, result.total);
     });
 
     listSuggestions = asyncHandler(async (req: Request, res: Response) => {
-        const page = Number(req.query.page ?? 1);
-        const limit = Number(req.query.limit ?? 20);
+        const { page, limit } = pageParams(req);
         const status = typeof req.query.status === 'string' ? req.query.status : 'PENDING';
         const result = await this.listSuggestionsUseCase.execute({ status, page, limit });
         return ApiResponse.paginated(res, result.items, page, limit, result.total);

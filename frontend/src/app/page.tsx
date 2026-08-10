@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import ScrollReveal from "@/components/feature/ScrollReveal";
 
 const PILLARS = [
@@ -203,12 +204,26 @@ export default function Home() {
               <ParkingSign inverted className="h-6 w-6 text-sm" />
               <span className="font-medium">© {new Date().getFullYear()} Parqi</span>
             </span>
-            <a
-              href="mailto:ola@parqi.pt"
-              className="text-mist underline underline-offset-4 transition-colors hover:text-white"
-            >
-              ola@parqi.pt
-            </a>
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
+              <Link
+                href="/termos"
+                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Termos e Condições
+              </Link>
+              <Link
+                href="/privacidade"
+                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Privacidade
+              </Link>
+              <a
+                href="mailto:geral@parqi.pt"
+                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+              >
+                geral@parqi.pt
+              </a>
+            </nav>
           </div>
         </ScrollReveal>
       </footer>
