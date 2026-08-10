@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -77,6 +77,28 @@ export default function ContributeScreen() {
         isCovered: false,
     });
     const [submitting, setSubmitting] = useState(false);
+
+    // Aviso de alterações por guardar ao sair (o formulário perde-se)
+    const navigation = useNavigation();
+    const dirtyRef = useRef(false);
+    const allowLeave = useRef(false);
+    dirtyRef.current =
+        name.trim().length > 0 || description.trim().length > 0 || vertices.length > 0;
+
+    useEffect(() => {
+        return navigation.addListener('beforeRemove', (e) => {
+            if (allowLeave.current || !dirtyRef.current) return;
+            e.preventDefault();
+            Alert.alert('Descartar contribuição?', 'O que preencheste vai perder-se.', [
+                { text: 'Continuar a editar', style: 'cancel' },
+                {
+                    text: 'Descartar',
+                    style: 'destructive',
+                    onPress: () => navigation.dispatch(e.data.action),
+                },
+            ]);
+        });
+    }, [navigation]);
 
     // Guarda de autenticação
     useEffect(() => {
@@ -187,6 +209,7 @@ export default function ContributeScreen() {
                 hasEvCharging: details.hasEvCharging || undefined,
                 isCovered: details.isCovered || undefined,
             });
+            allowLeave.current = true;
             Alert.alert(
                 'Contribuição enviada',
                 parkingType === 'STREET'
@@ -200,7 +223,10 @@ export default function ContributeScreen() {
                     { text: 'Cancelar', style: 'cancel' },
                     {
                         text: 'Ver',
-                        onPress: () => router.replace(`/parking/${error.details!.existingId as string}`),
+                        onPress: () => {
+                            allowLeave.current = true;
+                            router.replace(`/parking/${error.details!.existingId as string}`);
+                        },
                     },
                 ]);
             } else {

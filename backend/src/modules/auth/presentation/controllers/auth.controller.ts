@@ -6,6 +6,7 @@ import { LoginUseCase } from '../../application/usecases/Login.usecase';
 import { GetCurrentUserUseCase } from '../../application/usecases/GetCurrentUser.usecase';
 import { VerifyEmailUseCase } from '../../application/usecases/VerifyEmail.usecase';
 import { ResendCodeUseCase } from '../../application/usecases/ResendCode.usecase';
+import { PasswordResetService } from '../../infrastructure/services/PasswordReset.service';
 import { IJwtService } from '../../domain/services/IJwt.service';
 import { asyncHandler } from '../../../../shared/utils/async-handler';
 import { ApiResponse } from '../../../../shared/utils/api-response';
@@ -25,6 +26,7 @@ export class AuthController {
         @inject(AUTH_TOKENS.GetCurrentUserUseCase) private readonly getCurrentUserUseCase: GetCurrentUserUseCase,
         @inject(AUTH_TOKENS.VerifyEmailUseCase) private readonly verifyEmailUseCase: VerifyEmailUseCase,
         @inject(AUTH_TOKENS.ResendCodeUseCase) private readonly resendCodeUseCase: ResendCodeUseCase,
+        @inject(AUTH_TOKENS.PasswordResetService) private readonly passwordResetService: PasswordResetService,
         @inject(AUTH_TOKENS.IJwtService) private readonly jwtService: IJwtService
     ) {}
 
@@ -67,6 +69,20 @@ export class AuthController {
     resendCode = asyncHandler(async (req: Request, res: Response) => {
         const result = await this.resendCodeUseCase.execute({ userId: req.user!.userId });
         return ApiResponse.success(res, result);
+    });
+
+    /** Pede um código de recuperação. Resposta idêntica exista a conta ou não. */
+    forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+        await this.passwordResetService.requestReset(req.body.email);
+        return ApiResponse.success(res, {
+            message: 'Se o email existir, recebes um código de recuperação.',
+        });
+    });
+
+    /** Define a palavra-passe nova com o código recebido por email. */
+    resetPassword = asyncHandler(async (req: Request, res: Response) => {
+        await this.passwordResetService.reset(req.body.email, req.body.code, req.body.password);
+        return ApiResponse.success(res, { message: 'Palavra-passe alterada. Já podes entrar.' });
     });
 
     // Re-issues the access token + CSRF token while the current session is still

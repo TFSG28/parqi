@@ -138,6 +138,12 @@ export default function LoginScreen() {
 
                 {error && <Text style={styles.error}>{error}</Text>}
 
+                {mode === 'login' && (
+                    <Pressable onPress={() => router.push('/forgot-password')} hitSlop={8}>
+                        <Text style={styles.forgot}>Esqueceste-te da palavra-passe?</Text>
+                    </Pressable>
+                )}
+
                 <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submit} disabled={busy}>
                     {busy ? (
                         <ActivityIndicator color={colors.white} />
@@ -245,5 +251,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     link: {
         color: colors.primary,
         textDecorationLine: 'underline',
+    },
+    forgot: {
+        color: colors.primary,
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 12,
+        alignSelf: 'flex-end',
     },
 });

@@ -7,6 +7,8 @@ import { ValidationError } from '../../../../shared/errors/AppError';
 export interface ListParkingInput {
     bbox?: string;
     parkingType?: string;
+    /** Pesquisa por nome; quando presente, o bbox é ignorado (pesquisa nacional). */
+    q?: string;
     page: number;
     limit: number;
 }
@@ -23,9 +25,11 @@ export class ListParkingUseCase {
     ) {}
 
     async execute(input: ListParkingInput) {
+        const q = input.q?.trim() || null;
         return this.parkingRepository.list({
-            bbox: input.bbox ? this.parseBbox(input.bbox) : null,
+            bbox: !q && input.bbox ? this.parseBbox(input.bbox) : null,
             parkingType: (input.parkingType as ParkingType | undefined) ?? null,
+            q,
             statuses: ['APPROVED', 'PENDING'],
             page: input.page,
             limit: input.limit,

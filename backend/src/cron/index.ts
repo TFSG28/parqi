@@ -1,8 +1,40 @@
-export function initCronJobs() {
-    // Example: Run every day at midnight
-    // cron.schedule('0 0 * * *', () => {
-    //     console.log('Running daily cleanup job');
-    // });
+import { prisma } from '../lib/prisma';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const STALE_PENDING_DAYS = 90;
+
+/**
+ * Contribuições da comunidade PENDING há mais de 90 dias e sem um único voto
+ * nunca vão ser validadas — rejeita-as para não acumularem lixo na base de
+ * dados nem na fila de moderação. REJECTED não aparece no mapa e não bloqueia
+ * o dedup de novas contribuições no mesmo sítio.
+ */
+async function rejectStalePending(): Promise<void> {
+    try {
+        const cutoff = new Date(Date.now() - STALE_PENDING_DAYS * DAY_MS);
+        const { count } = await prisma.parkingSpot.updateMany({
+            where: {
+                source: 'COMMUNITY',
+                status: 'PENDING',
+                createdAt: { lt: cutoff },
+                votes: { none: {} },
+            },
+            data: { status: 'REJECTED' },
+        });
+        if (count > 0) {
+            console.log(`[cron] ${count} contribuições PENDING expiradas foram rejeitadas`);
+        }
+    } catch (error) {
+        console.error('[cron] limpeza de PENDING antigos falhou:', error);
+    }
+}
+
+export function initCronJobs() {
+    if (process.env.NODE_ENV === 'test') {
+        return;
+    }
+    // ponytail: setInterval chega para um job diário; node-cron se um dia for preciso horário exato
+    setInterval(rejectStalePending, DAY_MS).unref();
+    setTimeout(rejectStalePending, 30_000).unref();
     console.log('Cron jobs initialized');
 }

@@ -88,6 +88,15 @@ model User {
     emailVerificationAttempts  Int       @default(0)
     emailVerificationSentAt    DateTime?
 
+    // Recuperação de palavra-passe por código (mesmo modelo da verificação de email)
+    passwordResetCode     String?
+    passwordResetExpires  DateTime?
+    passwordResetAttempts Int       @default(0)
+    passwordResetSentAt   DateTime?
+
+    // Push notifications (Expo): último token registado (um dispositivo por conta)
+    pushToken String?
+
     contributions  ParkingSpot[]
     votes          ParkingVote[]
     moderationLogs ModerationLog[]

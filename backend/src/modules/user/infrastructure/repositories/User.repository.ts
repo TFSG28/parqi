@@ -17,6 +17,11 @@ function toEntity(user: {
     emailVerificationExpires: Date | null;
     emailVerificationAttempts: number;
     emailVerificationSentAt: Date | null;
+    passwordResetCode: string | null;
+    passwordResetExpires: Date | null;
+    passwordResetAttempts: number;
+    passwordResetSentAt: Date | null;
+    pushToken: string | null;
 }): UserEntity {
     return new UserEntity(
         user.id,
@@ -31,7 +36,12 @@ function toEntity(user: {
         user.emailVerificationCode,
         user.emailVerificationExpires,
         user.emailVerificationAttempts,
-        user.emailVerificationSentAt
+        user.emailVerificationSentAt,
+        user.passwordResetCode,
+        user.passwordResetExpires,
+        user.passwordResetAttempts,
+        user.passwordResetSentAt,
+        user.pushToken
     );
 }
 

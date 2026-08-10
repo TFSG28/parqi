@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
 import { FavoritesProvider } from '../src/context/FavoritesContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
-import { OfflineProvider } from '../src/context/OfflineContext';
 import { registerForPushNotifications } from '../src/services/notifications';
 
 function HeaderLogo() {
@@ -58,6 +57,10 @@ function AppContent() {
                 />
                 <Stack.Screen name="login" options={{ title: 'Entrar', headerBackButtonDisplayMode: 'minimal' }} />
                 <Stack.Screen
+                    name="forgot-password"
+                    options={{ title: 'Recuperar palavra-passe', headerBackButtonDisplayMode: 'minimal' }}
+                />
+                <Stack.Screen
                     name="verify"
                     options={{ title: 'Confirmar email', headerBackButtonDisplayMode: 'minimal' }}
                 />
@@ -78,13 +81,11 @@ export default function RootLayout() {
     return (
         <SafeAreaProvider>
             <ThemeProvider>
-                <OfflineProvider>
-                    <AuthProvider>
-                        <FavoritesProvider>
-                            <AppContent />
-                        </FavoritesProvider>
-                    </AuthProvider>
-                </OfflineProvider>
+                <AuthProvider>
+                    <FavoritesProvider>
+                        <AppContent />
+                    </FavoritesProvider>
+                </AuthProvider>
             </ThemeProvider>
         </SafeAreaProvider>
     );

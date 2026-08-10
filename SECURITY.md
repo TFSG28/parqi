@@ -1,82 +1,15 @@
-# Security Policy
+# Política de Segurança
 
-## Supported Versions
+## Reportar uma vulnerabilidade
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
+Se encontrares uma vulnerabilidade no Parqi:
 
-## Reporting a Vulnerability
+1. **Não** abras uma issue pública.
+2. Escreve para **geral@parqi.pt** com a descrição, passos para reproduzir e impacto.
+3. Respondemos assim que possível e trabalhamos contigo antes de qualquer divulgação.
 
-Se você descobrir uma vulnerabilidade de segurança neste projeto, por favor, siga estas etapas:
+## Medidas em vigor
 
-1. **NÃO** abra uma issue pública
-2. Envie um email para [security@example.com] com:
-   - Descrição detalhada da vulnerabilidade
-   - Passos para reproduzir
-   - Impacto potencial
-   - Sugestões de correção (se houver)
-
-3. Aguarde resposta em até 48 horas
-4. Trabalhe conosco para resolver o problema antes da divulgação pública
-
-## Security Best Practices
-
-### Autenticação e Autorização
-- Tokens JWT com expiração de 7 dias
-- Senhas hasheadas com bcrypt (10 salt rounds)
-- Validação de tokens em todas as rotas protegidas
-- Rate limiting: 200 requisições por 10 minutos
-
-### Proteção de Dados
-- Sanitização de inputs com XSS protection
-- Validação de dados com Zod
-- CORS configurado para domínios específicos
-- Headers de segurança com Helmet.js
-
-### Infraestrutura
-- Containers rodando como usuário não-root
-- Health checks configurados
-- Graceful shutdown implementado
-- Logs estruturados sem dados sensíveis
-
-### Banco de Dados
-- Conexões via Prisma ORM (proteção contra SQL injection)
-- Variáveis de ambiente para credenciais
-- Backups regulares recomendados
-
-## Security Headers
-
-O template implementa os seguintes headers de segurança:
-
-```
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-X-XSS-Protection: 1; mode=block
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Referrer-Policy: strict-origin-when-cross-origin
-Content-Security-Policy: default-src 'self'
-```
-
-## Dependências
-
-- Atualizações de segurança são aplicadas regularmente
-- Use `npm audit` para verificar vulnerabilidades
-- Dependabot configurado no GitHub
-
-## Compliance
-
-Este template segue:
-- OWASP Top 10 guidelines
-- GDPR considerations (data handling)
-- Security by design principles
-
-## Disclosure Policy
-
-- Vulnerabilidades críticas: divulgação após 7 dias da correção
-- Vulnerabilidades médias: divulgação após 30 dias da correção
-- Vulnerabilidades baixas: divulgação após 90 dias da correção
-
-## Contact
-
-Para questões de segurança: [security@example.com]
+- **Autenticação**: JWT (cookie httpOnly na web, Bearer na app), palavras-passe com bcrypt, verificação de email obrigatória para ações da comunidade, recuperação de palavra-passe por código com expiração e limite de tentativas.
+- **Anti-abuso**: rate limiting global e dedicado (registo, login, recuperação), limites diários de contribuições e votos, honeypot anti-bot, validação geográfica (Portugal) e viária, revisão manual de contas novas, suspensão de contas.
+- **Proteção de dados**: sanitização XSS de inputs, validação Zod em todos os endpoints, CSRF double-submit na web, headers de segurança (Helmet), Prisma ORM (sem SQL injection), RGPD (eliminação de conta com anonimização de contribuições).

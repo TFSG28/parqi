@@ -242,6 +242,9 @@ export class ParkingRepository implements IParkingRepository {
         if (filters.parkingType) {
             conditions.push(Prisma.sql`"parkingType" = ${filters.parkingType}`);
         }
+        if (filters.q) {
+            conditions.push(Prisma.sql`"name" ILIKE ${'%' + filters.q + '%'}`);
+        }
         if (filters.source) {
             conditions.push(Prisma.sql`"source" = ${filters.source}`);
         }

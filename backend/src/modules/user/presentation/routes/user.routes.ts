@@ -7,6 +7,8 @@ import { csrfMiddleware } from '../../../../shared/middleware/csrf.middleware';
 import { requireRole } from '../../../../shared/middleware/role.middleware';
 import { CreateUserSchema } from '../../application/dtos/CreateUser.dto';
 import { SetUserActiveSchema } from '../../application/dtos/SetUserActive.dto';
+import { DeleteAccountSchema } from '../../application/dtos/DeleteAccount.dto';
+import { PushTokenSchema } from '../../application/dtos/PushToken.dto';
 
 const router = Router();
 
@@ -24,6 +26,12 @@ router.post('/', registerLimiter, validate(CreateUserSchema), userController.cre
 
 // Estatísticas de contribuições do utilizador autenticado
 router.get('/me/stats', authMiddleware, parkingController.myStats);
+
+// Eliminação da própria conta (RGPD), confirmada com a palavra-passe
+router.delete('/me', authMiddleware, csrfMiddleware, validate(DeleteAccountSchema), userController.deleteMe);
+
+// Token Expo Push do dispositivo atual
+router.post('/push-token', authMiddleware, csrfMiddleware, validate(PushTokenSchema), userController.registerPushToken);
 
 // Suspender/reativar conta (só admin)
 router.patch(

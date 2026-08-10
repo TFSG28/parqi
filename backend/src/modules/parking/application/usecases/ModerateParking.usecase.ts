@@ -1,5 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { PARKING_TOKENS } from '../../../../shared/container/tokens/parking.tokens';
+import { USER_TOKENS } from '../../../../shared/container/tokens/user.tokens';
+import { PushService } from '../../../user/infrastructure/services/Push.service';
 import { IParkingRepository } from '../../domain/repositories/IParking.repository';
 import { ParkingSpotEntity } from '../../domain/entities/ParkingSpot.entity';
 import { ParkingNotFoundError } from '../../domain/errors/ParkingNotFound.error';
@@ -19,7 +21,9 @@ export interface ModerateParkingInput {
 export class ModerateParkingUseCase {
     constructor(
         @inject(PARKING_TOKENS.IParkingRepository)
-        private readonly parkingRepository: IParkingRepository
+        private readonly parkingRepository: IParkingRepository,
+        @inject(USER_TOKENS.PushService)
+        private readonly pushService: PushService
     ) {}
 
     async execute(input: ModerateParkingInput): Promise<ParkingSpotEntity> {
@@ -47,6 +51,26 @@ export class ModerateParkingUseCase {
         if (!updated) {
             throw new ParkingNotFoundError();
         }
+
+        // Reconhecimento do contribuidor: sabe logo que a decisão foi tomada
+        if (input.action === 'APPROVE') {
+            void this.pushService.notify(
+                spot.contributorId,
+                'Contribuição aprovada',
+                `«${spot.name}» já está verificado no mapa. Obrigado!`,
+                { type: 'contribution_approved', spotId: spot.id }
+            );
+        } else {
+            void this.pushService.notify(
+                spot.contributorId,
+                'Contribuição rejeitada',
+                input.reason
+                    ? `«${spot.name}» foi rejeitado: ${input.reason}`
+                    : `«${spot.name}» foi rejeitado pela moderação.`,
+                { type: 'contribution_rejected', spotId: spot.id }
+            );
+        }
+
         return updated;
     }
 }

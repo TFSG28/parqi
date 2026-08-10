@@ -56,6 +56,7 @@ export default function ListScreen() {
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<ParkingSpot[] | null>(null);
     const [showAll, setShowAll] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [onboardingChecked, setOnboardingChecked] = useState(false);
@@ -121,9 +122,28 @@ export default function ListScreen() {
         })();
     }, [fetchSpots]);
 
+    // Pesquisa via servidor (nome, todo o país) com debounce; enquanto a
+    // resposta não chega, o filtro local sobre o viewport dá resposta imediata
+    useEffect(() => {
+        const q = searchQuery.trim();
+        if (q.length < 2) {
+            setSearchResults(null);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            try {
+                setSearchResults(await parkingApi.search(q));
+            } catch {
+                setSearchResults(null); // sem servidor, fica o filtro local
+            }
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     // Lista ordenada por proximidade + filtrada por pesquisa
     const displayedSpots = useMemo(() => {
-        const base = userLocation ? [...spots].sort((a, b) => {
+        const source = searchResults ?? spots;
+        const base = userLocation ? [...source].sort((a, b) => {
             const da = a.latitude !== null && a.longitude !== null
                 ? distanceKm(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude)
                 : Number.POSITIVE_INFINITY;
@@ -131,12 +151,12 @@ export default function ListScreen() {
                 ? distanceKm(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude)
                 : Number.POSITIVE_INFINITY;
             return da - db;
-        }) : spots;
+        }) : source;
 
         const q = searchQuery.trim().toLowerCase();
-        if (!q) return base;
+        if (!q || searchResults) return base;
         return base.filter((s) => s.name.toLowerCase().includes(q));
-    }, [spots, userLocation, searchQuery]);
+    }, [spots, searchResults, userLocation, searchQuery]);
 
     // Favoritos: snapshot local, substituído por dados frescos quando estão no viewport
     const favoriteSpots = useMemo(() => {

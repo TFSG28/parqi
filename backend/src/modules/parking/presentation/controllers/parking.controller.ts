@@ -59,10 +59,10 @@ export class ParkingController {
     ) {}
 
     list = asyncHandler(async (req: Request, res: Response) => {
-        const { bbox, type } = req.query as { bbox?: string; type?: string };
+        const { bbox, type, q } = req.query as { bbox?: string; type?: string; q?: string };
         const { page, limit } = pageParams(req);
 
-        const result = await this.listParkingUseCase.execute({ bbox, parkingType: type, page, limit });
+        const result = await this.listParkingUseCase.execute({ bbox, parkingType: type, q, page, limit });
         return ApiResponse.paginated(res, result.items, page, limit, result.total);
     });
 

@@ -24,6 +24,7 @@ type Tab = 'contributions' | 'suggestions';
 interface PendingAction {
     kind: 'spot' | 'suggestion';
     id: string;
+    action: 'APPROVE' | 'REJECT';
 }
 
 /** Resumo legível do diff de uma sugestão (campos alterados). */
@@ -73,14 +74,14 @@ export default function AdminScreen() {
         load();
     }, [load]);
 
-    const decide = async (action: 'APPROVE' | 'REJECT') => {
+    const decide = async () => {
         if (!pendingAction) return;
         setBusy(true);
         try {
             if (pendingAction.kind === 'spot') {
-                await parkingApi.moderate(pendingAction.id, action, reason.trim() || undefined);
+                await parkingApi.moderate(pendingAction.id, pendingAction.action, reason.trim() || undefined);
             } else {
-                await parkingApi.decideSuggestion(pendingAction.id, action, reason.trim() || undefined);
+                await parkingApi.decideSuggestion(pendingAction.id, pendingAction.action, reason.trim() || undefined);
             }
             setReason('');
             setPendingAction(null);
@@ -93,6 +94,32 @@ export default function AdminScreen() {
     };
 
     const statusColor = (status: ParkingSpot['status']) => colors[STATUS_META[status].colorKey];
+
+    /** Suspende a conta do autor da contribuição (bloqueia login e ações). */
+    const confirmBan = (userId: string) => {
+        Alert.alert(
+            'Suspender autor?',
+            'O utilizador deixa de poder entrar, contribuir ou votar. Podes reativar mais tarde pela API.',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Suspender',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await parkingApi.setUserActive(userId, false);
+                            Alert.alert('Conta suspensa', 'O autor já não pode usar a conta.');
+                        } catch (error) {
+                            Alert.alert(
+                                'Erro',
+                                error instanceof ApiError ? error.message : 'Não foi possível suspender.'
+                            );
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -127,19 +154,31 @@ export default function AdminScreen() {
                                     </Pressable>
                                     <Pressable
                                         style={styles.approveButton}
-                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id })}
+                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'APPROVE' })}
                                         disabled={busy}
                                     >
                                         <Text style={styles.approveText}>Aprovar</Text>
                                     </Pressable>
                                     <Pressable
                                         style={styles.rejectButton}
-                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id })}
+                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'REJECT' })}
                                         disabled={busy}
                                     >
                                         <Text style={styles.rejectText}>Rejeitar</Text>
                                     </Pressable>
                                 </View>
+                                {spot.contributorId && (
+                                    <Pressable
+                                        style={styles.banRow}
+                                        onPress={() => confirmBan(spot.contributorId!)}
+                                        disabled={busy}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Suspender o autor desta contribuição"
+                                    >
+                                        <Ionicons name="hand-left-outline" size={14} color={colors.danger} />
+                                        <Text style={styles.banText}>Suspender autor</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         ))
                     )
@@ -170,14 +209,14 @@ export default function AdminScreen() {
                                     </Pressable>
                                     <Pressable
                                         style={styles.approveButton}
-                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id })}
+                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'APPROVE' })}
                                         disabled={busy}
                                     >
                                         <Text style={styles.approveText}>Aceitar</Text>
                                     </Pressable>
                                     <Pressable
                                         style={styles.rejectButton}
-                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id })}
+                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'REJECT' })}
                                         disabled={busy}
                                     >
                                         <Text style={styles.rejectText}>Recusar</Text>
@@ -193,8 +232,15 @@ export default function AdminScreen() {
             <Modal visible={pendingAction !== null} transparent animationType="slide">
                 <View style={styles.modalBackdrop}>
                     <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Decidir</Text>
-                        <Text style={styles.modalHint}>Motivo (opcional para aprovar, recomendado ao rejeitar):</Text>
+                        <Text style={styles.modalTitle}>
+                            {pendingAction?.action === 'APPROVE' ? 'Aprovar' : 'Rejeitar'}{' '}
+                            {pendingAction?.kind === 'spot' ? 'contribuição' : 'sugestão'}
+                        </Text>
+                        <Text style={styles.modalHint}>
+                            {pendingAction?.action === 'APPROVE'
+                                ? 'Motivo (opcional):'
+                                : 'Motivo (recomendado — o autor recebe-o na notificação):'}
+                        </Text>
                         <TextInput
                             style={styles.modalInput}
                             value={reason}
@@ -209,18 +255,16 @@ export default function AdminScreen() {
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </Pressable>
                             <Pressable
-                                style={[styles.modalReject, busy && styles.disabled]}
-                                onPress={() => decide('REJECT')}
+                                style={[
+                                    pendingAction?.action === 'APPROVE' ? styles.modalApprove : styles.modalReject,
+                                    busy && styles.disabled,
+                                ]}
+                                onPress={decide}
                                 disabled={busy}
                             >
-                                <Text style={styles.modalRejectText}>Rejeitar</Text>
-                            </Pressable>
-                            <Pressable
-                                style={[styles.modalApprove, busy && styles.disabled]}
-                                onPress={() => decide('APPROVE')}
-                                disabled={busy}
-                            >
-                                <Text style={styles.modalApproveText}>Aprovar</Text>
+                                <Text style={styles.modalApproveText}>
+                                    {pendingAction?.action === 'APPROVE' ? 'Confirmar aprovação' : 'Confirmar rejeição'}
+                                </Text>
                             </Pressable>
                         </View>
                     </View>
@@ -335,6 +379,19 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.danger,
             fontSize: 12,
             fontWeight: '700',
+        },
+        banRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 5,
+            paddingVertical: 4,
+        },
+        banText: {
+            color: colors.danger,
+            fontSize: 12,
+            fontWeight: '600',
+            textDecorationLine: 'underline',
         },
         modalBackdrop: {
             flex: 1,

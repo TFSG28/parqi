@@ -1,12 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chip } from '../../src/components/Chip';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme, type ThemeMode } from '../../src/context/ThemeContext';
-import { ApiError, parkingApi } from '../../src/lib/api';
+import { ApiError, authApi, parkingApi } from '../../src/lib/api';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ContributorStats } from '../../src/types/parking';
 
@@ -24,14 +35,19 @@ export default function AccountScreen() {
     const [loggingOut, setLoggingOut] = useState(false);
     const [stats, setStats] = useState<ContributorStats | null>(null);
     const [statsLoading, setStatsLoading] = useState(false);
+    const [statsError, setStatsError] = useState(false);
+    const [deleteModal, setDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleting, setDeleting] = useState(false);
 
     const loadStats = useCallback(async () => {
         if (!user) return;
         setStatsLoading(true);
+        setStatsError(false);
         try {
             setStats(await parkingApi.stats());
         } catch (error) {
-            // métricas não são críticas; mostra vazio
+            setStatsError(true);
             if (error instanceof ApiError && error.status === 429) {
                 Alert.alert('Limite atingido', error.message);
             }
@@ -43,6 +59,25 @@ export default function AccountScreen() {
     useEffect(() => {
         loadStats();
     }, [loadStats]);
+
+    const handleDeleteAccount = async () => {
+        if (!deletePassword) return;
+        setDeleting(true);
+        try {
+            await authApi.deleteAccount(deletePassword);
+            setDeleteModal(false);
+            setDeletePassword('');
+            await logout();
+            Alert.alert('Conta eliminada', 'Os teus dados pessoais foram removidos. Até um dia!');
+        } catch (error) {
+            Alert.alert(
+                'Erro',
+                error instanceof ApiError ? error.message : 'Não foi possível eliminar a conta.'
+            );
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     const handleLogout = async () => {
         setLoggingOut(true);
@@ -184,6 +219,13 @@ export default function AccountScreen() {
                                         </View>
                                     )}
                                 </>
+                            ) : statsError ? (
+                                <Pressable style={styles.statsRetry} onPress={loadStats} accessibilityRole="button">
+                                    <Ionicons name="refresh" size={16} color={colors.primary} />
+                                    <Text style={styles.statsRetryText}>
+                                        Não foi possível carregar. Tentar de novo
+                                    </Text>
+                                </Pressable>
                             ) : null}
                         </View>
                     </>
@@ -247,7 +289,55 @@ export default function AccountScreen() {
                         <Text style={styles.logoutText}>Terminar sessão</Text>
                     </Pressable>
                 )}
+
+                {/* Eliminação de conta (RGPD) */}
+                {user && (
+                    <Pressable onPress={() => setDeleteModal(true)} hitSlop={8}>
+                        <Text style={styles.deleteLink}>Eliminar conta</Text>
+                    </Pressable>
+                )}
             </ScrollView>
+
+            {/* Confirmação de eliminação, com palavra-passe */}
+            <Modal visible={deleteModal} transparent animationType="slide">
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>Eliminar conta</Text>
+                        <Text style={styles.modalHint}>
+                            Isto remove os teus dados pessoais de forma definitiva. As contribuições já
+                            validadas ficam no mapa, anonimizadas. Confirma com a tua palavra-passe.
+                        </Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={deletePassword}
+                            onChangeText={setDeletePassword}
+                            placeholder="Palavra-passe"
+                            placeholderTextColor={colors.textMuted}
+                            secureTextEntry
+                            autoComplete="password"
+                        />
+                        <View style={styles.modalActions}>
+                            <Pressable
+                                style={styles.modalCancel}
+                                onPress={() => { setDeleteModal(false); setDeletePassword(''); }}
+                            >
+                                <Text style={styles.modalCancelText}>Cancelar</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.modalDelete, (!deletePassword || deleting) && styles.disabled]}
+                                onPress={handleDeleteAccount}
+                                disabled={!deletePassword || deleting}
+                            >
+                                {deleting ? (
+                                    <ActivityIndicator color={colors.white} />
+                                ) : (
+                                    <Text style={styles.modalDeleteText}>Eliminar conta</Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -469,6 +559,81 @@ const createStyles = (colors: ThemeColors) =>
         logoutText: {
             color: colors.danger,
             fontWeight: '600',
+        },
+        deleteLink: {
+            textAlign: 'center',
+            color: colors.textMuted,
+            fontSize: 13,
+            textDecorationLine: 'underline',
+            marginTop: 4,
+            marginBottom: 12,
+        },
+        statsRetry: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingVertical: 8,
+        },
+        statsRetryText: {
+            color: colors.primary,
+            fontSize: 13,
+            fontWeight: '600',
+        },
+        modalBackdrop: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'flex-end',
+        },
+        modalCard: {
+            backgroundColor: colors.card,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            padding: 20,
+            gap: 12,
+            paddingBottom: 32,
+        },
+        modalTitle: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: colors.text,
+        },
+        modalHint: {
+            fontSize: 13,
+            color: colors.textMuted,
+            lineHeight: 19,
+        },
+        modalInput: {
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 12,
+            padding: 12,
+            color: colors.text,
+        },
+        modalActions: {
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            gap: 10,
+        },
+        modalCancel: {
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+        },
+        modalCancelText: {
+            color: colors.textMuted,
+            fontWeight: '600',
+        },
+        modalDelete: {
+            backgroundColor: colors.danger,
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderRadius: 12,
+            alignItems: 'center',
+        },
+        modalDeleteText: {
+            color: colors.white,
+            fontWeight: '700',
         },
         disabled: {
             opacity: 0.5,

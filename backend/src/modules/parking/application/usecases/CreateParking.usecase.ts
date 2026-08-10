@@ -78,9 +78,12 @@ export class CreateParkingUseCase {
             throw new ValidationError(road.reason ?? 'Este local não parece válido para estacionar.');
         }
 
-        // Contas novas: as primeiras contribuições entram em fila de revisão manual
+        // Contas novas: as primeiras contribuições entram em fila de revisão manual.
+        // Validação viária saltada (Overpass em baixo) também obriga a revisão —
+        // caso contrário bastava esgotar o Overpass para contornar a validação.
         const stats = await this.parkingRepository.getContributorStats(data.userId);
         const requiresReview =
+            road.skipped === true ||
             stats.total < CONTRIBUTION_LIMITS.firstContributionsRequireReview ||
             (await this.reputationService.getForUser(data.userId)).isNew;
 

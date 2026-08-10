@@ -74,8 +74,8 @@ export const baseEmailTemplate = (content: string, subject: string) => {
 export const sendEmail = async (to: string, subject: string, content: string) => {
     try {
         await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to,
+            from: `Parqi <${process.env.EMAIL}>`,
+            to: process.env.NODE_ENV === 'production' ? to : process.env.DEV_EMAIL,
             subject,
             html: baseEmailTemplate(content, subject)
         });

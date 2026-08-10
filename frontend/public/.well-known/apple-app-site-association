@@ -1,0 +1,12 @@
+{
+    "applinks": {
+        "details": [
+            {
+                "appIDs": ["TEAMID.pt.parqi.app"],
+                "components": [
+                    { "/": "/parking/*" }
+                ]
+            }
+        ]
+    }
+}

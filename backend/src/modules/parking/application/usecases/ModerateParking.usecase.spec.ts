@@ -55,7 +55,8 @@ describe('ModerateParkingUseCase', () => {
             getContributorStats: vi.fn(),
         } as unknown as IParkingRepository;
 
-        useCase = new ModerateParkingUseCase(mockRepository);
+        const mockPush = { notify: vi.fn(), registerToken: vi.fn() } as unknown as import('../../../user/infrastructure/services/Push.service').PushService;
+        useCase = new ModerateParkingUseCase(mockRepository, mockPush);
     });
 
     it('aprova um estacionamento flagado e regista o log', async () => {

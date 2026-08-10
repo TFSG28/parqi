@@ -78,11 +78,13 @@ describe('VoteParkingUseCase', () => {
             }),
         };
 
+        const mockPush = { notify: vi.fn(), registerToken: vi.fn() } as unknown as import('../../../user/infrastructure/services/Push.service').PushService;
         useCase = new VoteParkingUseCase(
             mockRepository,
             new TrustCalculator(),
             mockReputation,
-            mockUserRepository
+            mockUserRepository,
+            mockPush
         );
     });
 

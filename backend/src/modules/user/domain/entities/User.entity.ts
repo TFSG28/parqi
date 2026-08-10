@@ -12,6 +12,11 @@ export class UserEntity {
         public readonly emailVerificationCode: string | null = null,
         public readonly emailVerificationExpires: Date | null = null,
         public readonly emailVerificationAttempts: number = 0,
-        public readonly emailVerificationSentAt: Date | null = null
+        public readonly emailVerificationSentAt: Date | null = null,
+        public readonly passwordResetCode: string | null = null,
+        public readonly passwordResetExpires: Date | null = null,
+        public readonly passwordResetAttempts: number = 0,
+        public readonly passwordResetSentAt: Date | null = null,
+        public readonly pushToken: string | null = null
     ) {}
 }

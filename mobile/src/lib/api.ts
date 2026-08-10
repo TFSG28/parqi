@@ -110,7 +110,7 @@ export const api = {
     get: <T>(path: string) => request<T>(path),
     post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
     patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
-    delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    delete: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', body }),
 };
 
 export interface CreateParkingInput {
@@ -159,11 +159,19 @@ export const authApi = {
     verifyEmail: (code: string) =>
         api.post<{ emailVerified: true }>('/auth/verify-email', { code }),
     resendCode: () => api.post<{ resentAt: string; waitSeconds: number }>('/auth/resend-code'),
+    forgotPassword: (email: string) =>
+        api.post<{ message: string }>('/auth/forgot-password', { email }),
+    resetPassword: (email: string, code: string, password: string) =>
+        api.post<{ message: string }>('/auth/reset-password', { email, code, password }),
+    deleteAccount: (password: string) => api.delete<void>('/user/me', { password }),
 };
 
 export const parkingApi = {
     list: (bbox: string) =>
         api.get<ParkingSpot[]>(`/parking?bbox=${encodeURIComponent(bbox)}&limit=100`),
+    /** Pesquisa por nome em todo o país (não limitada ao viewport). */
+    search: (q: string) =>
+        api.get<ParkingSpot[]>(`/parking?q=${encodeURIComponent(q)}&limit=50`),
     get: (id: string) => api.get<ParkingSpot>(`/parking/${id}`),
     create: (data: CreateParkingInput) => api.post<ParkingSpot>('/parking', data),
     update: (id: string, data: SpotFields) => api.patch<ParkingSpot>(`/parking/${id}`, data),
@@ -181,4 +189,6 @@ export const parkingApi = {
         api.get<ParkingSuggestion[]>(`/parking/suggestions?status=${status}&page=${page}&limit=${limit}`),
     decideSuggestion: (id: string, action: 'APPROVE' | 'REJECT', reason?: string) =>
         api.post<ParkingSuggestion>(`/parking/suggestions/${id}/decide`, { action, reason }),
+    setUserActive: (userId: string, isActive: boolean) =>
+        api.patch<{ id: string; isActive: boolean }>(`/user/${userId}/active`, { isActive }),
 };

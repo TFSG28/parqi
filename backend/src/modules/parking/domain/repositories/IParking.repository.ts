@@ -47,6 +47,8 @@ export interface UpdateParkingRepositoryData {
 export interface ParkingListFilters {
     bbox?: { minLon: number; minLat: number; maxLon: number; maxLat: number } | null;
     parkingType?: ParkingType | null;
+    /** Pesquisa por nome (ILIKE %q%). */
+    q?: string | null;
     statuses: ContributionStatus[];
     /** Filtro opcional por fonte (admin / debug). */
     source?: DataSource | null;

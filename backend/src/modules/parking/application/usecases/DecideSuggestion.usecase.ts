@@ -1,5 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { PARKING_TOKENS } from '../../../../shared/container/tokens/parking.tokens';
+import { USER_TOKENS } from '../../../../shared/container/tokens/user.tokens';
+import { PushService } from '../../../user/infrastructure/services/Push.service';
 import { IParkingRepository, UpdateParkingRepositoryData } from '../../domain/repositories/IParking.repository';
 import { ISuggestionRepository, ParkingSuggestionEntity } from '../../domain/repositories/ISuggestion.repository';
 import { ITrustCalculator } from '../../domain/services/ITrustCalculator.service';
@@ -25,7 +27,9 @@ export class DecideSuggestionUseCase {
         @inject(PARKING_TOKENS.IParkingRepository)
         private readonly parkingRepository: IParkingRepository,
         @inject(PARKING_TOKENS.ITrustCalculator)
-        private readonly trustCalculator: ITrustCalculator
+        private readonly trustCalculator: ITrustCalculator,
+        @inject(USER_TOKENS.PushService)
+        private readonly pushService: PushService
     ) {}
 
     async execute(input: DecideSuggestionInput): Promise<ParkingSuggestionEntity> {
@@ -59,6 +63,18 @@ export class DecideSuggestionUseCase {
         if (!decided) {
             throw new NotFoundError('Sugestão não encontrada');
         }
+
+        void this.pushService.notify(
+            suggestion.suggestedById,
+            input.action === 'APPROVE' ? 'Sugestão aplicada' : 'Sugestão rejeitada',
+            input.action === 'APPROVE'
+                ? 'A tua sugestão foi aplicada ao estacionamento. Obrigado!'
+                : input.reason
+                    ? `A tua sugestão foi rejeitada: ${input.reason}`
+                    : 'A tua sugestão foi rejeitada pela moderação.',
+            { type: 'suggestion_decided', spotId: suggestion.parkingSpotId }
+        );
+
         return decided;
     }
 }
