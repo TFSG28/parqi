@@ -1,3 +1,4 @@
+import Image from "next/image";
 import ScrollReveal from "@/components/feature/ScrollReveal";
 
 const PILLARS = [
@@ -121,7 +122,14 @@ export default function Home() {
       <section className="bg-brand text-white">
         <div className="mx-auto max-w-5xl px-6">
           <header className="flex items-center gap-3 py-8">
-            <ParkingSign inverted className="h-9 w-9 text-xl" />
+            <Image
+              src="/icon.png"
+              alt="Parqi"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-[22%]"
+              priority
+            />
             <span className="font-display text-2xl font-bold tracking-tight">parqi</span>
           </header>
 

@@ -1,11 +1,24 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Image, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { OfflineProvider } from '../src/context/OfflineContext';
 import { registerForPushNotifications } from '../src/services/notifications';
+
+function HeaderLogo() {
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Image
+                source={require('../assets/icon.png')}
+                style={{ width: 28, height: 28, borderRadius: 6 }}
+                resizeMode="contain"
+            />
+        </View>
+    );
+}
 
 function AppContent() {
     const { colors } = useTheme();
@@ -21,6 +34,7 @@ function AppContent() {
                 screenOptions={{
                     headerStyle: { backgroundColor: colors.bar },
                     headerTintColor: colors.white,
+                    headerTitle: () => <HeaderLogo />,
                     headerTitleStyle: { fontWeight: '700' },
                     headerShadowVisible: false,
                     contentStyle: { backgroundColor: colors.background },
