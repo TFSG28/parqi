@@ -39,7 +39,7 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
     },
     ref
 ) {
-    // ponytail: sem clustering no modo google; volta ao OSM se a densidade de pins pesar
+    //   sem clustering no modo google; volta ao OSM se a densidade de pins pesar
     const mapRef = useRef<MapView>(null);
 
     const animateTo = (latitude: number, longitude: number, z: number) => {
@@ -86,14 +86,14 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
             onRegionChangeComplete={
                 interactive && onBoundsChange
                     ? (r) =>
-                          onBoundsChange(
-                              [
-                                  r.longitude - r.longitudeDelta / 2,
-                                  r.latitude - r.latitudeDelta / 2,
-                                  r.longitude + r.longitudeDelta / 2,
-                                  r.latitude + r.latitudeDelta / 2,
-                              ].join(',')
-                          )
+                        onBoundsChange(
+                            [
+                                r.longitude - r.longitudeDelta / 2,
+                                r.latitude - r.latitudeDelta / 2,
+                                r.longitude + r.longitudeDelta / 2,
+                                r.latitude + r.latitudeDelta / 2,
+                            ].join(',')
+                        )
                     : undefined
             }
         >

@@ -7,7 +7,7 @@ import { Prisma } from '../../generated/prisma/client';
  * that encrypts on create/update and decrypts on read for the target models,
  * using EncryptionService (see shared/services/encryption.service.ts).
  *
- * ponytail: intentionally a pass-through until specific fields need protection.
+ *   intentionally a pass-through until specific fields need protection.
  * Applied to the client in lib/prisma.ts via `$extends`.
  */
 export const encryptionExtension = Prisma.defineExtension({

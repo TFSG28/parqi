@@ -5,7 +5,7 @@
  * - csrf_token: readable cookie for the stateless double-submit CSRF check
  *   (the client echoes it back in the X-CSRF-Token header).
  *
- * ponytail: sameSite 'lax' assumes frontend and backend share a site.
+ *   sameSite 'lax' assumes frontend and backend share a site.
  * If they live on different domains (e.g. app.example.com + api.example.com),
  * switch to sameSite 'none' with secure: true.
  */

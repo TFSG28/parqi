@@ -33,7 +33,7 @@ export function initCronJobs() {
     if (process.env.NODE_ENV === 'test') {
         return;
     }
-    // ponytail: setInterval chega para um job diário; node-cron se um dia for preciso horário exato
+    //   setInterval chega para um job diário; node-cron se um dia for preciso horário exato
     setInterval(rejectStalePending, DAY_MS).unref();
     setTimeout(rejectStalePending, 30_000).unref();
     console.log('Cron jobs initialized');

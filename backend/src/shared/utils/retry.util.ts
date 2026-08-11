@@ -2,7 +2,7 @@
  * Retry with exponential backoff + jitter for transient operations
  * (external HTTP calls, SMTP, etc). Do not use for non-idempotent operations.
  *
- * ponytail: retries run in-process. If the Node process dies, the retry is lost.
+ *   retries run in-process. If the Node process dies, the retry is lost.
  * Upgrade path: move to a persistent queue (e.g. BullMQ) when this is insufficient.
  */
 export interface RetryOptions {

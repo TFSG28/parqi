@@ -121,7 +121,7 @@ class FetchClient {
     }
 
     private async handleCsrfFailure(url: string, response: Response, config: RequestInit): Promise<Response> {
-        // ponytail: clone() so we don't consume the original response body when it isn't a CSRF error.
+        //   clone() so we don't consume the original response body when it isn't a CSRF error.
         const data = await response.clone().json().catch(() => ({}));
         const isCsrfError = data.message?.includes('CSRF') && !this.isAuthExempt(url);
         if (!isCsrfError) return response;
