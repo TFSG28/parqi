@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -121,6 +121,113 @@ export default function AdminScreen() {
         );
     };
 
+    const modalTitle = pendingAction
+        ? `${pendingAction.action === 'APPROVE' ? 'Aprovar' : 'Rejeitar'} ${pendingAction.kind === 'spot' ? 'contribuição' : 'sugestão'}`
+        : '';
+
+    const modalHint = pendingAction?.action === 'APPROVE'
+        ? 'Motivo (opcional):'
+        : 'Motivo (recomendado — o autor recebe-o na notificação):';
+
+    let content: JSX.Element | JSX.Element[] | null = null;
+    if (loading) {
+        content = <ActivityIndicator color={colors.primary} style={styles.spinner} />;
+    } else if (tab === 'contributions') {
+        if (queue.length === 0) {
+            content = <Text style={styles.empty}>Fila de moderação vazia ✨</Text>;
+        } else {
+            content = queue.map((spot) => (
+                <View key={spot.id} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{spot.name}</Text>
+                        <Text style={[styles.status, { color: statusColor(spot.status) }]}>
+                            {STATUS_META[spot.status].label}
+                        </Text>
+                    </View>
+                    <Text style={styles.cardMeta}>
+                        Confiança {spot.trustScore.toFixed(1)}/10 · {TYPE_META[spot.parkingType].label} ·{' '}
+                        {spot.source}
+                    </Text>
+                    <View style={styles.cardActions}>
+                        <Pressable style={styles.viewButton} onPress={() => router.push(`/parking/${spot.id}`)}>
+                            <Ionicons name="eye-outline" size={16} color={colors.primary} />
+                            <Text style={styles.viewText}>Ver</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.approveButton}
+                            onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'APPROVE' })}
+                            disabled={busy}
+                        >
+                            <Text style={styles.approveText}>Aprovar</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.rejectButton}
+                            onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'REJECT' })}
+                            disabled={busy}
+                        >
+                            <Text style={styles.rejectText}>Rejeitar</Text>
+                        </Pressable>
+                    </View>
+                    {spot.contributorId && (
+                        <Pressable
+                            style={styles.banRow}
+                            onPress={() => confirmBan(spot.contributorId!)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel="Suspender o autor desta contribuição"
+                        >
+                            <Ionicons name="hand-left-outline" size={14} color={colors.danger} />
+                            <Text style={styles.banText}>Suspender autor</Text>
+                        </Pressable>
+                    )}
+                </View>
+            ));
+        }
+    } else if (suggestions.length === 0) {
+        content = <Text style={styles.empty}>Sem sugestões pendentes ✨</Text>;
+    } else {
+        content = suggestions.map((suggestion) => {
+            const summary = summarizeSuggestion(suggestion.data as Record<string, unknown>);
+            return (
+                <View key={suggestion.id} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>Sugestão #{suggestion.id.slice(0, 8)}</Text>
+                        <Text style={styles.cardMeta}>de {suggestion.suggestedById.slice(0, 8)}</Text>
+                    </View>
+                    {summary.map((line) => (
+                        <Text key={line} style={styles.summaryLine}>• {line}</Text>
+                    ))}
+                    {suggestion.reason ? (
+                        <Text style={styles.reasonText}>Motivo: {suggestion.reason}</Text>
+                    ) : null}
+                    <View style={styles.cardActions}>
+                        <Pressable
+                            style={styles.viewButton}
+                            onPress={() => router.push(`/parking/${suggestion.parkingSpotId}`)}
+                        >
+                            <Ionicons name="eye-outline" size={16} color={colors.primary} />
+                            <Text style={styles.viewText}>Ver parque</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.approveButton}
+                            onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'APPROVE' })}
+                            disabled={busy}
+                        >
+                            <Text style={styles.approveText}>Aceitar</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.rejectButton}
+                            onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'REJECT' })}
+                            disabled={busy}
+                        >
+                            <Text style={styles.rejectText}>Recusar</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            );
+        });
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.tabs}>
@@ -129,147 +236,50 @@ export default function AdminScreen() {
             </View>
 
             <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-                {loading ? (
-                    <ActivityIndicator color={colors.primary} style={styles.spinner} />
-                ) : tab === 'contributions' ? (
-                    queue.length === 0 ? (
-                        <Text style={styles.empty}>Fila de moderação vazia ✨</Text>
-                    ) : (
-                        queue.map((spot) => (
-                            <View key={spot.id} style={styles.card}>
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.cardTitle} numberOfLines={1}>{spot.name}</Text>
-                                    <Text style={[styles.status, { color: statusColor(spot.status) }]}>
-                                        {STATUS_META[spot.status].label}
+                {content}
+                {/* Modal de decisão */}
+                <Modal visible={pendingAction !== null} transparent animationType="slide">
+                    <View style={styles.modalBackdrop}>
+                        <View style={styles.modalCard}>
+                            <Text style={styles.modalTitle}>
+                                {pendingAction?.action === 'APPROVE' ? 'Aprovar' : 'Rejeitar'}{' '}
+                                {pendingAction?.kind === 'spot' ? 'contribuição' : 'sugestão'}
+                            </Text>
+                            <Text style={styles.modalHint}>
+                                {pendingAction?.action === 'APPROVE'
+                                    ? 'Motivo (opcional):'
+                                    : 'Motivo (recomendado — o autor recebe-o na notificação):'}
+                            </Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={reason}
+                                onChangeText={setReason}
+                                placeholder="Ex.: verificado no local"
+                                placeholderTextColor={colors.textMuted}
+                                maxLength={500}
+                                multiline
+                            />
+                            <View style={styles.modalActions}>
+                                <Pressable style={styles.modalCancel} onPress={() => { setPendingAction(null); setReason(''); }}>
+                                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[
+                                        pendingAction?.action === 'APPROVE' ? styles.modalApprove : styles.modalReject,
+                                        busy && styles.disabled,
+                                    ]}
+                                    onPress={decide}
+                                    disabled={busy}
+                                >
+                                    <Text style={styles.modalApproveText}>
+                                        {pendingAction?.action === 'APPROVE' ? 'Confirmar aprovação' : 'Confirmar rejeição'}
                                     </Text>
-                                </View>
-                                <Text style={styles.cardMeta}>
-                                    Confiança {spot.trustScore.toFixed(1)}/10 · {TYPE_META[spot.parkingType].label} ·{' '}
-                                    {spot.source}
-                                </Text>
-                                <View style={styles.cardActions}>
-                                    <Pressable style={styles.viewButton} onPress={() => router.push(`/parking/${spot.id}`)}>
-                                        <Ionicons name="eye-outline" size={16} color={colors.primary} />
-                                        <Text style={styles.viewText}>Ver</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.approveButton}
-                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'APPROVE' })}
-                                        disabled={busy}
-                                    >
-                                        <Text style={styles.approveText}>Aprovar</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.rejectButton}
-                                        onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'REJECT' })}
-                                        disabled={busy}
-                                    >
-                                        <Text style={styles.rejectText}>Rejeitar</Text>
-                                    </Pressable>
-                                </View>
-                                {spot.contributorId && (
-                                    <Pressable
-                                        style={styles.banRow}
-                                        onPress={() => confirmBan(spot.contributorId!)}
-                                        disabled={busy}
-                                        accessibilityRole="button"
-                                        accessibilityLabel="Suspender o autor desta contribuição"
-                                    >
-                                        <Ionicons name="hand-left-outline" size={14} color={colors.danger} />
-                                        <Text style={styles.banText}>Suspender autor</Text>
-                                    </Pressable>
-                                )}
+                                </Pressable>
                             </View>
-                        ))
-                    )
-                ) : suggestions.length === 0 ? (
-                    <Text style={styles.empty}>Sem sugestões pendentes ✨</Text>
-                ) : (
-                    suggestions.map((suggestion) => {
-                        const summary = summarizeSuggestion(suggestion.data as Record<string, unknown>);
-                        return (
-                            <View key={suggestion.id} style={styles.card}>
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.cardTitle} numberOfLines={1}>Sugestão #{suggestion.id.slice(0, 8)}</Text>
-                                    <Text style={styles.cardMeta}>de {suggestion.suggestedById.slice(0, 8)}</Text>
-                                </View>
-                                {summary.map((line, index) => (
-                                    <Text key={index} style={styles.summaryLine}>• {line}</Text>
-                                ))}
-                                {suggestion.reason ? (
-                                    <Text style={styles.reasonText}>Motivo: {suggestion.reason}</Text>
-                                ) : null}
-                                <View style={styles.cardActions}>
-                                    <Pressable
-                                        style={styles.viewButton}
-                                        onPress={() => router.push(`/parking/${suggestion.parkingSpotId}`)}
-                                    >
-                                        <Ionicons name="eye-outline" size={16} color={colors.primary} />
-                                        <Text style={styles.viewText}>Ver parque</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.approveButton}
-                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'APPROVE' })}
-                                        disabled={busy}
-                                    >
-                                        <Text style={styles.approveText}>Aceitar</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={styles.rejectButton}
-                                        onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'REJECT' })}
-                                        disabled={busy}
-                                    >
-                                        <Text style={styles.rejectText}>Recusar</Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        );
-                    })
-                )}
-            </ScrollView>
-
-            {/* Modal de decisão */}
-            <Modal visible={pendingAction !== null} transparent animationType="slide">
-                <View style={styles.modalBackdrop}>
-                    <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>
-                            {pendingAction?.action === 'APPROVE' ? 'Aprovar' : 'Rejeitar'}{' '}
-                            {pendingAction?.kind === 'spot' ? 'contribuição' : 'sugestão'}
-                        </Text>
-                        <Text style={styles.modalHint}>
-                            {pendingAction?.action === 'APPROVE'
-                                ? 'Motivo (opcional):'
-                                : 'Motivo (recomendado — o autor recebe-o na notificação):'}
-                        </Text>
-                        <TextInput
-                            style={styles.modalInput}
-                            value={reason}
-                            onChangeText={setReason}
-                            placeholder="Ex.: verificado no local"
-                            placeholderTextColor={colors.textMuted}
-                            maxLength={500}
-                            multiline
-                        />
-                        <View style={styles.modalActions}>
-                            <Pressable style={styles.modalCancel} onPress={() => { setPendingAction(null); setReason(''); }}>
-                                <Text style={styles.modalCancelText}>Cancelar</Text>
-                            </Pressable>
-                            <Pressable
-                                style={[
-                                    pendingAction?.action === 'APPROVE' ? styles.modalApprove : styles.modalReject,
-                                    busy && styles.disabled,
-                                ]}
-                                onPress={decide}
-                                disabled={busy}
-                            >
-                                <Text style={styles.modalApproveText}>
-                                    {pendingAction?.action === 'APPROVE' ? 'Confirmar aprovação' : 'Confirmar rejeição'}
-                                </Text>
-                            </Pressable>
                         </View>
                     </View>
-                </View>
-            </Modal>
+                </Modal>
+            </ScrollView>
         </View>
     );
 }

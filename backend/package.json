@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon",
-    "build": "npm run test && npm run lint && prisma generate && tsc",
+    "build": "npm run test && npm run lint && prisma generate && tsc && cp -r src/generated dist/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

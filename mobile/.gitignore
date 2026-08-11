@@ -7,3 +7,6 @@ expo-env.d.ts
 .DS_Store
 .env
 .env.*.local
+# CNG: pastas nativas geradas pelo prebuild (gitignored, regeneradas via `npx expo prebuild`)
+android/
+ios/

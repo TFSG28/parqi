@@ -7,7 +7,7 @@ export default defineConfig({
         environment: 'node',
         setupFiles: ['./src/tests/setup.ts'],
         // e2e specs are Playwright tests (npm run test:e2e), not vitest.
-        exclude: [...configDefaults.exclude, 'src/tests/e2e/**'],
+        exclude: [...configDefaults.exclude, 'src/tests/e2e/**', 'dist/**'],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
