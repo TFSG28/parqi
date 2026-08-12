@@ -1,15 +1,15 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { STATUS_META } from '../lib/geo';
+import { alpha10, MONO, STATUS_DESIGN } from '../theme/design';
 import type { ContributionStatus } from '../types/parking';
 
-export function StatusBadge({ status }: { status: ContributionStatus }) {
-    const { colors } = useTheme();
-    const color = colors[STATUS_META[status].colorKey];
+/** Badge de estado do design: ícone + label mono sobre fundo translúcido. */
+export function StatusBadge({ status }: Readonly<{ status: ContributionStatus }>) {
+    const meta = STATUS_DESIGN[status];
     return (
-        <View style={[styles.badge, { backgroundColor: color + '1A', borderColor: color + '66' }]}>
-            <View style={[styles.dot, { backgroundColor: color }]} />
-            <Text style={[styles.text, { color }]}>{STATUS_META[status].label}</Text>
+        <View style={[styles.badge, { backgroundColor: alpha10(meta.color) }]}>
+            <Ionicons name={meta.icon} size={11} color={meta.color} />
+            <Text style={[styles.text, { color: meta.color }]}>{meta.label}</Text>
         </View>
     );
 }
@@ -19,19 +19,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        borderWidth: 1,
-        gap: 6,
-    },
-    dot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+        gap: 4,
     },
     text: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 10,
+        fontWeight: '500',
+        fontFamily: MONO,
     },
 });

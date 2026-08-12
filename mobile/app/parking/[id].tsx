@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Linking,
     Modal,
     Pressable,
@@ -13,30 +14,94 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppMap } from '../../src/components/AppMap';
 import { StatusBadge } from '../../src/components/StatusBadge';
 import { TrustBar } from '../../src/components/TrustBar';
+import { TypeChip } from '../../src/components/TypeChip';
 import { useAuth } from '../../src/context/AuthContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
-import { CAPACITY_LABELS, directionsUrl, SOURCE_META, TYPE_META } from '../../src/lib/geo';
+import { CAPACITY_LABELS, directionsUrl } from '../../src/lib/geo';
+import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, trustColor } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
-import type { ParkingSpot } from '../../src/types/parking';
+import type { ParkingSpot, ParkingType } from '../../src/types/parking';
 
-const DETAIL_ROWS: {
-    key: 'hasPregnantSpaces' | 'hasDisabledSpaces' | 'hasEvCharging' | 'isCovered';
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-    { key: 'hasPregnantSpaces', label: 'Lugares para grávidas', icon: 'woman' },
-    { key: 'hasDisabledSpaces', label: 'Mobilidade reduzida', icon: 'accessibility' },
-    { key: 'hasEvCharging', label: 'Carregamento elétrico', icon: 'flash' },
-    { key: 'isCovered', label: 'Coberto', icon: 'umbrella' },
-];
+/** Imagens hero por tipo, as mesmas do design. */
+const HERO_IMAGES: Partial<Record<ParkingType, string>> = {
+    UNDERGROUND: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=600&h=300&fit=crop&auto=format',
+    MULTI_STORY: 'https://images.unsplash.com/photo-1590674899484-13da64c9c3d7?w=600&h=300&fit=crop&auto=format',
+};
+const HERO_DEFAULT = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&h=300&fit=crop&auto=format';
+
+function priceLabel(isFree: boolean | null): string {
+    if (isFree === true) return 'GRÁTIS';
+    if (isFree === false) return 'PAGO';
+    return '—';
+}
+
+/** Leaflet usa pares [lat, lng]; o GeoJSON vem [lng, lat]. */
+function polygonRingOf(spot: ParkingSpot): [number, number][] {
+    if (spot.geometry?.type !== 'Polygon') return [];
+    return spot.geometry.coordinates[0].map((c) => [c[1], c[0]] as [number, number]);
+}
+
+function linePointsOf(spot: ParkingSpot): [number, number][] {
+    if (spot.geometry?.type !== 'LineString') return [];
+    return spot.geometry.coordinates.map((c) => [c[1], c[0]] as [number, number]);
+}
+
+interface VoteButtonProps {
+    dir: 'up' | 'down';
+    voted: 'up' | 'down' | null;
+    voting: boolean;
+    onPress: () => void;
+    styles: ReturnType<typeof createStyles>;
+    mutedColor: string;
+}
+
+function VoteButton({ dir, voted, voting, onPress, styles, mutedColor }: Readonly<VoteButtonProps>) {
+    const isUp = dir === 'up';
+    const active = voted === dir;
+    const activeColor = isUp ? PALETTE.emerald : PALETTE.red;
+    const activeStyle = isUp ? styles.voteBtnUp : styles.voteBtnDown;
+    return (
+        <Pressable
+            style={[styles.voteBtn, active && activeStyle, voting && styles.disabled]}
+            onPress={onPress}
+            disabled={voting}
+        >
+            <Ionicons
+                name={isUp ? 'thumbs-up' : 'thumbs-down'}
+                size={16}
+                color={active ? activeColor : mutedColor}
+            />
+            <Text style={[styles.voteText, active && { color: activeColor }]}>
+                {isUp ? 'Confirmar' : 'Reportar'}
+            </Text>
+        </Pressable>
+    );
+}
+
+function submissionRowsOf(spot: ParkingSpot): { label: string; value: string }[] {
+    const rows = [
+        { label: 'Adicionado por', value: SOURCE_LABELS[spot.source] },
+        { label: 'Data', value: spot.createdAt.slice(0, 10) },
+        { label: 'Fonte', value: SOURCE_LABELS[spot.source] },
+    ];
+    if (spot.latitude !== null && spot.longitude !== null) {
+        rows.push({
+            label: 'Coordenadas',
+            value: `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`,
+        });
+    }
+    return rows;
+}
 
 export default function ParkingDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const { isFavorite, toggleFavorite, refreshFavorite } = useFavorites();
     const { colors } = useTheme();
@@ -46,6 +111,7 @@ export default function ParkingDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [voting, setVoting] = useState(false);
+    const [voted, setVoted] = useState<'up' | 'down' | null>(null);
     const [reasonModal, setReasonModal] = useState(false);
     const [reason, setReason] = useState('');
 
@@ -85,6 +151,7 @@ export default function ParkingDetailScreen() {
         setVoting(true);
         try {
             setSpot(await parkingApi.vote(spot.id, value, voteReason));
+            setVoted(value === 1 ? 'up' : 'down');
         } catch (error) {
             Alert.alert('Erro', error instanceof ApiError ? error.message : 'Não foi possível votar.');
         } finally {
@@ -119,6 +186,7 @@ export default function ParkingDetailScreen() {
     if (loading) {
         return (
             <View style={styles.center}>
+                <Stack.Screen options={{ headerShown: false }} />
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
@@ -127,6 +195,7 @@ export default function ParkingDetailScreen() {
     if (notFound || !spot) {
         return (
             <View style={styles.center}>
+                <Stack.Screen options={{ headerShown: false }} />
                 <Text style={styles.emptyTitle}>Estacionamento não encontrado</Text>
                 <Pressable style={styles.primaryButton} onPress={() => router.back()}>
                     <Text style={styles.primaryButtonText}>Voltar</Text>
@@ -135,141 +204,170 @@ export default function ParkingDetailScreen() {
         );
     }
 
-    const type = TYPE_META[spot.parkingType];
-    const source = SOURCE_META[spot.source];
     const isOwner = user?.id === spot.contributorId;
-    // Leaflet usa pares [lat, lng]; o GeoJSON vem [lng, lat]
-    const polygonRing: [number, number][] =
-        spot.geometry?.type === 'Polygon'
-            ? spot.geometry.coordinates[0].map((c) => [c[1], c[0]] as [number, number])
-            : [];
-    const linePoints: [number, number][] =
-        spot.geometry?.type === 'LineString'
-            ? spot.geometry.coordinates.map((c) => [c[1], c[0]] as [number, number])
-            : [];
+    const heroUri = HERO_IMAGES[spot.parkingType] ?? HERO_DEFAULT;
+    const scoreColor = trustColor(spot.trustScore, colors.primary);
+    const amenities = AMENITY_DESIGN.filter((a) => spot[a.key] === true);
+    const polygonRing = polygonRingOf(spot);
+    const linePoints = linePointsOf(spot);
     const mapCenter = {
         latitude: spot.latitude ?? 41.4426,
         longitude: spot.longitude ?? -8.2914,
     };
-    const knownDetails = DETAIL_ROWS.filter((row) => spot[row.key] === true);
+    const submissionRows = submissionRowsOf(spot);
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            {/* Cabeçalho */}
-            <View style={styles.header}>
-                <View style={[styles.typeIcon, { backgroundColor: type.color + '22' }]}>
-                    <Ionicons name={type.icon} size={26} color={type.color} />
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+            <Stack.Screen options={{ headerShown: false }} />
+
+            {/* Hero */}
+            <View style={styles.hero}>
+                <Image source={{ uri: heroUri }} style={styles.heroImage} />
+                <View style={styles.heroOverlay} />
+                <Pressable
+                    style={[styles.backBtn, { top: insets.top + 8 }]}
+                    onPress={() => router.back()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Voltar"
+                >
+                    <Ionicons name="arrow-back" size={18} color={colors.text} />
+                </Pressable>
+                <View style={[styles.heroStatus, { top: insets.top + 8 }]}>
+                    <StatusBadge status={spot.status} />
                 </View>
-                <View style={styles.headerText}>
+                <Pressable
+                    style={styles.favBtn}
+                    onPress={() => toggleFavorite(spot)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                >
+                    <Ionicons
+                        name={isFavorite(spot.id) ? 'heart' : 'heart-outline'}
+                        size={20}
+                        color={isFavorite(spot.id) ? colors.accent : colors.text}
+                    />
+                </Pressable>
+            </View>
+
+            <View style={styles.body}>
+                {/* Título */}
+                <View style={styles.titleBlock}>
                     <Text style={styles.name}>{spot.name}</Text>
-                    <View style={styles.metaRow}>
-                        <Text style={styles.typeLabel}>{type.label}</Text>
-                        <View style={[styles.sourceBadge, { backgroundColor: source.color + '1A' }]}>
-                            <Ionicons name={source.icon} size={11} color={source.color} />
-                            <Text style={[styles.sourceLabel, { color: source.color }]}>{source.label}</Text>
-                        </View>
+                    {spot.description ? (
+                        <Text style={styles.address}>{spot.description}</Text>
+                    ) : null}
+                    <View style={styles.titleMeta}>
+                        <TypeChip type={spot.parkingType} />
+                        <Text style={styles.price}>{priceLabel(spot.isFree)}</Text>
+                        {spot.capacityRange && (
+                            <Text style={styles.capacity}>· {CAPACITY_LABELS[spot.capacityRange]}</Text>
+                        )}
                     </View>
                     {spot.requiresReview && (
                         <Text style={styles.reviewHint}>A aguardar revisão manual</Text>
                     )}
                 </View>
-                <View style={styles.headerRight}>
-                    <StatusBadge status={spot.status} />
-                    <Pressable
-                        onPress={() => toggleFavorite(spot)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                            isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
-                        }
-                    >
-                        <Ionicons
-                            name={isFavorite(spot.id) ? 'heart' : 'heart-outline'}
-                            size={24}
-                            color={isFavorite(spot.id) ? colors.accent : colors.textMuted}
+
+                {/* Trust score */}
+                <View style={styles.card}>
+                    <View style={styles.trustHeader}>
+                        <Text style={styles.sectionLabel}>CONFIANÇA DA COMUNIDADE</Text>
+                        <Text style={[styles.trustValue, { color: scoreColor }]}>
+                            {spot.trustScore.toFixed(1)}
+                            <Text style={styles.trustMax}>/10</Text>
+                        </Text>
+                    </View>
+                    <TrustBar trustScore={spot.trustScore} />
+                </View>
+
+                {/* Amenities */}
+                {amenities.length > 0 && (
+                    <View style={styles.card}>
+                        <Text style={styles.sectionLabel}>COMODIDADES</Text>
+                        <View style={styles.amenityGrid}>
+                            {amenities.map((a) => (
+                                <View key={a.key} style={styles.amenityCell}>
+                                    <Ionicons name={a.icon} size={14} color={colors.primary} />
+                                    <Text style={styles.amenityText}>{a.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* Votos da comunidade */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>VOTOS DA COMUNIDADE</Text>
+                    <View style={styles.voteRow}>
+                        <VoteButton
+                            dir="up"
+                            voted={voted}
+                            voting={voting}
+                            onPress={() => handleVote(1)}
+                            styles={styles}
+                            mutedColor={colors.textMuted}
                         />
-                    </Pressable>
+                        <VoteButton
+                            dir="down"
+                            voted={voted}
+                            voting={voting}
+                            onPress={() => handleVote(-1)}
+                            styles={styles}
+                            mutedColor={colors.textMuted}
+                        />
+                    </View>
+                    {!user && (
+                        <Text style={styles.authHint}>Inicia sessão para votar.</Text>
+                    )}
                 </View>
-            </View>
 
-            {/* Confiança */}
-            <View style={styles.card}>
-                <TrustBar trustScore={spot.trustScore} />
-            </View>
+                {/* Mapa */}
+                <View style={styles.mapCard}>
+                    <AppMap
+                        center={mapCenter}
+                        zoom={16}
+                        interactive={false}
+                        polygon={polygonRing}
+                        polyline={linePoints}
+                        markers={
+                            spot.latitude !== null && spot.longitude !== null
+                                ? [{ id: spot.id, latitude: spot.latitude, longitude: spot.longitude, color: colors.primary }]
+                                : []
+                        }
+                        style={styles.mapPreview}
+                    />
+                </View>
 
-            {/* Detalhes */}
-            <View style={styles.card}>
-                <View style={styles.detailRow}>
-                    <Ionicons name="car" size={18} color={colors.textMuted} />
-                    <Text style={styles.detailText}>
-                        {spot.capacityRange ? CAPACITY_LABELS[spot.capacityRange] : 'Lotação desconhecida'}
-                    </Text>
-                </View>
-                <View style={styles.detailRow}>
-                    <Ionicons name={spot.isFree === true ? 'pricetag' : spot.isFree === false ? 'wallet' : 'help'} size={18} color={colors.textMuted} />
-                    <Text style={styles.detailText}>
-                        {spot.isFree === true ? 'Gratuito' : spot.isFree === false ? 'Pago' : 'Custo desconhecido'}
-                    </Text>
-                </View>
-                {knownDetails.length > 0 && (
-                    <View style={styles.detailsDivider}>
-                        {knownDetails.map((row) => (
-                            <View key={row.key} style={styles.detailRow}>
-                                <Ionicons name={row.icon} size={18} color={colors.success} />
-                                <Text style={styles.detailText}>{row.label}</Text>
-                                <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                {/* Submission info */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>INFORMAÇÃO DA SUBMISSÃO</Text>
+                    <View style={styles.infoList}>
+                        {submissionRows.map(({ label, value }) => (
+                            <View key={label} style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>{label}</Text>
+                                <Text style={styles.infoValue}>{value}</Text>
                             </View>
                         ))}
                     </View>
-                )}
-                {spot.description ? (
-                    <Text style={styles.description}>{spot.description}</Text>
-                ) : null}
-            </View>
+                </View>
 
-            {/* Pré-visualização no mapa */}
-            <View style={styles.mapCard}>
-                <AppMap
-                    center={mapCenter}
-                    zoom={16}
-                    interactive={false}
-                    polygon={polygonRing}
-                    polyline={linePoints}
-                    markers={
-                        spot.latitude !== null && spot.longitude !== null
-                            ? [{ id: spot.id, latitude: spot.latitude, longitude: spot.longitude, color: type.color }]
-                            : []
-                    }
-                    style={styles.mapPreview}
-                />
-            </View>
-
-            {/* Ações */}
-            <View style={styles.actions}>
-                <Pressable style={[styles.upvoteButton, voting && styles.buttonDisabled]} onPress={() => handleVote(1)} disabled={voting}>
-                    <Ionicons name="thumbs-up" size={18} color={colors.success} />
-                    <Text style={styles.upvoteText}>Confirmar</Text>
-                </Pressable>
-                <Pressable style={[styles.downvoteButton, voting && styles.buttonDisabled]} onPress={() => handleVote(-1)} disabled={voting}>
-                    <Ionicons name="thumbs-down" size={18} color={colors.danger} />
-                    <Text style={styles.downvoteText}>Reportar</Text>
-                </Pressable>
-                <Pressable style={styles.routeButton} onPress={openRoute}>
-                    <Ionicons name="navigate" size={18} color={colors.onAccent} />
+                {/* Ações */}
+                <Pressable style={styles.routeBtn} onPress={openRoute}>
+                    <Ionicons name="navigate" size={16} color={colors.white} />
                     <Text style={styles.routeText}>Rota</Text>
                 </Pressable>
+                <Pressable style={styles.suggestBtn} onPress={openSuggest}>
+                    <Ionicons
+                        name={isOwner ? 'create-outline' : 'git-compare-outline'}
+                        size={16}
+                        color={colors.primary}
+                    />
+                    <Text style={styles.suggestText}>
+                        {isOwner ? 'Editar este estacionamento' : 'Sugerir alteração ou informação'}
+                    </Text>
+                </Pressable>
             </View>
-
-            {/* Complementar informação */}
-            <Pressable style={styles.suggestButton} onPress={openSuggest}>
-                <Ionicons name={isOwner ? 'create-outline' : 'git-compare-outline'} size={18} color={colors.primary} />
-                <Text style={styles.suggestText}>
-                    {isOwner ? 'Editar este estacionamento' : 'Sugerir alteração ou informação'}
-                </Text>
-            </Pressable>
-            {!user && (
-                <Text style={styles.authHint}>Inicia sessão para votar ou adicionar estacionamentos.</Text>
-            )}
 
             {/* Modal motivo do voto negativo */}
             <Modal visible={reasonModal} transparent animationType="slide">
@@ -290,7 +388,7 @@ export default function ParkingDetailScreen() {
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </Pressable>
                             <Pressable
-                                style={[styles.primaryButton, !reason.trim() && styles.buttonDisabled]}
+                                style={[styles.primaryButton, !reason.trim() && styles.disabled]}
                                 disabled={!reason.trim() || voting}
                                 onPress={() => doVote(-1, reason.trim())}
                             >
@@ -309,9 +407,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    content: {
-        padding: 16,
-        gap: 12,
+    scrollContent: {
         paddingBottom: 40,
     },
     center: {
@@ -320,182 +416,254 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         justifyContent: 'center',
         gap: 16,
         padding: 24,
+        backgroundColor: colors.background,
     },
     emptyTitle: {
         fontSize: 16,
         color: colors.textMuted,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+    hero: {
+        height: 190,
         backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: 16,
+    },
+    heroImage: {
+        width: '100%',
+        height: '100%',
+        opacity: 0.55,
+    },
+    heroOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.background + '66',
+    },
+    backBtn: {
+        position: 'absolute',
+        left: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.card + 'E6',
         borderWidth: 1,
         borderColor: colors.border,
-    },
-    typeIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerText: {
-        flex: 1,
-        gap: 4,
+    heroStatus: {
+        position: 'absolute',
+        right: 16,
     },
-    headerRight: {
+    favBtn: {
+        position: 'absolute',
+        right: 16,
+        bottom: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.card + 'E6',
+        borderWidth: 1,
+        borderColor: colors.border,
         alignItems: 'center',
-        gap: 10,
+        justifyContent: 'center',
+    },
+    body: {
+        paddingHorizontal: 16,
+        gap: 12,
+        marginTop: -8,
+    },
+    titleBlock: {
+        marginBottom: 4,
     },
     name: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.text,
     },
-    metaRow: {
+    address: {
+        fontSize: 14,
+        color: colors.textMuted,
+        marginTop: 2,
+    },
+    titleMeta: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        flexWrap: 'wrap',
+        marginTop: 8,
     },
-    typeLabel: {
-        fontSize: 13,
+    price: {
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: MONO,
+        color: colors.primary,
+    },
+    capacity: {
+        fontSize: 12,
+        fontFamily: MONO,
         color: colors.textMuted,
     },
-    sourceBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 999,
-    },
-    sourceLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-    },
     reviewHint: {
-        fontSize: 11,
-        color: colors.accent,
-        fontWeight: '600',
+        fontSize: 12,
+        color: PALETTE.amber,
+        marginTop: 6,
     },
     card: {
         backgroundColor: colors.card,
-        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 12,
         padding: 16,
-        borderWidth: 1,
-        borderColor: colors.border,
-        gap: 10,
     },
-    detailRow: {
+    sectionLabel: {
+        fontSize: 11,
+        fontFamily: MONO,
+        letterSpacing: 1.5,
+        color: colors.textMuted,
+        marginBottom: 10,
+    },
+    trustHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        justifyContent: 'space-between',
+        marginBottom: 8,
     },
-    detailText: {
-        fontSize: 14,
-        color: colors.text,
-        flex: 1,
-    },
-    detailsDivider: {
-        gap: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        paddingTop: 10,
-    },
-    description: {
-        fontSize: 14,
-        color: colors.text,
-        lineHeight: 20,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        paddingTop: 10,
-    },
-    mapCard: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    mapPreview: {
-        height: 180,
-    },
-    actions: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    upvoteButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.success,
-        backgroundColor: colors.card,
-    },
-    upvoteText: {
-        color: colors.success,
-        fontWeight: '600',
-    },
-    downvoteButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.danger,
-        backgroundColor: colors.card,
-    },
-    downvoteText: {
-        color: colors.danger,
-        fontWeight: '600',
-    },
-    routeButton: {
-        flex: 1.2,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: colors.accent,
-    },
-    routeText: {
-        color: colors.onAccent,
+    trustValue: {
+        fontSize: 24,
         fontWeight: '700',
+        fontFamily: MONO,
     },
-    suggestButton: {
+    trustMax: {
+        fontSize: 13,
+        fontWeight: '400',
+        color: colors.textMuted,
+    },
+    amenityGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    amenityCell: {
+        width: '48%',
+        flexGrow: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: colors.background,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    amenityText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: colors.text,
+    },
+    voteRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    voteBtn: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        paddingVertical: 13,
-        borderRadius: 12,
+        paddingVertical: 10,
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: colors.primary,
-        backgroundColor: colors.card,
+        borderColor: colors.border,
     },
-    suggestText: {
-        color: colors.primary,
-        fontWeight: '600',
+    voteBtnUp: {
+        backgroundColor: PALETTE.emerald + '1A',
+        borderColor: PALETTE.emerald + '66',
+    },
+    voteBtnDown: {
+        backgroundColor: PALETTE.red + '1A',
+        borderColor: PALETTE.red + '66',
+    },
+    voteText: {
+        fontSize: 13,
+        fontWeight: '500',
+        fontFamily: MONO,
+        color: colors.textMuted,
     },
     authHint: {
+        fontSize: 11,
+        color: colors.textMuted,
+        marginTop: 10,
         textAlign: 'center',
+    },
+    mapCard: {
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+    },
+    mapPreview: {
+        height: 160,
+    },
+    infoList: {
+        gap: 8,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    infoLabel: {
         fontSize: 12,
         color: colors.textMuted,
     },
+    infoValue: {
+        fontSize: 12,
+        fontFamily: MONO,
+        color: colors.text,
+    },
+    routeBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: colors.primary,
+    },
+    routeText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.white,
+    },
+    suggestBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+    },
+    suggestText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: colors.primary,
+    },
+    primaryButton: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: colors.primary,
+    },
+    primaryButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.white,
+    },
+    disabled: {
+        opacity: 0.5,
+    },
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalCard: {
@@ -504,48 +672,39 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         borderTopRightRadius: 20,
         padding: 20,
         gap: 12,
-        paddingBottom: 32,
     },
     modalTitle: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
         color: colors.text,
     },
     modalInput: {
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
-        padding: 12,
-        minHeight: 80,
-        textAlignVertical: 'top',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 15,
         color: colors.text,
+        backgroundColor: colors.background,
+        minHeight: 70,
+        textAlignVertical: 'top',
     },
     modalActions: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
         gap: 10,
     },
     modalCancel: {
+        flex: 1,
+        alignItems: 'center',
         paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     modalCancelText: {
-        color: colors.textMuted,
+        fontSize: 14,
         fontWeight: '600',
-    },
-    primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    primaryButtonText: {
-        color: colors.white,
-        fontWeight: '700',
-    },
-    buttonDisabled: {
-        opacity: 0.5,
+        color: colors.text,
     },
 });

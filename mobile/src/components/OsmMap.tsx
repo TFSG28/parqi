@@ -157,7 +157,7 @@ const markerLayer = ${cluster}
               const size = n < 10 ? 38 : n < 100 ? 44 : 52;
               return L.divIcon({
                   className: 'parqi-cluster',
-                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#3B6BFF;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
+                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#0647AC;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
                   iconSize: [size, size],
               });
           },
@@ -188,14 +188,14 @@ function updateMarkers(list) {
 function setPolygon(ring) {
     if (poly) { poly.remove(); poly = null; }
     if (ring && ring.length > 1) {
-        poly = L.polygon(ring, { color: '#3B6BFF', weight: 2, fillColor: '#3B6BFF', fillOpacity: 0.2 }).addTo(map);
+        poly = L.polygon(ring, { color: '#0647AC', weight: 2, fillColor: '#0647AC', fillOpacity: 0.2 }).addTo(map);
     }
 }
 
 function setPolyline(pts) {
     if (line) { line.remove(); line = null; }
     if (pts && pts.length > 1) {
-        line = L.polyline(pts, { color: '#FF7A00', weight: 5, opacity: 0.9, dashArray: '1 8', lineCap: 'round' }).addTo(map);
+        line = L.polyline(pts, { color: '#FF6900', weight: 5, opacity: 0.9, dashArray: '1 8', lineCap: 'round' }).addTo(map);
     }
 }
 
@@ -203,7 +203,7 @@ function setUser(u) {
     if (userDot) { userDot.remove(); userDot = null; }
     if (u) {
         userDot = L.circleMarker([u.latitude, u.longitude], {
-            radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#3B6BFF', fillOpacity: 1,
+            radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#0647AC', fillOpacity: 1,
         }).addTo(map);
     }
 }

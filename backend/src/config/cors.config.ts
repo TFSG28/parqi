@@ -7,15 +7,15 @@ import cors from 'cors';
  *
  * Em desenvolvimento, aceita localhost:3000 (Next.js) e localhost:19006 (Expo web).
  */
-const allowedOrigins = [
+const allowedOrigins = new Set([
     process.env.FRONT_URL || 'https://parqi.cesar.wearemateria.com',
-];
+]);
 
 export const corsMiddleware = cors({
     origin: process.env.NODE_ENV === 'production'
         ? (origin, callback) => {
             // Apps mobile e ferramentas como Postman não enviam Origin — permitir
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || allowedOrigins.has(origin)) {
                 callback(null, true);
             } else {
                 callback(new Error(`Origin ${origin} não permitida pelo CORS`));

@@ -11,11 +11,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pt.parqi.app",
-      "associatedDomains": ["applinks:parqi.pt"]
+      "associatedDomains": [
+        "applinks:parqi.pt"
+      ]
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#3B6BFF",
+        "backgroundColor": "#0647AC",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -33,7 +35,10 @@
               "pathPrefix": "/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -54,7 +59,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#3B6BFF"
+          "color": "#0647AC"
         }
       ],
     ]

@@ -38,15 +38,15 @@ export function directionsUrl(latitude: number, longitude: number): string {
 }
 
 export const TYPE_META: Record<ParkingType, { label: string; icon: IoniconName; color: string }> = {
-    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: '#3B6BFF' },
-    UNDERGROUND: { label: 'Subterrâneo', icon: 'water', color: '#7C3AED' },
-    MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: '#0EA5E9' },
-    STREET: { label: 'Na via', icon: 'car', color: '#64748B' },
+    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: '#0EA5E9' },
+    UNDERGROUND: { label: 'Subterrâneo', icon: 'water', color: '#8B5CF6' },
+    MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: '#0647AC' },
+    STREET: { label: 'Na via', icon: 'car', color: '#FF6900' },
     OTHER: { label: 'Outro', icon: 'help', color: '#94A3B8' },
 };
 
 export const SOURCE_META: Record<DataSource, { label: string; icon: IoniconName; color: string }> = {
-    COMMUNITY: { label: 'Comunidade', icon: 'people', color: '#3B6BFF' },
+    COMMUNITY: { label: 'Comunidade', icon: 'people', color: '#0647AC' },
     MUNICIPAL: { label: 'Câmara municipal', icon: 'business', color: '#16A34A' },
     OVERPASS: { label: 'OpenStreetMap', icon: 'map', color: '#0EA5E9' },
     GEOAPIFY: { label: 'Geoapify', icon: 'globe', color: '#7C3AED' },

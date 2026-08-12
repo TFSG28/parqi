@@ -1,40 +1,46 @@
-/** Branding Parqi: #3B6BFF (azul mais claro), #FF7A00 (laranja vivo), #FFFFFF. */
+/**
+ * Tema Parqi (design_example/src/styles/theme.css):
+ * claro = azul #0647AC sobre fundos frios; escuro = laranja #FF6900 sobre azul-noite.
+ */
 
 export const LIGHT = {
-    primary: '#3B6BFF',
+    primary: '#0647AC',
     // Barras/headers: azul da marca
-    bar: '#3B6BFF',
+    bar: '#0647AC',
     // Card hero: tom mais profundo da família — destaca-se sem gritar
-    heroBg: '#2A4ED6',
-    accent: '#FF7A00',
-    // Texto/ícones sobre laranja: escuro, porque branco sobre laranja vivo não passa o contraste AA
-    onAccent: '#15173A',
+    heroBg: '#053A8C',
+    accent: '#FF6900',
+    // Texto/ícones sobre laranja: branco, como no design (primary-foreground)
+    onAccent: '#FFFFFF',
     white: '#FFFFFF',
-    background: '#F7F8FA',
+    background: '#F4F7FC',
     card: '#FFFFFF',
-    text: '#111318',
-    textMuted: '#6B7280',
-    border: '#E5E7EB',
-    success: '#16A34A',
+    text: '#0D1A2E',
+    textMuted: '#5A7099',
+    // rgba(6,71,172,0.14) achatada sobre branco
+    border: '#DCE5F3',
+    success: '#059669',
     danger: '#DC2626',
 } as const;
 
 export const DARK: ThemeColors = {
-    primary: '#3B6BFF',
-    // Barras no escuro: azul profundo com texto branco com bom contraste
-    bar: '#2E46C9',
-    // Card hero no escuro: azul mais claro para se destacar do fundo quase preto
-    heroBg: '#3A56D8',
-    accent: '#FF7A00',
-    onAccent: '#15173A',
+    // No escuro a marca vira laranja, como no design
+    primary: '#FF6900',
+    // Barras no escuro: superfície azul-noite (card) com texto claro
+    bar: '#131826',
+    // Card hero no escuro: um nível acima do card para se destacar do fundo
+    heroBg: '#1A2030',
+    accent: '#FF6900',
+    onAccent: '#FFFFFF',
     white: '#FFFFFF',
-    background: '#0F1117',
-    card: '#1A1D27',
-    text: '#F2F3F7',
-    textMuted: '#9AA0B4',
-    border: '#2A2E3D',
-    success: '#34D27B',
-    danger: '#F87171',
+    background: '#0B0F1A',
+    card: '#131826',
+    text: '#E8EDF5',
+    textMuted: '#6B7FA0',
+    // rgba(255,105,0,0.15) achatada sobre o fundo
+    border: '#31221C',
+    success: '#34D399',
+    danger: '#EF4444',
 };
 
 export type ThemeColors = { -readonly [K in keyof typeof LIGHT]: string };

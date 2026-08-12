@@ -1,51 +1,131 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ParqiHeader } from '../../src/components/ParqiHeader';
 import { useTheme } from '../../src/context/ThemeContext';
+import { MONO } from '../../src/theme/design';
+import type { ThemeColors } from '../../src/theme/colors';
 
-/** Navegação principal no rodapé: Parques (lista), Mapa e Conta. */
-export default function TabsLayout() {
+const TAB_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
+    mapa: { icon: 'map-outline', label: 'MAPA' },
+    index: { icon: 'search-outline', label: 'DESCOBRIR' },
+    add: { icon: 'add', label: '' },
+    conta: { icon: 'person-outline', label: 'PERFIL' },
+};
+
+/** Props do tabBar extraídas do próprio Tabs (evita dependência direta). */
+type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+/** Barra inferior do design: 4 itens, Add como botão quadrado destacado. */
+function DesignTabBar({ state, navigation }: Readonly<TabBarProps>) {
+    const insets = useSafeAreaInsets();
     const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
+        <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            {state.routes.map((route, index) => {
+                const meta = TAB_META[route.name];
+                if (!meta) return null;
+                const focused = state.index === index;
+                const color = focused ? colors.primary : colors.textMuted;
+
+                const onPress = () => {
+                    const event = navigation.emit({
+                        type: 'tabPress',
+                        target: route.key,
+                        canPreventDefault: true,
+                    });
+                    if (!focused && !event.defaultPrevented) {
+                        navigation.navigate(route.name);
+                    }
+                };
+
+                return (
+                    <Pressable
+                        key={route.key}
+                        onPress={onPress}
+                        style={styles.item}
+                        accessibilityRole="button"
+                        accessibilityState={focused ? { selected: true } : {}}
+                        accessibilityLabel={route.name === 'add' ? 'Adicionar estacionamento' : meta.label}
+                    >
+                        {route.name === 'add' ? (
+                            <View style={[styles.addButton, focused && styles.addButtonActive]}>
+                                <Ionicons
+                                    name="add"
+                                    size={22}
+                                    color={focused ? colors.white : colors.textMuted}
+                                />
+                            </View>
+                        ) : (
+                            <>
+                                <Ionicons name={meta.icon} size={20} color={color} />
+                                <Text style={[styles.label, { color }]}>{meta.label}</Text>
+                            </>
+                        )}
+                    </Pressable>
+                );
+            })}
+        </View>
+    );
+}
+
+const renderTabBar = (props: TabBarProps) => <DesignTabBar {...props} />;
+const renderHeader = () => <ParqiHeader />;
+
+export default function TabsLayout() {
+    return (
         <Tabs
-            screenOptions={{
-                headerShown: false,
-                tabBarActiveTintColor: colors.primary,
-                tabBarInactiveTintColor: colors.textMuted,
-                tabBarStyle: {
-                    backgroundColor: colors.card,
-                    borderTopColor: colors.border,
-                },
-                tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-            }}
+            tabBar={renderTabBar}
+            screenOptions={{ header: renderHeader }}
         >
-            <Tabs.Screen
-                name="index"
-                options={{
-                    title: 'Parques',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="mapa"
-                options={{
-                    title: 'Mapa',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? 'map' : 'map-outline'} size={22} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="conta"
-                options={{
-                    title: 'Conta',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
-                    ),
-                }}
-            />
+            <Tabs.Screen name="mapa" />
+            <Tabs.Screen name="index" />
+            <Tabs.Screen name="add" />
+            <Tabs.Screen name="conta" />
         </Tabs>
     );
 }
+
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        bar: {
+            flexDirection: 'row',
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            backgroundColor: colors.card,
+            paddingHorizontal: 8,
+            paddingTop: 4,
+        },
+        item: {
+            flex: 1,
+            alignItems: 'center',
+            gap: 2,
+            paddingVertical: 6,
+        },
+        label: {
+            fontSize: 9,
+            fontWeight: '500',
+            fontFamily: MONO,
+            letterSpacing: 1,
+        },
+        addButton: {
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.background,
+        },
+        addButtonActive: {
+            backgroundColor: colors.primary,
+            shadowColor: colors.primary,
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+        },
+    });

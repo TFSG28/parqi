@@ -21,7 +21,7 @@ function HeaderLogo() {
 }
 
 function AppContent() {
-    const { colors } = useTheme();
+    const { colors, resolvedScheme } = useTheme();
 
     useEffect(() => {
         registerForPushNotifications();
@@ -29,7 +29,7 @@ function AppContent() {
 
     return (
         <>
-            <StatusBar style="light" />
+            <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
             <Stack
                 screenOptions={{
                     headerStyle: { backgroundColor: colors.bar },

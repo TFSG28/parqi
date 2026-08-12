@@ -124,15 +124,15 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
             {polygon.length > 1 && (
                 <Polygon
                     coordinates={polygon.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))}
-                    strokeColor="#3B6BFF"
+                    strokeColor="#0647AC"
                     strokeWidth={2}
-                    fillColor="rgba(59,107,255,0.2)"
+                    fillColor="rgba(6,71,172,0.2)"
                 />
             )}
             {polyline.length > 1 && (
                 <Polyline
                     coordinates={polyline.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))}
-                    strokeColor="#FF7A00"
+                    strokeColor="#FF6900"
                     strokeWidth={5}
                     lineDashPattern={[1, 8]}
                 />

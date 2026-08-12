@@ -14,3 +14,6 @@
   - import:osm → país inteiro por bbox (Continente + Madeira + Açores), 3 queries Overpass
   - import:caop → concelhos dos gpkg (node:sqlite, sem GDAL; TM06/UTM→WGS84 em Node) + associa parques ao concelho
   - novo modelo Municipality (CAOP 2025) e ParkingSpot.municipalityId
+
+#FF6900 -> dark mode com esta cor principal
+#0647AC -> light mode com esta cor principal

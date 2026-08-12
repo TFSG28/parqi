@@ -13,24 +13,29 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Chip } from '../../src/components/Chip';
 import { useAuth } from '../../src/context/AuthContext';
-import { useTheme, type ThemeMode } from '../../src/context/ThemeContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, authApi, parkingApi } from '../../src/lib/api';
+import { alpha10, MONO, PALETTE } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ContributorStats } from '../../src/types/parking';
 
-const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
-    { mode: 'system', label: 'Sistema' },
-    { mode: 'light', label: 'Claro' },
-    { mode: 'dark', label: 'Escuro' },
+function levelLabel(rep: ContributorStats['reputation'] | undefined): string {
+    if (rep?.isTrusted) return 'Contribuidor de confiança';
+    if (rep?.isNew) return 'Novo membro';
+    return 'Contribuidor';
+}
+
+const PERKS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
+    { icon: 'trending-up', text: 'Peso de voto 1.4× (normal: 1.0×)' },
+    { icon: 'chatbubble-outline', text: 'Edições aplicadas de imediato' },
+    { icon: 'eye-outline', text: 'Vê detalhes de estacionamentos sinalizados' },
+    { icon: 'shield-outline', text: 'Sem fila de moderação' },
 ];
 
-export default function AccountScreen() {
-    const insets = useSafeAreaInsets();
+export default function ProfileScreen() {
     const { user, logout } = useAuth();
-    const { colors, mode, setMode } = useTheme();
+    const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [loggingOut, setLoggingOut] = useState(false);
     const [stats, setStats] = useState<ContributorStats | null>(null);
@@ -90,211 +95,244 @@ export default function AccountScreen() {
         }
     };
 
-    const repColor =
-        stats && stats.reputation.score >= 5
-            ? colors.success
-            : stats && stats.reputation.score >= 3
-                ? colors.accent
-                : colors.danger;
+    const rep = stats?.reputation;
+    const repPct = rep ? Math.min(100, (rep.score / 10) * 100) : 0;
+    const level = levelLabel(rep);
+    const handle = user ? `@${user.email.split('@')[0]}` : '';
+
+    const badges = useMemo(() => {
+        const list: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }[] = [];
+        if (!stats) return list;
+        if (stats.reputation.isTrusted) {
+            list.push({ icon: 'shield-checkmark', label: 'De confiança', color: PALETTE.emerald });
+        }
+        if (stats.total >= 10) {
+            list.push({ icon: 'flash', label: '10 estacionamentos', color: PALETTE.violet });
+        }
+        if (stats.approved >= 1) {
+            list.push({ icon: 'star', label: 'Contribuidor', color: PALETTE.amber });
+        }
+        return list;
+    }, [stats]);
+
+    const quality = stats
+        ? [
+            { label: 'Aprovadas', count: stats.approved, color: colors.primary },
+            { label: 'Em verificação', count: stats.pending, color: PALETTE.amberDeep },
+            { label: 'Sinalizadas', count: stats.flagged + stats.rejected, color: PALETTE.redDeep },
+        ]
+        : [];
+
+    const showRepSpinner = statsLoading && !stats;
+    const repScoreText = rep ? rep.score.toFixed(1) : '—';
+    const trustedMark = rep?.isTrusted ? '✓' : '';
 
     return (
         <View style={styles.container}>
-            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                <Text style={styles.topBarTitle}>Conta</Text>
+            <View style={styles.header}>
+                <Text style={styles.title}>Perfil</Text>
+                {user?.role === 'ADMIN' && (
+                    <Pressable
+                        style={styles.iconBtn}
+                        onPress={() => router.push('/admin')}
+                        accessibilityLabel="Administração"
+                    >
+                        <Ionicons name="settings-outline" size={16} color={colors.textMuted} />
+                    </Pressable>
+                )}
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-                {/* Perfil */}
-                {user ? (
-                    <View style={styles.profileCard}>
-                        <View style={styles.avatar}>
+                {/* Avatar + nome */}
+                <View style={styles.identity}>
+                    <View style={styles.avatar}>
+                        {user ? (
                             <Text style={styles.avatarText}>{user.name.trim().charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <View style={styles.profileInfo}>
-                            <Text style={styles.name}>{user.name}</Text>
-                            <Text style={styles.email}>{user.email}</Text>
-                            {user.role === 'ADMIN' && (
-                                <View style={styles.adminBadge}>
-                                    <Ionicons name="shield-checkmark" size={12} color={colors.accent} />
-                                    <Text style={styles.adminBadgeText}>Administrador</Text>
-                                </View>
-                            )}
-                        </View>
+                        ) : (
+                            <Ionicons name="person" size={26} color={colors.primary} />
+                        )}
                     </View>
-                ) : (
-                    <View style={styles.profileCard}>
-                        <View style={styles.avatar}>
-                            <Ionicons name="person" size={24} color={colors.white} />
-                        </View>
-                        <View style={styles.profileInfo}>
-                            <Text style={styles.name}>Sem sessão iniciada</Text>
-                            <Text style={styles.email}>Entra para votar e adicionar estacionamentos.</Text>
-                        </View>
-                    </View>
-                )}
-
-                {!user && (
-                    <Pressable style={styles.loginButton} onPress={() => router.push('/login')}>
-                        <Text style={styles.loginButtonText}>Entrar ou criar conta</Text>
-                    </Pressable>
-                )}
-
-                {/* Email ainda não validado */}
-                {user?.emailVerified === false && (
-                    <Pressable style={styles.verifyBanner} onPress={() => router.push('/verify')}>
-                        <Ionicons name="mail-unread" size={18} color={colors.onAccent} />
-                        <Text style={styles.verifyBannerText}>
-                            Email não verificado — valida a tua conta para poderes contribuir.
-                        </Text>
-                        <Ionicons name="chevron-forward" size={16} color={colors.onAccent} />
-                    </Pressable>
-                )}
-
-                {/* As minhas contribuições */}
-                {user && (
-                    <>
-                        <Text style={styles.sectionTitle}>As minhas contribuições</Text>
-                        <View style={styles.card}>
-                            {statsLoading && !stats ? (
-                                <ActivityIndicator color={colors.primary} />
-                            ) : stats ? (
-                                <>
-                                    <View style={styles.repRow}>
-                                        <View style={styles.repLeft}>
-                                            <Ionicons name="ribbon" size={22} color={repColor} />
-                                            <View>
-                                                <Text style={styles.repLabel}>Reputação</Text>
-                                                <Text style={[styles.repValue, { color: repColor }]}>
-                                                    {stats.reputation.score.toFixed(1)}/10
-                                                    {stats.reputation.isTrusted ? ' · confiável' : ''}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <Text style={styles.repHint}>
-                                            {stats.reputation.isTrusted
-                                                ? 'As tuas edições aplicam-se de imediato e os teus votos valem mais.'
-                                                : 'Contribui e recebe confirmações para ficares confiável.'}
-                                        </Text>
-                                    </View>
-
-                                    <View style={styles.statsGrid}>
-                                        <View style={styles.statCell}>
-                                            <Text style={styles.statValue}>{stats.total}</Text>
-                                            <Text style={styles.statLabel}>Total</Text>
-                                        </View>
-                                        <View style={styles.statCell}>
-                                            <Text style={[styles.statValue, { color: colors.success }]}>{stats.approved}</Text>
-                                            <Text style={styles.statLabel}>Aprovadas</Text>
-                                        </View>
-                                        <View style={styles.statCell}>
-                                            <Text style={[styles.statValue, { color: colors.accent }]}>{stats.pending}</Text>
-                                            <Text style={styles.statLabel}>Em verificação</Text>
-                                        </View>
-                                        <View style={styles.statCell}>
-                                            <Text style={[styles.statValue, { color: colors.danger }]}>{stats.rejected + stats.flagged}</Text>
-                                            <Text style={styles.statLabel}>Rejeitadas/Sinalizadas</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.statsRow}>
-                                        <Ionicons name="checkmark-done" size={15} color={colors.textMuted} />
-                                        <Text style={styles.statsRowText}>{stats.approvedRate}% de aprovação</Text>
-                                    </View>
-                                    <View style={styles.statsRow}>
-                                        <Ionicons name="thumbs-up" size={15} color={colors.textMuted} />
-                                        <Text style={styles.statsRowText}>
-                                            {stats.votesReceivedUp} confirmações recebidas · {stats.votesReceivedDown} reportes
-                                        </Text>
-                                    </View>
-                                    <View style={styles.statsRow}>
-                                        <Ionicons name="hand-left" size={15} color={colors.textMuted} />
-                                        <Text style={styles.statsRowText}>{stats.votesGiven} votos dados</Text>
-                                    </View>
-                                    {stats.avgTrustApproved > 0 && (
-                                        <View style={styles.statsRow}>
-                                            <Ionicons name="shield-half" size={15} color={colors.textMuted} />
-                                            <Text style={styles.statsRowText}>
-                                                Confiança média dos aprovados: {stats.avgTrustApproved.toFixed(1)}/10
-                                            </Text>
-                                        </View>
-                                    )}
-                                </>
-                            ) : statsError ? (
-                                <Pressable style={styles.statsRetry} onPress={loadStats} accessibilityRole="button">
-                                    <Ionicons name="refresh" size={16} color={colors.primary} />
-                                    <Text style={styles.statsRetryText}>
-                                        Não foi possível carregar. Tentar de novo
-                                    </Text>
-                                </Pressable>
-                            ) : null}
-                        </View>
-                    </>
-                )}
-
-                {/* Administração (admin) */}
-                {user?.role === 'ADMIN' && (
-                    <Pressable style={styles.adminButton} onPress={() => router.push('/admin')}>
-                        <Ionicons name="shield-checkmark" size={18} color={colors.onAccent} />
-                        <Text style={styles.adminButtonText}>Administração · moderação</Text>
-                    </Pressable>
-                )}
-
-                {/* Preferências */}
-                <Text style={styles.sectionTitle}>Preferências</Text>
-                <View style={styles.card}>
-                    <Text style={styles.prefLabel}>Tema</Text>
-                    <View style={styles.chipRow}>
-                        {THEME_OPTIONS.map((option) => (
-                            <Chip
-                                key={option.mode}
-                                label={option.label}
-                                selected={mode === option.mode}
-                                onPress={() => setMode(option.mode)}
-                            />
-                        ))}
+                    <View>
+                        <Text style={styles.name}>{user ? user.name : 'Sem sessão iniciada'}</Text>
+                        {user ? (
+                            <>
+                                <Text style={styles.handle}>{handle}</Text>
+                                <Text style={styles.level}>{level}</Text>
+                            </>
+                        ) : (
+                            <Text style={styles.handle}>Entra para votar e adicionar estacionamentos.</Text>
+                        )}
                     </View>
                 </View>
 
-                {/* Sobre */}
-                <Text style={styles.sectionTitle}>Sobre</Text>
+                {!user && (
+                    <Pressable style={styles.primaryBtn} onPress={() => router.push('/login')}>
+                        <Text style={styles.primaryBtnText}>Entrar ou criar conta</Text>
+                    </Pressable>
+                )}
+
+                {user?.emailVerified === false && (
+                    <Pressable style={styles.verifyBanner} onPress={() => router.push('/verify')}>
+                        <Ionicons name="mail-unread" size={16} color={PALETTE.amber} />
+                        <Text style={styles.verifyText}>
+                            Email não verificado — valida a tua conta para poderes contribuir.
+                        </Text>
+                        <Ionicons name="chevron-forward" size={14} color={PALETTE.amber} />
+                    </Pressable>
+                )}
+
+                {user && (
+                    <>
+                        {/* Reputação */}
+                        <View style={styles.card}>
+                            <View style={styles.repHeader}>
+                                <Text style={styles.sectionLabel}>REPUTAÇÃO</Text>
+                                {showRepSpinner ? (
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                ) : (
+                                    <Text style={styles.repValue}>
+                                        {repScoreText}
+                                        <Text style={styles.repMax}>/10</Text>
+                                    </Text>
+                                )}
+                            </View>
+                            <View style={styles.repTrack}>
+                                <View style={[styles.repFill, { width: `${repPct}%` }]} />
+                            </View>
+                            <View style={styles.repScale}>
+                                <Text style={styles.repScaleText}>Novo (0)</Text>
+                                <Text style={[styles.repScaleText, { color: colors.primary }]}>
+                                    Confiável ≥5 {trustedMark}
+                                </Text>
+                                <Text style={styles.repScaleText}>Perito (10)</Text>
+                            </View>
+                            {statsError && (
+                                <Pressable style={styles.retry} onPress={loadStats}>
+                                    <Ionicons name="refresh" size={14} color={colors.primary} />
+                                    <Text style={styles.retryText}>Não foi possível carregar. Tentar de novo</Text>
+                                </Pressable>
+                            )}
+                        </View>
+
+                        {/* Stats grid */}
+                        {stats && (
+                            <View style={styles.statsGrid}>
+                                {[
+                                    { label: 'Total', value: stats.total, icon: 'location-outline' as const, color: PALETTE.sky },
+                                    { label: 'Aprovadas', value: stats.approved, icon: 'checkmark-circle-outline' as const, color: PALETTE.emerald },
+                                    { label: 'Em verificação', value: stats.pending, icon: 'time-outline' as const, color: PALETTE.amber },
+                                    { label: 'Votos dados', value: stats.votesGiven, icon: 'thumbs-up-outline' as const, color: PALETTE.violet },
+                                ].map(({ label, value, icon, color }) => (
+                                    <View key={label} style={styles.statCard}>
+                                        <Ionicons name={icon} size={16} color={color} />
+                                        <View>
+                                            <Text style={styles.statValue}>{value}</Text>
+                                            <Text style={styles.statLabel}>{label}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Badges */}
+                        {badges.length > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionLabel}>DISTINTIVOS</Text>
+                                <View style={styles.badgeRow}>
+                                    {badges.map(({ icon, label, color }) => (
+                                        <View
+                                            key={label}
+                                            style={[styles.badge, { backgroundColor: alpha10(color) }]}
+                                        >
+                                            <Ionicons name={icon} size={13} color={color} />
+                                            <Text style={[styles.badgeText, { color }]}>{label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Qualidade das contribuições */}
+                        {stats && stats.total > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionLabel}>QUALIDADE DAS CONTRIBUIÇÕES</Text>
+                                <View style={styles.qualityList}>
+                                    {quality.map(({ label, count, color }) => (
+                                        <View key={label}>
+                                            <View style={styles.qualityHeader}>
+                                                <Text style={styles.qualityLabel}>{label}</Text>
+                                                <Text style={[styles.qualityCount, { color }]}>
+                                                    {count}/{stats.total}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.qualityTrack}>
+                                                <View
+                                                    style={[
+                                                        styles.qualityFill,
+                                                        { width: `${(count / stats.total) * 100}%`, backgroundColor: color },
+                                                    ]}
+                                                />
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Perks */}
+                        {rep?.isTrusted && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionLabel}>VANTAGENS DE UTILIZADOR CONFIÁVEL</Text>
+                                {PERKS.map(({ icon, text }, i) => (
+                                    <View
+                                        key={text}
+                                        style={[styles.perkRow, i < PERKS.length - 1 && styles.perkBorder]}
+                                    >
+                                        <Ionicons name={icon} size={14} color={colors.primary} />
+                                        <Text style={styles.perkText}>{text}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </>
+                )}
+
+                {/* Legal */}
                 <View style={styles.card}>
                     <Pressable
                         style={styles.aboutRow}
                         accessibilityRole="link"
                         onPress={() => Linking.openURL('https://parqi.pt/termos')}
                     >
-                        <Ionicons name="document-text-outline" size={18} color={colors.textMuted} />
+                        <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
                         <Text style={styles.aboutText}>Termos e Condições</Text>
-                        <Ionicons name="open-outline" size={15} color={colors.textMuted} />
+                        <Ionicons name="open-outline" size={13} color={colors.textMuted} />
                     </Pressable>
                     <Pressable
                         style={styles.aboutRow}
                         accessibilityRole="link"
                         onPress={() => Linking.openURL('https://parqi.pt/privacidade')}
                     >
-                        <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
+                        <Ionicons name="lock-closed-outline" size={16} color={colors.textMuted} />
                         <Text style={styles.aboutText}>Política de Privacidade</Text>
-                        <Ionicons name="open-outline" size={15} color={colors.textMuted} />
+                        <Ionicons name="open-outline" size={13} color={colors.textMuted} />
                     </Pressable>
                 </View>
 
-                {/* Sessão */}
                 {user && (
-                    <Pressable
-                        style={[styles.logoutButton, loggingOut && styles.disabled]}
-                        onPress={handleLogout}
-                        disabled={loggingOut}
-                    >
-                        <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-                        <Text style={styles.logoutText}>Terminar sessão</Text>
-                    </Pressable>
-                )}
-
-                {/* Eliminação de conta (RGPD) */}
-                {user && (
-                    <Pressable onPress={() => setDeleteModal(true)} hitSlop={8}>
-                        <Text style={styles.deleteLink}>Eliminar conta</Text>
-                    </Pressable>
+                    <>
+                        <Pressable
+                            style={[styles.signOutBtn, loggingOut && styles.disabled]}
+                            onPress={handleLogout}
+                            disabled={loggingOut}
+                        >
+                            <Ionicons name="log-out-outline" size={16} color={colors.textMuted} />
+                            <Text style={styles.signOutText}>Terminar sessão</Text>
+                        </Pressable>
+                        <Pressable onPress={() => setDeleteModal(true)} hitSlop={8}>
+                            <Text style={styles.deleteLink}>Eliminar conta</Text>
+                        </Pressable>
+                    </>
                 )}
             </ScrollView>
 
@@ -348,241 +386,286 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             backgroundColor: colors.background,
         },
-        topBar: {
+        header: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 16,
-            paddingBottom: 10,
-            backgroundColor: colors.bar,
+            paddingTop: 16,
+            paddingBottom: 8,
         },
-        topBarTitle: {
-            fontSize: 20,
-            fontWeight: '700',
-            color: colors.white,
+        title: {
+            fontSize: 16,
+            fontWeight: '600',
+            color: colors.text,
+        },
+        iconBtn: {
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            backgroundColor: colors.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: 'center',
+            justifyContent: 'center',
         },
         scroll: {
             flex: 1,
         },
         content: {
-            padding: 16,
-            paddingBottom: 32,
+            paddingHorizontal: 16,
+            paddingBottom: 24,
             gap: 12,
         },
-        profileCard: {
+        identity: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 14,
-            backgroundColor: colors.card,
-            borderRadius: 16,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
+            gap: 16,
+            marginTop: 8,
+            marginBottom: 4,
         },
         avatar: {
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            backgroundColor: colors.primary,
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            backgroundColor: colors.primary + '26',
+            borderWidth: 1,
+            borderColor: colors.primary + '4D',
             alignItems: 'center',
             justifyContent: 'center',
         },
         avatarText: {
-            color: colors.white,
-            fontSize: 22,
-            fontWeight: '800',
-        },
-        profileInfo: {
-            flex: 1,
-            gap: 2,
+            fontSize: 24,
+            fontWeight: '700',
+            color: colors.primary,
         },
         name: {
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: '700',
             color: colors.text,
         },
-        email: {
-            fontSize: 13,
+        handle: {
+            fontSize: 12,
+            fontFamily: MONO,
             color: colors.textMuted,
+            marginTop: 1,
         },
-        adminBadge: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            alignSelf: 'flex-start',
+        level: {
+            fontSize: 12,
+            fontFamily: MONO,
+            color: colors.primary,
             marginTop: 2,
         },
-        adminBadgeText: {
-            fontSize: 11,
-            fontWeight: '700',
-            color: colors.accent,
-        },
-        loginButton: {
-            backgroundColor: colors.accent,
-            borderRadius: 12,
-            paddingVertical: 14,
+        primaryBtn: {
             alignItems: 'center',
+            paddingVertical: 14,
+            borderRadius: 12,
+            backgroundColor: colors.primary,
         },
-        loginButtonText: {
-            color: colors.onAccent,
-            fontWeight: '700',
+        primaryBtnText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.white,
         },
         verifyBanner: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 10,
-            backgroundColor: colors.accent,
+            gap: 8,
+            backgroundColor: alpha10(PALETTE.amber),
             borderRadius: 12,
-            paddingVertical: 12,
-            paddingHorizontal: 14,
+            padding: 12,
         },
-        verifyBannerText: {
+        verifyText: {
             flex: 1,
-            color: colors.onAccent,
-            fontSize: 13,
-            fontWeight: '600',
-            lineHeight: 18,
-        },
-        sectionTitle: {
-            fontSize: 13,
-            fontWeight: '700',
-            color: colors.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: 0.6,
-            marginTop: 8,
+            fontSize: 12,
+            color: colors.text,
         },
         card: {
             backgroundColor: colors.card,
-            borderRadius: 16,
-            padding: 16,
             borderWidth: 1,
             borderColor: colors.border,
-            gap: 10,
+            borderRadius: 12,
+            padding: 16,
         },
-        repRow: {
-            gap: 8,
+        sectionLabel: {
+            fontSize: 11,
+            fontFamily: MONO,
+            letterSpacing: 1.5,
+            color: colors.textMuted,
+            marginBottom: 10,
         },
-        repLeft: {
+        repHeader: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 10,
-        },
-        repLabel: {
-            fontSize: 12,
-            color: colors.textMuted,
+            justifyContent: 'space-between',
+            marginBottom: 8,
         },
         repValue: {
-            fontSize: 18,
-            fontWeight: '800',
+            fontSize: 24,
+            fontWeight: '700',
+            fontFamily: MONO,
+            color: colors.primary,
         },
-        repHint: {
-            fontSize: 12,
+        repMax: {
+            fontSize: 13,
+            fontWeight: '400',
             color: colors.textMuted,
-            lineHeight: 17,
+        },
+        repTrack: {
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: colors.border,
+            overflow: 'hidden',
+            marginBottom: 8,
+        },
+        repFill: {
+            height: '100%',
+            borderRadius: 4,
+            backgroundColor: colors.primary,
+        },
+        repScale: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+        },
+        repScaleText: {
+            fontSize: 10,
+            fontFamily: MONO,
+            color: colors.textMuted,
+        },
+        retry: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 10,
+        },
+        retryText: {
+            fontSize: 12,
+            color: colors.primary,
         },
         statsGrid: {
             flexDirection: 'row',
-            justifyContent: 'space-between',
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            paddingTop: 10,
+            flexWrap: 'wrap',
+            gap: 8,
         },
-        statCell: {
+        statCard: {
+            width: '48%',
+            flexGrow: 1,
+            flexDirection: 'row',
             alignItems: 'center',
-            gap: 2,
+            gap: 12,
+            backgroundColor: colors.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 12,
+            padding: 12,
         },
         statValue: {
-            fontSize: 18,
-            fontWeight: '800',
+            fontSize: 17,
+            fontWeight: '700',
+            fontFamily: MONO,
             color: colors.text,
         },
         statLabel: {
             fontSize: 10,
+            fontFamily: MONO,
             color: colors.textMuted,
-            textAlign: 'center',
         },
-        statsRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-        },
-        statsRowText: {
-            fontSize: 13,
-            color: colors.textMuted,
-            flex: 1,
-        },
-        adminButton: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            backgroundColor: colors.accent,
-            borderRadius: 12,
-            paddingVertical: 14,
-        },
-        adminButtonText: {
-            color: colors.onAccent,
-            fontWeight: '700',
-        },
-        prefLabel: {
-            fontSize: 14,
-            fontWeight: '600',
-            color: colors.text,
-        },
-        chipRow: {
+        badgeRow: {
             flexDirection: 'row',
             flexWrap: 'wrap',
             gap: 8,
+        },
+        badge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 999,
+        },
+        badgeText: {
+            fontSize: 12,
+            fontWeight: '500',
+            fontFamily: MONO,
+        },
+        qualityList: {
+            gap: 10,
+        },
+        qualityHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginBottom: 4,
+        },
+        qualityLabel: {
+            fontSize: 12,
+            color: colors.textMuted,
+        },
+        qualityCount: {
+            fontSize: 12,
+            fontFamily: MONO,
+        },
+        qualityTrack: {
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: colors.border,
+            overflow: 'hidden',
+        },
+        qualityFill: {
+            height: '100%',
+            borderRadius: 3,
+        },
+        perkRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            paddingVertical: 8,
+        },
+        perkBorder: {
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        perkText: {
+            fontSize: 12,
+            color: colors.textMuted,
         },
         aboutRow: {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 10,
-            paddingVertical: 6,
+            paddingVertical: 8,
         },
         aboutText: {
             flex: 1,
-            fontSize: 14,
+            fontSize: 13,
             color: colors.text,
         },
-        logoutButton: {
+        signOutBtn: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
-            borderWidth: 1,
-            borderColor: colors.danger,
+            paddingVertical: 14,
             borderRadius: 12,
-            paddingVertical: 13,
-            marginTop: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
         },
-        logoutText: {
-            color: colors.danger,
-            fontWeight: '600',
+        signOutText: {
+            fontSize: 14,
+            fontWeight: '500',
+            color: colors.textMuted,
         },
         deleteLink: {
+            fontSize: 13,
+            color: colors.danger,
             textAlign: 'center',
-            color: colors.textMuted,
-            fontSize: 13,
-            textDecorationLine: 'underline',
-            marginTop: 4,
-            marginBottom: 12,
+            paddingVertical: 4,
         },
-        statsRetry: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            paddingVertical: 8,
-        },
-        statsRetryText: {
-            color: colors.primary,
-            fontSize: 13,
-            fontWeight: '600',
+        disabled: {
+            opacity: 0.5,
         },
         modalBackdrop: {
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.4)',
+            backgroundColor: 'rgba(0,0,0,0.5)',
             justifyContent: 'flex-end',
         },
         modalCard: {
@@ -591,10 +674,9 @@ const createStyles = (colors: ThemeColors) =>
             borderTopRightRadius: 20,
             padding: 20,
             gap: 12,
-            paddingBottom: 32,
         },
         modalTitle: {
-            fontSize: 16,
+            fontSize: 17,
             fontWeight: '700',
             color: colors.text,
         },
@@ -606,36 +688,40 @@ const createStyles = (colors: ThemeColors) =>
         modalInput: {
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            fontSize: 15,
             color: colors.text,
+            backgroundColor: colors.background,
         },
         modalActions: {
             flexDirection: 'row',
-            justifyContent: 'flex-end',
             gap: 10,
         },
         modalCancel: {
+            flex: 1,
+            alignItems: 'center',
             paddingVertical: 12,
-            paddingHorizontal: 16,
-            borderRadius: 12,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
         },
         modalCancelText: {
-            color: colors.textMuted,
+            fontSize: 14,
             fontWeight: '600',
+            color: colors.text,
         },
         modalDelete: {
-            backgroundColor: colors.danger,
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            borderRadius: 12,
+            flex: 1,
             alignItems: 'center',
+            paddingVertical: 12,
+            borderRadius: 10,
+            backgroundColor: colors.danger,
         },
         modalDeleteText: {
+            fontSize: 14,
+            fontWeight: '600',
             color: colors.white,
-            fontWeight: '700',
-        },
-        disabled: {
-            opacity: 0.5,
         },
     });
