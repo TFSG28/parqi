@@ -201,11 +201,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
-      # Segredos do cPanel (quality/production): nomes sem prefixo.
+      # Conta cPanel partilhada (host/user/token); caminho próprio por app.
       CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
       CPANEL_USER: ${{ secrets.CPANEL_USER }}
       CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
-      DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+      DEPLOY_PATH: ${{ secrets.BACKEND_DEPLOY_PATH }}
       ZIP_FILE: deploy.zip
       # prisma generate nao liga a BD: so precisa que a variavel exista para o
       # prisma.config.ts carregar. A URL real e definida no cPanel (runtime).
@@ -275,9 +275,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
-      CPANEL_HOST: ${{ secrets.FRONTEND_CPANEL_HOST }}
-      CPANEL_USER: ${{ secrets.FRONTEND_CPANEL_USER }}
-      CPANEL_API_TOKEN: ${{ secrets.FRONTEND_CPANEL_API_TOKEN }}
+      # Conta cPanel partilhada (host/user/token); caminho próprio por app.
+      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
       DEPLOY_PATH: ${{ secrets.FRONTEND_DEPLOY_PATH }}
       ZIP_FILE: deploy.zip
     steps:

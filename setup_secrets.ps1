@@ -102,22 +102,25 @@ foreach ($ENV in $ENVIRONMENTS) {
     gh api -X PUT "repos/$REPO/environments/$ENV" --silent 2>$null | Out-Null
 
     Write-Host ""
+    Write-Host "Frontend e backend partilham a mesma conta cPanel (host/user/token)."
     $CPANEL_HOST = Read-Host "CPANEL_HOST (ex: meusite.pt)"
     $CPANEL_USER = Read-Host "CPANEL_USER"
     $CPANEL_API_TOKEN_SECURE = Read-Host "CPANEL_API_TOKEN" -AsSecureString
     $CPANEL_API_TOKEN = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($CPANEL_API_TOKEN_SECURE)
     )
-    $CPANEL_DEPLOY_PATH = Read-Host "CPANEL_DEPLOY_PATH (ex: /home/user/app)"
+    $FRONTEND_DEPLOY_PATH = Read-Host "FRONTEND_DEPLOY_PATH (ex: /home/user/frontend)"
+    $BACKEND_DEPLOY_PATH = Read-Host "BACKEND_DEPLOY_PATH (ex: /home/user/backend)"
     $NEXT_PUBLIC_API_URL = Read-Host "NEXT_PUBLIC_API_URL (deixa vazio se não aplicável)"
 
     Write-Host ""
     Write-Host "A guardar secrets em '$ENV'..."
 
-    $CPANEL_HOST       | gh secret set CPANEL_HOST       --env $ENV --repo $REPO
-    $CPANEL_USER       | gh secret set CPANEL_USER       --env $ENV --repo $REPO
-    $CPANEL_API_TOKEN  | gh secret set CPANEL_API_TOKEN  --env $ENV --repo $REPO
-    $CPANEL_DEPLOY_PATH | gh secret set CPANEL_DEPLOY_PATH --env $ENV --repo $REPO
+    $CPANEL_HOST          | gh secret set CPANEL_HOST          --env $ENV --repo $REPO
+    $CPANEL_USER          | gh secret set CPANEL_USER          --env $ENV --repo $REPO
+    $CPANEL_API_TOKEN     | gh secret set CPANEL_API_TOKEN     --env $ENV --repo $REPO
+    $FRONTEND_DEPLOY_PATH | gh secret set FRONTEND_DEPLOY_PATH --env $ENV --repo $REPO
+    $BACKEND_DEPLOY_PATH  | gh secret set BACKEND_DEPLOY_PATH  --env $ENV --repo $REPO
 
     if ($NEXT_PUBLIC_API_URL) {
         $NEXT_PUBLIC_API_URL | gh variable set NEXT_PUBLIC_API_URL --env $ENV --repo $REPO
