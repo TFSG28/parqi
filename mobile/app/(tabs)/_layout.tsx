@@ -5,14 +5,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParqiHeader } from '../../src/components/ParqiHeader';
 import { useTheme } from '../../src/context/ThemeContext';
-import { MONO } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 
 const TAB_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
-    mapa: { icon: 'map-outline', label: 'MAPA' },
-    index: { icon: 'search-outline', label: 'DESCOBRIR' },
+    mapa: { icon: 'map-outline', label: 'Mapa' },
+    index: { icon: 'search-outline', label: 'Descobrir' },
     add: { icon: 'add', label: '' },
-    conta: { icon: 'person-outline', label: 'PERFIL' },
+    conta: { icon: 'person-outline', label: 'Perfil' },
 };
 
 /** Props do tabBar extraídas do próprio Tabs (evita dependência direta). */
@@ -47,7 +46,7 @@ function DesignTabBar({ state, navigation }: Readonly<TabBarProps>) {
                     <Pressable
                         key={route.key}
                         onPress={onPress}
-                        style={styles.item}
+                        style={({ pressed }) => [styles.item, pressed && styles.pressed]}
                         accessibilityRole="button"
                         accessibilityState={focused ? { selected: true } : {}}
                         accessibilityLabel={route.name === 'add' ? 'Adicionar estacionamento' : meta.label}
@@ -107,10 +106,8 @@ const createStyles = (colors: ThemeColors) =>
             paddingVertical: 6,
         },
         label: {
-            fontSize: 9,
-            fontWeight: '500',
-            fontFamily: MONO,
-            letterSpacing: 1,
+            fontSize: 10,
+            fontWeight: '600',
         },
         addButton: {
             width: 40,
@@ -127,5 +124,8 @@ const createStyles = (colors: ThemeColors) =>
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 4 },
             elevation: 6,
+        },
+        pressed: {
+            opacity: 0.7,
         },
     });

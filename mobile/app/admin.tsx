@@ -15,7 +15,7 @@ import {
 import { Chip } from '../src/components/Chip';
 import { useTheme } from '../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../src/lib/api';
-import { STATUS_META, TYPE_META } from '../src/lib/geo';
+import { formatScore, STATUS_META, TYPE_META } from '../src/lib/geo';
 import type { ThemeColors } from '../src/theme/colors';
 import type { ParkingSpot, ParkingSuggestion } from '../src/types/parking';
 
@@ -145,23 +145,34 @@ export default function AdminScreen() {
                         </Text>
                     </View>
                     <Text style={styles.cardMeta}>
-                        Confiança {spot.trustScore.toFixed(1)}/10 · {TYPE_META[spot.parkingType].label} ·{' '}
+                        Confiança {formatScore(spot.trustScore)}/10 · {TYPE_META[spot.parkingType].label} ·{' '}
                         {spot.source}
                     </Text>
                     <View style={styles.cardActions}>
-                        <Pressable style={styles.viewButton} onPress={() => router.push(`/parking/${spot.id}`)}>
+                        <Pressable
+                            style={({ pressed }) => [styles.viewButton, pressed && styles.pressed]}
+                            onPress={() => router.push(`/parking/${spot.id}`)}
+                        >
                             <Ionicons name="eye-outline" size={16} color={colors.primary} />
                             <Text style={styles.viewText}>Ver</Text>
                         </Pressable>
                         <Pressable
-                            style={styles.approveButton}
+                            style={({ pressed }) => [
+                                styles.approveButton,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
                             onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'APPROVE' })}
                             disabled={busy}
                         >
                             <Text style={styles.approveText}>Aprovar</Text>
                         </Pressable>
                         <Pressable
-                            style={styles.rejectButton}
+                            style={({ pressed }) => [
+                                styles.rejectButton,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
                             onPress={() => setPendingAction({ kind: 'spot', id: spot.id, action: 'REJECT' })}
                             disabled={busy}
                         >
@@ -170,7 +181,7 @@ export default function AdminScreen() {
                     </View>
                     {spot.contributorId && (
                         <Pressable
-                            style={styles.banRow}
+                            style={({ pressed }) => [styles.banRow, pressed && styles.pressed]}
                             onPress={() => confirmBan(spot.contributorId!)}
                             disabled={busy}
                             accessibilityRole="button"
@@ -202,21 +213,29 @@ export default function AdminScreen() {
                     ) : null}
                     <View style={styles.cardActions}>
                         <Pressable
-                            style={styles.viewButton}
+                            style={({ pressed }) => [styles.viewButton, pressed && styles.pressed]}
                             onPress={() => router.push(`/parking/${suggestion.parkingSpotId}`)}
                         >
                             <Ionicons name="eye-outline" size={16} color={colors.primary} />
                             <Text style={styles.viewText}>Ver parque</Text>
                         </Pressable>
                         <Pressable
-                            style={styles.approveButton}
+                            style={({ pressed }) => [
+                                styles.approveButton,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
                             onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'APPROVE' })}
                             disabled={busy}
                         >
                             <Text style={styles.approveText}>Aceitar</Text>
                         </Pressable>
                         <Pressable
-                            style={styles.rejectButton}
+                            style={({ pressed }) => [
+                                styles.rejectButton,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
                             onPress={() => setPendingAction({ kind: 'suggestion', id: suggestion.id, action: 'REJECT' })}
                             disabled={busy}
                         >
@@ -260,13 +279,17 @@ export default function AdminScreen() {
                                 multiline
                             />
                             <View style={styles.modalActions}>
-                                <Pressable style={styles.modalCancel} onPress={() => { setPendingAction(null); setReason(''); }}>
+                                <Pressable
+                                    style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]}
+                                    onPress={() => { setPendingAction(null); setReason(''); }}
+                                >
                                     <Text style={styles.modalCancelText}>Cancelar</Text>
                                 </Pressable>
                                 <Pressable
-                                    style={[
+                                    style={({ pressed }) => [
                                         pendingAction?.action === 'APPROVE' ? styles.modalApprove : styles.modalReject,
                                         busy && styles.disabled,
+                                        pressed && !busy && styles.pressed,
                                     ]}
                                     onPress={decide}
                                     disabled={busy}
@@ -470,5 +493,9 @@ const createStyles = (colors: ThemeColors) =>
         },
         disabled: {
             opacity: 0.5,
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
         },
     });

@@ -380,6 +380,12 @@ export class ParkingRepository implements IParkingRepository {
         return { ...vote, value: vote.value as 1 | -1 };
     }
 
+    async deleteVote(userId: string, parkingSpotId: string): Promise<void> {
+        await prisma.parkingVote.deleteMany({
+            where: { userId, parkingSpotId },
+        });
+    }
+
     async getVoteSummary(parkingSpotId: string): Promise<{ upvotes: number; downvotes: number }> {
         const rows = await prisma.$queryRaw<{ upvotes: number; downvotes: number }[]>`
             SELECT COALESCE(SUM("weight") FILTER (WHERE "value" = 1), 0)::float AS upvotes,

@@ -1,22 +1,23 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { MONO, trustColor } from '../theme/design';
+import { formatScore } from '../lib/geo';
+import { MONO, themedText, trustColor } from '../theme/design';
 import type { ThemeColors } from '../theme/colors';
 
 /** Barra fina + valor mono à direita, como o TrustBar do design. */
 export function TrustBar({ trustScore }: Readonly<{ trustScore: number }>) {
-    const { colors } = useTheme();
+    const { colors, resolvedScheme } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const pct = Math.min(100, Math.max(0, trustScore * 10));
-    const color = trustColor(trustScore, colors.primary);
+    const color = themedText(trustColor(trustScore, colors.primary), resolvedScheme);
 
     return (
         <View style={styles.container}>
             <View style={styles.track}>
                 <View style={[styles.fill, { width: `${pct}%`, backgroundColor: color }]} />
             </View>
-            <Text style={[styles.value, { color }]}>{trustScore.toFixed(1)}</Text>
+            <Text style={[styles.value, { color }]}>{formatScore(trustScore)}</Text>
         </View>
     );
 }

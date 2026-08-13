@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import { Chip } from '../src/components/Chip';
+import { PasswordInput } from '../src/components/PasswordInput';
 import { useAuth } from '../src/context/AuthContext';
 import { useTheme } from '../src/context/ThemeContext';
 import { ApiError } from '../src/lib/api';
@@ -126,25 +127,34 @@ export default function LoginScreen() {
                 />
 
                 <Text style={styles.label}>Palavra-passe</Text>
-                <TextInput
-                    style={styles.input}
+                <PasswordInput
                     value={password}
                     onChangeText={setPassword}
                     placeholder="••••••••"
-                    placeholderTextColor={colors.textMuted}
-                    secureTextEntry
                     autoComplete={mode === 'register' ? 'new-password' : 'password'}
                 />
 
                 {error && <Text style={styles.error}>{error}</Text>}
 
                 {mode === 'login' && (
-                    <Pressable onPress={() => router.push('/forgot-password')} hitSlop={8}>
+                    <Pressable
+                        onPress={() => router.push('/forgot-password')}
+                        hitSlop={8}
+                        style={({ pressed }) => pressed && styles.pressed}
+                    >
                         <Text style={styles.forgot}>Esqueceste-te da palavra-passe?</Text>
                     </Pressable>
                 )}
 
-                <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submit} disabled={busy}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.submit,
+                        busy && styles.disabled,
+                        pressed && !busy && styles.pressed,
+                    ]}
+                    onPress={submit}
+                    disabled={busy}
+                >
                     {busy ? (
                         <ActivityIndicator color={colors.white} />
                     ) : (
@@ -155,23 +165,23 @@ export default function LoginScreen() {
                 </Pressable>
 
                 {mode === 'register' && (
-                    <Text style={styles.hint}>
-                        Ao criares conta aceitas os{' '}
-                        <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/termos')}>
-                            Termos e Condições
-                        </Text>{' '}
-                        e a{' '}
-                        <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/privacidade')}>
-                            Política de Privacidade
+                    <>
+                        <Text style={styles.hint}>
+                            Ao criares conta aceitas os{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/termos')}>
+                                Termos e Condições
+                            </Text>{' '}
+                            e a{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://parqi.pt/privacidade')}>
+                                Política de Privacidade
+                            </Text>
+                            .
                         </Text>
-                        .
-                    </Text>
+                        <Text style={styles.hint}>
+                            Recebes um código por email para validar a conta antes de contribuir.
+                        </Text>
+                    </>
                 )}
-
-                <Text style={styles.hint}>
-                    Após criares a conta recebes um código por email para a validares — só assim podes
-                    adicionar, votar e sugerir estacionamentos.
-                </Text>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -240,6 +250,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     disabled: {
         opacity: 0.6,
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
     hint: {
         fontSize: 12,

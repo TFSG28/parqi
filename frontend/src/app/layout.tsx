@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Semi_Condensed } from "next/font/google";
+import { ThemeProvider } from "@/context/ThemeContext";
 import "./globals.css";
+
+// Define o tema antes do primeiro paint (sem flash): lê o localStorage ou a
+// preferência do sistema e aplica a classe .dark no <html> antes da hidratação.
+const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark')}catch(e){}})();`;
 
 // Barlow descende das letras da sinalética rodoviária: a marca Parqi É sinalética.
 const body = Barlow({
@@ -86,9 +91,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-PT">
+    <html lang="pt-PT" suppressHydrationWarning>
       <body className={`${display.variable} ${body.variable} font-sans antialiased`}>
-        {children}
+        <script
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+          suppressHydrationWarning
+        />
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

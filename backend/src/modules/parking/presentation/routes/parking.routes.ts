@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { parkingController } from '../../../../shared/container/controllers';
 import { validate } from '../../../../shared/middleware/validation.middleware';
 import { authMiddleware } from '../../../../shared/middleware/auth.middleware';
+import { optionalAuthMiddleware } from '../../../../shared/middleware/optional-auth.middleware';
 import { requireRole } from '../../../../shared/middleware/role.middleware';
 import { csrfMiddleware } from '../../../../shared/middleware/csrf.middleware';
 import { cacheMiddleware } from '../../../../shared/middleware/cache.middleware';
@@ -41,13 +42,20 @@ router.post(
     parkingController.decideSuggestion
 );
 
-router.get('/:id', cacheMiddleware(60), validate(ParkingIdParamsSchema), parkingController.getById);
+router.get(
+    '/:id',
+    optionalAuthMiddleware,
+    cacheMiddleware(60),
+    validate(ParkingIdParamsSchema),
+    parkingController.getById
+);
 
 // Autenticado (comunidade)
 router.post('/', authMiddleware, csrfMiddleware, validate(CreateParkingSchema), parkingController.create);
 router.patch('/:id', authMiddleware, csrfMiddleware, validate(UpdateParkingSchema), parkingController.update);
 router.delete('/:id', authMiddleware, csrfMiddleware, validate(ParkingIdParamsSchema), parkingController.remove);
 router.post('/:id/vote', authMiddleware, csrfMiddleware, validate(VoteParkingSchema), parkingController.vote);
+router.delete('/:id/vote', authMiddleware, csrfMiddleware, validate(ParkingIdParamsSchema), parkingController.unvote);
 router.post(
     '/:id/suggest',
     authMiddleware,

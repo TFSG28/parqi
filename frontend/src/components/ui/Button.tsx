@@ -19,7 +19,7 @@ interface ButtonProps {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-    primary: 'bg-accent text-ink font-semibold hover:brightness-110 active:brightness-90 transition-[filter]',
+    primary: 'bg-accent text-on-accent font-semibold hover:brightness-110 active:brightness-90 transition-[filter]',
     secondary: 'bg-mist text-ink border border-brand/15 hover:bg-brand/10 active:bg-brand/20 transition-colors',
 };
 
@@ -64,7 +64,7 @@ export function Button({
             onClick={onClick}
             disabled={disabled || isLoading}
         >
-            {isLoading ? 'Carregando...' : children}
+            {isLoading ? 'A carregar...' : children}
         </button>
     );
 }

@@ -41,7 +41,7 @@ export function LoginForm({ onSuccess, className = '' }: Readonly<LoginFormProps
     function validate(): boolean {
         const errors: FieldErrors = {};
         if (!isValidEmail(email)) errors.email = 'Email inválido';
-        if (!password) errors.password = 'Senha é obrigatória';
+        if (!password) errors.password = 'A palavra-passe é obrigatória';
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     }
@@ -56,7 +56,7 @@ export function LoginForm({ onSuccess, className = '' }: Readonly<LoginFormProps
             await login(email.trim(), password);
             onSuccess?.();
         } catch (error) {
-            setFormError(error instanceof Error ? error.message : 'Erro ao fazer login');
+            setFormError(error instanceof Error ? error.message : 'Não foi possível iniciar sessão.');
         } finally {
             setLoading(false);
         }
@@ -83,7 +83,7 @@ export function LoginForm({ onSuccess, className = '' }: Readonly<LoginFormProps
             />
 
             <TextInput
-                label="Senha"
+                label="Palavra-passe"
                 type="password"
                 autoComplete="current-password"
                 required

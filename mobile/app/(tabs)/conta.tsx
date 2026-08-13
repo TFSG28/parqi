@@ -13,10 +13,15 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { Onboarding } from '../../src/components/Onboarding';
+import { TypeChip } from '../../src/components/TypeChip';
+import { TrustBar } from '../../src/components/TrustBar';
 import { useAuth } from '../../src/context/AuthContext';
+import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, authApi, parkingApi } from '../../src/lib/api';
-import { alpha10, MONO, PALETTE } from '../../src/theme/design';
+import { formatScore } from '../../src/lib/geo';
+import { alpha10, MONO, PALETTE, themedText } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ContributorStats } from '../../src/types/parking';
 
@@ -27,15 +32,43 @@ function levelLabel(rep: ContributorStats['reputation'] | undefined): string {
 }
 
 const PERKS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
-    { icon: 'trending-up', text: 'Peso de voto 1.4× (normal: 1.0×)' },
+    { icon: 'trending-up', text: 'Votos com peso total (contas novas: 0,5×)' },
     { icon: 'chatbubble-outline', text: 'Edições aplicadas de imediato' },
     { icon: 'eye-outline', text: 'Vê detalhes de estacionamentos sinalizados' },
     { icon: 'shield-outline', text: 'Sem fila de moderação' },
 ];
 
+const FAQ_ITEMS: { q: string; a: string }[] = [
+    {
+        q: 'Como funciona a confiança (0–10)?',
+        a: 'Cada voto ajusta a pontuação: +1,5 por confirmação e −2 por reporte. A partir de 5 o lugar fica Verificado; abaixo de 3 entra em revisão.',
+    },
+    {
+        q: 'Como funciona o peso dos votos?',
+        a: 'Contas novas e utilizadores sem confiança votam com peso 0,5. A partir da reputação 5 (Confiável) passas a votar com peso total.',
+    },
+    {
+        q: 'Posso alterar ou anular o meu voto?',
+        a: 'Sim. Toca outra vez no teu voto para o anular, ou vota no sentido contrário para o mudar. A confiança é recalculada de imediato.',
+    },
+    {
+        q: 'Quem pode adicionar estacionamentos?',
+        a: 'Qualquer pessoa com conta e email validado. Contribuições de contas novas entram na fila de moderação antes de aparecerem no mapa.',
+    },
+    {
+        q: 'De onde vêm os dados oficiais?',
+        a: 'Importamos dados públicos da OpenStreetMap, Geoapify e câmaras municipais. Esses lugares têm confiança base mais alta que os da comunidade.',
+    },
+    {
+        q: 'Como elimino a minha conta?',
+        a: 'Em Perfil → Eliminar conta, com confirmação por palavra-passe. As contribuições já validadas ficam no mapa, anonimizadas.',
+    },
+];
+
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
-    const { colors } = useTheme();
+    const { favorites } = useFavorites();
+    const { colors, resolvedScheme } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [loggingOut, setLoggingOut] = useState(false);
     const [stats, setStats] = useState<ContributorStats | null>(null);
@@ -44,6 +77,8 @@ export default function ProfileScreen() {
     const [deleteModal, setDeleteModal] = useState(false);
     const [deletePassword, setDeletePassword] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [openFaq, setOpenFaq] = useState<number | null>(null);
 
     const loadStats = useCallback(async () => {
         if (!user) return;
@@ -124,7 +159,7 @@ export default function ProfileScreen() {
         : [];
 
     const showRepSpinner = statsLoading && !stats;
-    const repScoreText = rep ? rep.score.toFixed(1) : '—';
+    const repScoreText = rep ? formatScore(rep.score) : '—';
     const trustedMark = rep?.isTrusted ? '✓' : '';
 
     return (
@@ -133,7 +168,7 @@ export default function ProfileScreen() {
                 <Text style={styles.title}>Perfil</Text>
                 {user?.role === 'ADMIN' && (
                     <Pressable
-                        style={styles.iconBtn}
+                        style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
                         onPress={() => router.push('/admin')}
                         accessibilityLabel="Administração"
                     >
@@ -152,12 +187,12 @@ export default function ProfileScreen() {
                             <Ionicons name="person" size={26} color={colors.primary} />
                         )}
                     </View>
-                    <View>
-                        <Text style={styles.name}>{user ? user.name : 'Sem sessão iniciada'}</Text>
+                    <View style={styles.identityInfo}>
+                        <Text style={styles.name} numberOfLines={2}>{user ? user.name : 'Sem sessão iniciada'}</Text>
                         {user ? (
                             <>
-                                <Text style={styles.handle}>{handle}</Text>
-                                <Text style={styles.level}>{level}</Text>
+                                <Text style={styles.handle} numberOfLines={1}>{handle}</Text>
+                                <Text style={styles.level} numberOfLines={1}>{level}</Text>
                             </>
                         ) : (
                             <Text style={styles.handle}>Entra para votar e adicionar estacionamentos.</Text>
@@ -166,13 +201,19 @@ export default function ProfileScreen() {
                 </View>
 
                 {!user && (
-                    <Pressable style={styles.primaryBtn} onPress={() => router.push('/login')}>
+                    <Pressable
+                        style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+                        onPress={() => router.push('/login')}
+                    >
                         <Text style={styles.primaryBtnText}>Entrar ou criar conta</Text>
                     </Pressable>
                 )}
 
                 {user?.emailVerified === false && (
-                    <Pressable style={styles.verifyBanner} onPress={() => router.push('/verify')}>
+                    <Pressable
+                        style={({ pressed }) => [styles.verifyBanner, pressed && styles.pressed]}
+                        onPress={() => router.push('/verify')}
+                    >
                         <Ionicons name="mail-unread" size={16} color={PALETTE.amber} />
                         <Text style={styles.verifyText}>
                             Email não verificado — valida a tua conta para poderes contribuir.
@@ -181,12 +222,40 @@ export default function ProfileScreen() {
                     </Pressable>
                 )}
 
+                {/* Favoritos guardados no dispositivo */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>Favoritos</Text>
+                    {favorites.length === 0 ? (
+                        <Text style={styles.favEmpty}>
+                            Ainda não guardaste favoritos. Toca no coração de um estacionamento para o
+                            encontrares aqui.
+                        </Text>
+                    ) : (
+                        favorites.map((f) => (
+                            <Pressable
+                                key={f.id}
+                                style={({ pressed }) => [styles.favRow, pressed && styles.favRowPressed]}
+                                onPress={() => router.push(`/parking/${f.id}`)}
+                                accessibilityRole="button"
+                            >
+                                <View style={styles.favInfo}>
+                                    <Text style={styles.favName} numberOfLines={1}>{f.name}</Text>
+                                    <TypeChip type={f.parkingType} />
+                                </View>
+                                <View style={styles.favTrust}>
+                                    <TrustBar trustScore={f.trustScore} />
+                                </View>
+                            </Pressable>
+                        ))
+                    )}
+                </View>
+
                 {user && (
                     <>
                         {/* Reputação */}
                         <View style={styles.card}>
                             <View style={styles.repHeader}>
-                                <Text style={styles.sectionLabel}>REPUTAÇÃO</Text>
+                                <Text style={styles.sectionLabelIdentity}>REPUTAÇÃO</Text>
                                 {showRepSpinner ? (
                                     <ActivityIndicator size="small" color={colors.primary} />
                                 ) : (
@@ -207,7 +276,10 @@ export default function ProfileScreen() {
                                 <Text style={styles.repScaleText}>Perito (10)</Text>
                             </View>
                             {statsError && (
-                                <Pressable style={styles.retry} onPress={loadStats}>
+                                <Pressable
+                                    style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+                                    onPress={loadStats}
+                                >
                                     <Ionicons name="refresh" size={14} color={colors.primary} />
                                     <Text style={styles.retryText}>Não foi possível carregar. Tentar de novo</Text>
                                 </Pressable>
@@ -237,17 +309,20 @@ export default function ProfileScreen() {
                         {/* Badges */}
                         {badges.length > 0 && (
                             <View style={styles.card}>
-                                <Text style={styles.sectionLabel}>DISTINTIVOS</Text>
+                                <Text style={styles.sectionLabel}>Distintivos</Text>
                                 <View style={styles.badgeRow}>
-                                    {badges.map(({ icon, label, color }) => (
-                                        <View
-                                            key={label}
-                                            style={[styles.badge, { backgroundColor: alpha10(color) }]}
-                                        >
-                                            <Ionicons name={icon} size={13} color={color} />
-                                            <Text style={[styles.badgeText, { color }]}>{label}</Text>
-                                        </View>
-                                    ))}
+                                    {badges.map(({ icon, label, color }) => {
+                                        const textColor = themedText(color, resolvedScheme);
+                                        return (
+                                            <View
+                                                key={label}
+                                                style={[styles.badge, { backgroundColor: alpha10(color) }]}
+                                            >
+                                                <Ionicons name={icon} size={13} color={textColor} />
+                                                <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
+                                            </View>
+                                        );
+                                    })}
                                 </View>
                             </View>
                         )}
@@ -255,26 +330,29 @@ export default function ProfileScreen() {
                         {/* Qualidade das contribuições */}
                         {stats && stats.total > 0 && (
                             <View style={styles.card}>
-                                <Text style={styles.sectionLabel}>QUALIDADE DAS CONTRIBUIÇÕES</Text>
+                                <Text style={styles.sectionLabel}>Qualidade das contribuições</Text>
                                 <View style={styles.qualityList}>
-                                    {quality.map(({ label, count, color }) => (
-                                        <View key={label}>
-                                            <View style={styles.qualityHeader}>
-                                                <Text style={styles.qualityLabel}>{label}</Text>
-                                                <Text style={[styles.qualityCount, { color }]}>
-                                                    {count}/{stats.total}
-                                                </Text>
+                                    {quality.map(({ label, count, color }) => {
+                                        const textColor = themedText(color, resolvedScheme);
+                                        return (
+                                            <View key={label}>
+                                                <View style={styles.qualityHeader}>
+                                                    <Text style={styles.qualityLabel}>{label}</Text>
+                                                    <Text style={[styles.qualityCount, { color: textColor }]}>
+                                                        {count}/{stats.total}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.qualityTrack}>
+                                                    <View
+                                                        style={[
+                                                            styles.qualityFill,
+                                                            { width: `${(count / stats.total) * 100}%`, backgroundColor: color },
+                                                        ]}
+                                                    />
+                                                </View>
                                             </View>
-                                            <View style={styles.qualityTrack}>
-                                                <View
-                                                    style={[
-                                                        styles.qualityFill,
-                                                        { width: `${(count / stats.total) * 100}%`, backgroundColor: color },
-                                                    ]}
-                                                />
-                                            </View>
-                                        </View>
-                                    ))}
+                                        );
+                                    })}
                                 </View>
                             </View>
                         )}
@@ -282,7 +360,7 @@ export default function ProfileScreen() {
                         {/* Perks */}
                         {rep?.isTrusted && (
                             <View style={styles.card}>
-                                <Text style={styles.sectionLabel}>VANTAGENS DE UTILIZADOR CONFIÁVEL</Text>
+                                <Text style={styles.sectionLabel}>Vantagens de utilizador confiável</Text>
                                 {PERKS.map(({ icon, text }, i) => (
                                     <View
                                         key={text}
@@ -297,10 +375,44 @@ export default function ProfileScreen() {
                     </>
                 )}
 
+                {/* Ajuda */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>Ajuda</Text>
+                    <Pressable
+                        style={({ pressed }) => [styles.aboutRow, pressed && styles.pressed]}
+                        accessibilityRole="button"
+                        onPress={() => setShowOnboarding(true)}
+                        hitSlop={8}
+                    >
+                        <Ionicons name="eye-outline" size={16} color={colors.textMuted} />
+                        <Text style={styles.aboutText}>Ver introdução</Text>
+                        <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
+                    </Pressable>
+                    {FAQ_ITEMS.map((item, i) => (
+                        <View key={item.q}>
+                            <Pressable
+                                style={({ pressed }) => [styles.aboutRow, pressed && styles.pressed]}
+                                accessibilityRole="button"
+                                onPress={() => setOpenFaq(openFaq === i ? null : i)}
+                                hitSlop={8}
+                            >
+                                <Ionicons name="help-circle-outline" size={16} color={colors.textMuted} />
+                                <Text style={styles.aboutText}>{item.q}</Text>
+                                <Ionicons
+                                    name={openFaq === i ? 'chevron-up' : 'chevron-down'}
+                                    size={13}
+                                    color={colors.textMuted}
+                                />
+                            </Pressable>
+                            {openFaq === i && <Text style={styles.faqAnswer}>{item.a}</Text>}
+                        </View>
+                    ))}
+                </View>
+
                 {/* Legal */}
                 <View style={styles.card}>
                     <Pressable
-                        style={styles.aboutRow}
+                        style={({ pressed }) => [styles.aboutRow, pressed && styles.pressed]}
                         accessibilityRole="link"
                         onPress={() => Linking.openURL('https://parqi.pt/termos')}
                     >
@@ -309,7 +421,7 @@ export default function ProfileScreen() {
                         <Ionicons name="open-outline" size={13} color={colors.textMuted} />
                     </Pressable>
                     <Pressable
-                        style={styles.aboutRow}
+                        style={({ pressed }) => [styles.aboutRow, pressed && styles.pressed]}
                         accessibilityRole="link"
                         onPress={() => Linking.openURL('https://parqi.pt/privacidade')}
                     >
@@ -322,19 +434,36 @@ export default function ProfileScreen() {
                 {user && (
                     <>
                         <Pressable
-                            style={[styles.signOutBtn, loggingOut && styles.disabled]}
+                            style={({ pressed }) => [
+                                styles.signOutBtn,
+                                loggingOut && styles.disabled,
+                                pressed && !loggingOut && styles.pressed,
+                            ]}
                             onPress={handleLogout}
                             disabled={loggingOut}
                         >
                             <Ionicons name="log-out-outline" size={16} color={colors.textMuted} />
                             <Text style={styles.signOutText}>Terminar sessão</Text>
                         </Pressable>
-                        <Pressable onPress={() => setDeleteModal(true)} hitSlop={8}>
+                        <Pressable
+                            onPress={() => setDeleteModal(true)}
+                            hitSlop={8}
+                            style={({ pressed }) => pressed && styles.pressed}
+                        >
                             <Text style={styles.deleteLink}>Eliminar conta</Text>
                         </Pressable>
                     </>
                 )}
             </ScrollView>
+
+            {/* Rever a introdução (modal a ecrã inteiro) */}
+            <Modal
+                visible={showOnboarding}
+                animationType="fade"
+                onRequestClose={() => setShowOnboarding(false)}
+            >
+                <Onboarding onDone={() => setShowOnboarding(false)} />
+            </Modal>
 
             {/* Confirmação de eliminação, com palavra-passe */}
             <Modal visible={deleteModal} transparent animationType="slide">
@@ -356,13 +485,17 @@ export default function ProfileScreen() {
                         />
                         <View style={styles.modalActions}>
                             <Pressable
-                                style={styles.modalCancel}
+                                style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]}
                                 onPress={() => { setDeleteModal(false); setDeletePassword(''); }}
                             >
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </Pressable>
                             <Pressable
-                                style={[styles.modalDelete, (!deletePassword || deleting) && styles.disabled]}
+                                style={({ pressed }) => [
+                                    styles.modalDelete,
+                                    (!deletePassword || deleting) && styles.disabled,
+                                    pressed && !deleting && deletePassword && styles.pressed,
+                                ]}
                                 onPress={handleDeleteAccount}
                                 disabled={!deletePassword || deleting}
                             >
@@ -424,6 +557,10 @@ const createStyles = (colors: ThemeColors) =>
             marginTop: 8,
             marginBottom: 4,
         },
+        identityInfo: {
+            flex: 1,
+            minWidth: 0,
+        },
         avatar: {
             width: 64,
             height: 64,
@@ -467,6 +604,10 @@ const createStyles = (colors: ThemeColors) =>
             fontWeight: '600',
             color: colors.white,
         },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
+        },
         verifyBanner: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -474,6 +615,32 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: alpha10(PALETTE.amber),
             borderRadius: 12,
             padding: 12,
+        },
+        favEmpty: {
+            fontSize: 12,
+            color: colors.textMuted,
+            lineHeight: 18,
+        },
+        favRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            paddingVertical: 6,
+        },
+        favRowPressed: {
+            opacity: 0.7,
+        },
+        favInfo: {
+            flex: 1,
+            gap: 4,
+        },
+        favName: {
+            fontSize: 13,
+            fontWeight: '600',
+            color: colors.text,
+        },
+        favTrust: {
+            width: 120,
         },
         verifyText: {
             flex: 1,
@@ -488,6 +655,13 @@ const createStyles = (colors: ThemeColors) =>
             padding: 16,
         },
         sectionLabel: {
+            fontSize: 13,
+            fontWeight: '600',
+            color: colors.text,
+            marginBottom: 10,
+        },
+        // Momento de identidade: só a reputação mantém o rótulo mono maiúsculo
+        sectionLabelIdentity: {
             fontSize: 11,
             fontFamily: MONO,
             letterSpacing: 1.5,
@@ -566,8 +740,7 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.text,
         },
         statLabel: {
-            fontSize: 10,
-            fontFamily: MONO,
+            fontSize: 11,
             color: colors.textMuted,
         },
         badgeRow: {
@@ -638,6 +811,14 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             fontSize: 13,
             color: colors.text,
+        },
+        faqAnswer: {
+            fontSize: 12,
+            color: colors.textMuted,
+            lineHeight: 18,
+            paddingLeft: 42,
+            paddingRight: 12,
+            paddingBottom: 10,
         },
         signOutBtn: {
             flexDirection: 'row',

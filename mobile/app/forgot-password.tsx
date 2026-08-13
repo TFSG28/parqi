@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -11,11 +12,14 @@ import {
     Text,
     TextInput,
 } from 'react-native';
+import { PasswordInput } from '../src/components/PasswordInput';
 import { useTheme } from '../src/context/ThemeContext';
 import { ApiError, authApi } from '../src/lib/api';
 import type { ThemeColors } from '../src/theme/colors';
 
 type Step = 'email' | 'code';
+
+const RESEND_LOCK_SECONDS = 60;
 
 export default function ForgotPasswordScreen() {
     const { colors } = useTheme();
@@ -27,6 +31,26 @@ export default function ForgotPasswordScreen() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [countdown, setCountdown] = useState(0);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Contagem decrescente para o botão "Reenviar" (paridade com o ecrã de verificação)
+    useEffect(() => {
+        if (countdown <= 0) {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+            return;
+        }
+        timerRef.current = setInterval(() => setCountdown((v) => v - 1), 1000);
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, [countdown]);
 
     const requestCode = async () => {
         const trimmed = email.trim();
@@ -39,12 +63,18 @@ export default function ForgotPasswordScreen() {
         try {
             await authApi.forgotPassword(trimmed);
             setStep('code');
+            setCountdown(RESEND_LOCK_SECONDS);
         } catch (e) {
+            if (e instanceof ApiError && e.status === 429) {
+                setCountdown(RESEND_LOCK_SECONDS);
+            }
             setError(e instanceof ApiError ? e.message : 'Não foi possível pedir o código. Tenta de novo.');
         } finally {
             setBusy(false);
         }
     };
+
+    const canResend = countdown <= 0 && !busy;
 
     const submitReset = async () => {
         if (code.length !== 6) {
@@ -96,7 +126,15 @@ export default function ForgotPasswordScreen() {
                             autoComplete="email"
                         />
                         {error && <Text style={styles.error}>{error}</Text>}
-                        <Pressable style={[styles.submit, busy && styles.disabled]} onPress={requestCode} disabled={busy}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.submit,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
+                            onPress={requestCode}
+                            disabled={busy}
+                        >
                             {busy ? (
                                 <ActivityIndicator color={colors.white} />
                             ) : (
@@ -121,25 +159,42 @@ export default function ForgotPasswordScreen() {
                             maxLength={6}
                         />
                         <Text style={styles.label}>Palavra-passe nova</Text>
-                        <TextInput
-                            style={styles.input}
+                        <PasswordInput
                             value={password}
                             onChangeText={setPassword}
                             placeholder="••••••••"
-                            placeholderTextColor={colors.textMuted}
-                            secureTextEntry
                             autoComplete="new-password"
                         />
                         {error && <Text style={styles.error}>{error}</Text>}
-                        <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submitReset} disabled={busy}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.submit,
+                                busy && styles.disabled,
+                                pressed && !busy && styles.pressed,
+                            ]}
+                            onPress={submitReset}
+                            disabled={busy}
+                        >
                             {busy ? (
                                 <ActivityIndicator color={colors.white} />
                             ) : (
                                 <Text style={styles.submitText}>Alterar palavra-passe</Text>
                             )}
                         </Pressable>
-                        <Pressable onPress={requestCode} disabled={busy} hitSlop={8}>
-                            <Text style={styles.resend}>Reenviar código</Text>
+                        <Pressable
+                            style={({ pressed }) => [styles.resend, pressed && styles.pressed]}
+                            onPress={requestCode}
+                            disabled={!canResend}
+                            hitSlop={8}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={16}
+                                color={canResend ? colors.primary : colors.textMuted}
+                            />
+                            <Text style={[styles.resendText, !canResend && styles.resendDisabled]}>
+                                {countdown > 0 ? `Reenviar código em ${countdown}s` : 'Reenviar código'}
+                            </Text>
                         </Pressable>
                     </>
                 )}
@@ -209,13 +264,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 15,
     },
     resend: {
-        textAlign: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 16,
+        paddingVertical: 8,
+    },
+    resendText: {
         color: colors.primary,
         fontWeight: '600',
         fontSize: 13,
-        marginTop: 16,
+    },
+    resendDisabled: {
+        color: colors.textMuted,
     },
     disabled: {
         opacity: 0.6,
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
 });

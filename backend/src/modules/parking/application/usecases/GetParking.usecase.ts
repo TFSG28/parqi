@@ -30,7 +30,14 @@ export class GetParkingUseCase {
             }
         }
 
-        const geometry = await this.parkingRepository.getGeometry(input.parkingSpotId);
-        return { ...spot, geometry };
+        const [geometry, vote] = await Promise.all([
+            this.parkingRepository.getGeometry(input.parkingSpotId),
+            input.userId
+                ? this.parkingRepository.getVote(input.userId, input.parkingSpotId)
+                : Promise.resolve(null),
+        ]);
+
+        const myVote = vote?.value === 1 ? 'up' : vote?.value === -1 ? 'down' : null;
+        return { ...spot, geometry, myVote };
     }
 }

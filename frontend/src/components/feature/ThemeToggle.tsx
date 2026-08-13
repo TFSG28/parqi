@@ -1,17 +1,22 @@
-'use client'
+'use client';
 
-import { useId } from 'react'
-import { useTheme } from '@/context/ThemeContext'
+import { useId } from 'react';
+import { useTheme } from '@/context/ThemeContext';
 
 /**
  * Tactile day/night toggle: a sun that morphs into a crescent moon.
  * Visual state is driven by the `.dark` class (set before paint by the theme
- * init script), so it never flashes on hydration; behavior comes from context.
+ * init script in the layout), so it never flashes on hydration; behavior
+ * comes from context.
+ *
+ * Class names are single-line strings on purpose: multi-line className
+ * attributes combined with CRLF files produce `\r\n` sequences that the HTML
+ * parser normalizes differently from the client bundle, breaking hydration.
  */
 export default function ThemeToggle() {
-    const { theme, toggleTheme } = useTheme()
-    const maskId = useId()
-    const isDark = theme === 'dark'
+    const { theme, toggleTheme } = useTheme();
+    const maskId = useId();
+    const isDark = theme === 'dark';
 
     return (
         <button
@@ -19,35 +24,17 @@ export default function ThemeToggle() {
             onClick={toggleTheme}
             aria-label={isDark ? 'Ativar tema claro' : 'Ativar tema escuro'}
             aria-pressed={isDark}
-            className="
-                group relative grid size-11 place-items-center overflow-hidden rounded-2xl
-                border border-black/10 dark:border-white/10
-                bg-linear-to-b from-amber-50 to-orange-100
-                dark:from-slate-800 dark:to-slate-950
-                shadow-sm transition-[transform,box-shadow] duration-300 ease-out
-                hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-                focus-visible:ring-amber-400/70 dark:focus-visible:ring-slate-300/50
-                focus-visible:ring-offset-transparent
-            "
+            className="group relative grid size-11 place-items-center overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-linear-to-b from-amber-50 to-orange-100 dark:from-slate-800 dark:to-slate-950 shadow-sm transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-400/70 dark:focus-visible:ring-slate-300/50 focus-visible:ring-offset-transparent"
         >
             {/* faint stars, only in the night sky */}
             <span
                 aria-hidden
-                className="
-                    pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500
-                    dark:opacity-100 motion-reduce:transition-none
-                    bg-[radial-gradient(1px_1px_at_20%_30%,white,transparent),radial-gradient(1px_1px_at_75%_25%,white,transparent),radial-gradient(1.5px_1.5px_at_60%_70%,white,transparent)]
-                "
+                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 dark:opacity-100 motion-reduce:transition-none bg-[radial-gradient(1px_1px_at_20%_30%,white,transparent),radial-gradient(1px_1px_at_75%_25%,white,transparent),radial-gradient(1.5px_1.5px_at_60%_70%,white,transparent)]"
             />
 
             <svg
                 viewBox="0 0 24 24"
-                className="
-                    relative size-6 text-amber-500 dark:text-slate-100
-                    transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]
-                    dark:rotate-[-18deg] motion-reduce:transition-none
-                "
+                className="relative size-6 text-amber-500 dark:text-slate-100 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:rotate-[-18deg] motion-reduce:transition-none"
             >
                 <mask id={maskId}>
                     <rect x="0" y="0" width="24" height="24" fill="white" />
@@ -57,7 +44,7 @@ export default function ThemeToggle() {
                         cy="9"
                         r="7"
                         fill="black"
-                        className="transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]5 motion-reduce:transition-none"
+                        className="transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
                     />
                 </mask>
 
@@ -82,5 +69,5 @@ export default function ThemeToggle() {
                 </g>
             </svg>
         </button>
-    )
+    );
 }

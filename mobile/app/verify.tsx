@@ -128,7 +128,15 @@ export default function VerifyScreen() {
 
                 {error && <Text style={styles.error}>{error}</Text>}
 
-                <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submit} disabled={busy}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.submit,
+                        busy && styles.disabled,
+                        pressed && !busy && styles.pressed,
+                    ]}
+                    onPress={submit}
+                    disabled={busy}
+                >
                     {busy ? (
                         <ActivityIndicator color={colors.white} />
                     ) : (
@@ -136,14 +144,23 @@ export default function VerifyScreen() {
                     )}
                 </Pressable>
 
-                <Pressable style={styles.resend} onPress={resend} disabled={!canResend}>
+                <Pressable
+                    style={({ pressed }) => [styles.resend, pressed && styles.pressed]}
+                    onPress={resend}
+                    disabled={!canResend}
+                >
                     <Ionicons name="refresh" size={16} color={canResend ? colors.primary : colors.textMuted} />
                     <Text style={[styles.resendText, !canResend && styles.resendDisabled]}>
                         {countdown > 0 ? `Reenviar código em ${countdown}s` : 'Reenviar código'}
                     </Text>
                 </Pressable>
 
-                <Pressable style={styles.logout} onPress={leave}>
+                <Text style={styles.spamHint}>Não recebeste? Verifica o spam ou tenta de novo.</Text>
+
+                <Pressable
+                    style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
+                    onPress={leave}
+                >
                     <Text style={styles.logoutText}>Terminar sessão</Text>
                 </Pressable>
             </View>
@@ -237,6 +254,16 @@ const createStyles = (colors: ThemeColors) =>
         },
         resendDisabled: {
             color: colors.textMuted,
+        },
+        spamHint: {
+            fontSize: 12,
+            color: colors.textMuted,
+            textAlign: 'center',
+            marginTop: 2,
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
         },
         logout: {
             alignItems: 'center',

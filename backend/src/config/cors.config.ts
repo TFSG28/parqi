@@ -5,7 +5,7 @@ import cors from 'cors';
  *  • FRONT_URL (domínio do frontend web — ex. parqi.cesar.wearemateria.com)
  *  • Exceção para apps mobile (não enviam Origin header — CORS não se aplica)
  *
- * Em desenvolvimento, aceita localhost:3000 (Next.js) e localhost:19006 (Expo web).
+ * Em desenvolvimento, aceita localhost:3000 (Next.js) e localhost:8081/19006 (Expo web).
  */
 const allowedOrigins = new Set([
     process.env.FRONT_URL || 'https://parqi.cesar.wearemateria.com',
@@ -21,7 +21,7 @@ export const corsMiddleware = cors({
                 callback(new Error(`Origin ${origin} não permitida pelo CORS`));
             }
         }
-        : ['http://localhost:3000', 'http://localhost:19006'],
+        : ['http://localhost:3000', 'http://localhost:8081', 'http://localhost:19006'],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'X-Requested-With', 'Accept', 'Origin', 'X-CSRF-Token'],
     credentials: true

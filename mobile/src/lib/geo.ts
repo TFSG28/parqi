@@ -93,3 +93,15 @@ export function formatDistance(km: number): string {
     if (km < 1) return `${Math.round(km * 1000)} m`;
     return `${km.toFixed(1).replace('.', ',')} km`;
 }
+
+/** Data ISO (yyyy-mm-dd) -> dd/mm/aaaa, formato pt-PT. Robusto a entradas parciais. */
+export function formatDate(iso: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+    if (!match) return iso;
+    return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+/** Score 0–10 com vírgula decimal (pt-PT), ex.: "9,2". */
+export function formatScore(score: number): string {
+    return score.toFixed(1).replace('.', ',');
+}

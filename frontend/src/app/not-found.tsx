@@ -7,7 +7,7 @@ export default function NotFound() {
                 ?
             </span>
             <h1 className="font-display text-3xl font-bold">Página não encontrada</h1>
-            <Link href="/" className="text-brand underline underline-offset-4 hover:text-brand-deep">
+            <Link href="/" className="text-brand underline underline-offset-4 hover:opacity-80">
                 Voltar ao início
             </Link>
         </main>

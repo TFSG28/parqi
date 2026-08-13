@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    AccessibilityInfo,
     Animated,
     Dimensions,
     FlatList,
@@ -32,7 +33,8 @@ const STEPS: Step[] = [
     {
         icon: 'thumbs-up',
         title: 'Vota e verifica',
-        description: 'Confirma se um lugar existe ou reporta se está errado. Cada voto melhora os dados.',
+        description:
+            'Confirma se um lugar existe ou reporta se está errado. A confiança (0–10) sobe com os votos; lugares com 5+ ficam verificados.',
     },
     {
         icon: 'add-circle',
@@ -54,27 +56,22 @@ export function Onboarding({ onDone }: OnboardingProps) {
     const slideAnim = useRef(new Animated.Value(1)).current;
     const listRef = useRef<FlatList<Step>>(null);
 
-    // Animação de entrada apenas na primeira montagem
+    // Animação de entrada (montagem + mudança de slide); respeita movimento reduzido
     useEffect(() => {
-        slideAnim.setValue(0);
-        Animated.spring(slideAnim, {
-            toValue: 1,
-            tension: 80,
-            friction: 12,
-            useNativeDriver: true,
-        }).start();
-    }, []);
-
-    // Reinicia a animação de entrada quando muda de slide
-    useEffect(() => {
-        slideAnim.setValue(0);
-        Animated.spring(slideAnim, {
-            toValue: 1,
-            tension: 80,
-            friction: 12,
-            useNativeDriver: true,
-        }).start();
-    }, [current]);
+        AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+            if (reduce) {
+                slideAnim.setValue(1);
+                return;
+            }
+            slideAnim.setValue(0);
+            Animated.spring(slideAnim, {
+                toValue: 1,
+                tension: 80,
+                friction: 12,
+                useNativeDriver: true,
+            }).start();
+        });
+    }, [current, slideAnim]);
 
     const finish = useCallback(async () => {
         await AsyncStorage.setItem(STORAGE_KEY, '1');
@@ -90,9 +87,10 @@ export function Onboarding({ onDone }: OnboardingProps) {
         <Animated.View style={[styles.overlay, { opacity: fade, paddingTop: insets.top }]}>
             {/* Saltar */}
             <Pressable
-                style={[styles.skip, { top: insets.top + 12 }]}
+                style={({ pressed }) => [styles.skip, { top: insets.top + 12 }, pressed && styles.pressed]}
                 onPress={finish}
                 accessibilityLabel="Saltar introdução"
+                hitSlop={10}
             >
                 <Text style={styles.skipText}>Saltar</Text>
             </Pressable>
@@ -139,7 +137,11 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
                 {current < STEPS.length - 1 ? (
                     <Pressable
-                        style={[styles.nextBtn, { backgroundColor: colors.primary }]}
+                        style={({ pressed }) => [
+                            styles.nextBtn,
+                            { backgroundColor: colors.primary },
+                            pressed && styles.pressed,
+                        ]}
                         onPress={() => goTo(current + 1)}
                         accessibilityLabel="Próximo passo"
                     >
@@ -147,7 +149,11 @@ export function Onboarding({ onDone }: OnboardingProps) {
                     </Pressable>
                 ) : (
                     <Pressable
-                        style={[styles.nextBtn, { backgroundColor: colors.accent }]}
+                        style={({ pressed }) => [
+                            styles.nextBtn,
+                            { backgroundColor: colors.accent },
+                            pressed && styles.pressed,
+                        ]}
                         onPress={finish}
                         accessibilityLabel="Começar a usar o Parqi"
                     >
@@ -176,6 +182,10 @@ const createStyles = (colors: ThemeColors) =>
         skipText: {
             fontSize: 14,
             color: colors.textMuted,
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
         },
         slide: {
             flex: 1,

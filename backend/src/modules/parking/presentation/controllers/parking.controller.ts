@@ -8,6 +8,7 @@ import { ListParkingUseCase } from '../../application/usecases/ListParking.useca
 import { ModerateParkingUseCase } from '../../application/usecases/ModerateParking.usecase';
 import { UpdateParkingUseCase } from '../../application/usecases/UpdateParking.usecase';
 import { VoteParkingUseCase } from '../../application/usecases/VoteParking.usecase';
+import { DeleteVoteUseCase } from '../../application/usecases/DeleteVote.usecase';
 import { SuggestParkingUseCase } from '../../application/usecases/SuggestParking.usecase';
 import { DecideSuggestionUseCase } from '../../application/usecases/DecideSuggestion.usecase';
 import { ListSuggestionsUseCase } from '../../application/usecases/ListSuggestions.usecase';
@@ -44,6 +45,8 @@ export class ParkingController {
         private readonly deleteParkingUseCase: DeleteParkingUseCase,
         @inject(PARKING_TOKENS.VoteParkingUseCase)
         private readonly voteParkingUseCase: VoteParkingUseCase,
+        @inject(PARKING_TOKENS.DeleteVoteUseCase)
+        private readonly deleteVoteUseCase: DeleteVoteUseCase,
         @inject(PARKING_TOKENS.ModerateParkingUseCase)
         private readonly moderateParkingUseCase: ModerateParkingUseCase,
         @inject(PARKING_TOKENS.SuggestParkingUseCase)
@@ -116,6 +119,15 @@ export class ParkingController {
             userRole: req.user?.role,
             value: req.body.value,
             reason: req.body.reason,
+        });
+        return ApiResponse.success(res, parking);
+    });
+
+    unvote = asyncHandler(async (req: Request, res: Response) => {
+        const parking = await this.deleteVoteUseCase.execute({
+            parkingSpotId: routeId(req),
+            userId: req.user!.userId,
+            userRole: req.user?.role,
         });
         return ApiResponse.success(res, parking);
     });

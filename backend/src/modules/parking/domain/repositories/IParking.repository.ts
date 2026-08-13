@@ -98,6 +98,8 @@ export interface IParkingRepository {
         reason: string | null,
         weight?: number
     ): Promise<ParkingVoteEntity>;
+    /** Remove o voto do utilizador (anular voto); idempotente. */
+    deleteVote(userId: string, parkingSpotId: string): Promise<void>;
     getVoteSummary(parkingSpotId: string): Promise<{ upvotes: number; downvotes: number }>;
 
     createModerationLog(

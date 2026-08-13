@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api, authApi, setToken } from '../lib/api';
+import { api, authApi, setToken, setUnauthorizedHandler } from '../lib/api';
 import type { User } from '../types/parking';
 
 interface AuthContextValue {
@@ -31,6 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         refresh().finally(() => setLoading(false));
     }, [refresh]);
+
+    // Sessão expirada a meio da utilização: qualquer 401 limpa o utilizador,
+    // e os ecrãs guardados redirecionam para o login.
+    useEffect(() => {
+        setUnauthorizedHandler(() => setUser(null));
+        return () => setUnauthorizedHandler(null);
+    }, []);
 
     const login = useCallback(async (email: string, password: string) => {
         const result = await authApi.login(email, password);

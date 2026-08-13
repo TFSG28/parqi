@@ -32,6 +32,8 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
         userLocation = null,
         interactive = true,
         layer = 'standard',
+        brandColor = '#0647AC',
+        accentColor = '#FF6900',
         onMarkerPress,
         onMapPress,
         onBoundsChange,
@@ -124,15 +126,15 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
             {polygon.length > 1 && (
                 <Polygon
                     coordinates={polygon.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))}
-                    strokeColor="#0647AC"
+                    strokeColor={brandColor}
                     strokeWidth={2}
-                    fillColor="rgba(6,71,172,0.2)"
+                    fillColor={brandColor + '33'}
                 />
             )}
             {polyline.length > 1 && (
                 <Polyline
                     coordinates={polyline.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))}
-                    strokeColor="#FF6900"
+                    strokeColor={accentColor}
                     strokeWidth={5}
                     lineDashPattern={[1, 8]}
                 />

@@ -69,7 +69,7 @@ export default function ContributeScreen() {
     const [description, setDescription] = useState('');
     const [parkingType, setParkingType] = useState<ParkingType>('SURFACE');
     const [capacityRange, setCapacityRange] = useState<CapacityRange | null>(null);
-    const [isFree, setIsFree] = useState(false);
+    const [isFree, setIsFree] = useState<boolean | null>(null);
     const [details, setDetails] = useState({
         hasPregnantSpaces: false,
         hasDisabledSpaces: false,
@@ -203,7 +203,7 @@ export default function ContributeScreen() {
                 geometry,
                 parkingType,
                 capacityRange: capacityRange ?? undefined,
-                isFree,
+                isFree: isFree ?? undefined,
                 hasPregnantSpaces: details.hasPregnantSpaces || undefined,
                 hasDisabledSpaces: details.hasDisabledSpaces || undefined,
                 hasEvCharging: details.hasEvCharging || undefined,
@@ -293,6 +293,8 @@ export default function ContributeScreen() {
                         polygon={mode === 'polygon' ? polygonRing : []}
                         polyline={mode === 'line' ? linePoints : []}
                         layer={mapLayer}
+                        brandColor={colors.primary}
+                        accentColor={colors.accent}
                         onMapPress={handleMapPress}
                         style={styles.map}
                     />
@@ -301,7 +303,11 @@ export default function ContributeScreen() {
                     {mode !== 'point' && (
                         <View style={styles.polygonControls}>
                             <Pressable
-                                style={[styles.polygonButton, vertices.length === 0 && styles.polygonButtonDisabled]}
+                                style={({ pressed }) => [
+                                    styles.polygonButton,
+                                    vertices.length === 0 && styles.polygonButtonDisabled,
+                                    pressed && vertices.length > 0 && styles.pressed,
+                                ]}
                                 onPress={undoVertex}
                                 disabled={vertices.length === 0}
                             >
@@ -309,7 +315,11 @@ export default function ContributeScreen() {
                                 <Text style={styles.polygonButtonText}>Desfazer</Text>
                             </Pressable>
                             <Pressable
-                                style={[styles.polygonButton, vertices.length === 0 && styles.polygonButtonDisabled]}
+                                style={({ pressed }) => [
+                                    styles.polygonButton,
+                                    vertices.length === 0 && styles.polygonButtonDisabled,
+                                    pressed && vertices.length > 0 && styles.pressed,
+                                ]}
                                 onPress={() => setVertices([])}
                                 disabled={vertices.length === 0}
                             >
@@ -368,9 +378,16 @@ export default function ContributeScreen() {
                     ))}
                 </View>
 
-                <View style={styles.switchRow}>
-                    <Text style={styles.label}>Gratuito</Text>
-                    <Switch value={isFree} onValueChange={setIsFree} trackColor={{ true: colors.primary }} />
+                <Text style={styles.label}>Custo</Text>
+                <View style={styles.chipRow}>
+                    {[{ v: true, label: 'Grátis' }, { v: false, label: 'Pago' }, { v: null, label: 'Desconhecido' }].map(({ v, label }) => (
+                        <Chip
+                            key={label}
+                            label={label}
+                            selected={isFree === v}
+                            onPress={() => setIsFree(v)}
+                        />
+                    ))}
                 </View>
 
                 {/* Detalhes de acessibilidade e serviços */}
@@ -403,7 +420,11 @@ export default function ContributeScreen() {
                 />
 
                 <Pressable
-                    style={[styles.submitButton, submitting && styles.buttonDisabled]}
+                    style={({ pressed }) => [
+                        styles.submitButton,
+                        submitting && styles.buttonDisabled,
+                        pressed && !submitting && styles.pressed,
+                    ]}
                     onPress={submit}
                     disabled={submitting}
                 >
@@ -572,8 +593,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.onAccent,
         fontWeight: '700',
         fontSize: 15,
-    },
-    buttonDisabled: {
-        opacity: 0.6,
-    },
-});
+    },        buttonDisabled: {
+            opacity: 0.6,
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
+        },
+    });

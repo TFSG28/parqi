@@ -42,7 +42,7 @@ describe('useApi Hook', () => {
       promise = result.current.execute('post', '/api/test', { data: 'test' });
     });
 
-    // Deve estar carregando enquanto a request está pendente
+    // Deve estar a carregar enquanto o pedido está pendente
     expect(result.current.loading).toBe(true);
 
     await act(async () => {

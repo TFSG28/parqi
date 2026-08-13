@@ -11,18 +11,19 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     View,
 } from 'react-native';
+import { HeroSection } from '../../src/components/HeroSection';
 import { Onboarding } from '../../src/components/Onboarding';
+import { SearchBar } from '../../src/components/SearchBar';
 import { SpotCardSkeleton } from '../../src/components/SpotCardSkeleton';
 import { StatusBadge } from '../../src/components/StatusBadge';
 import { TrustBar } from '../../src/components/TrustBar';
 import { TypeChip } from '../../src/components/TypeChip';
 import { parkingApi } from '../../src/lib/api';
 import { useTheme } from '../../src/context/ThemeContext';
-import { CAPACITY_LABELS, distanceKm, formatDistance, regionToBbox, type Region } from '../../src/lib/geo';
-import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS } from '../../src/theme/design';
+import { CAPACITY_LABELS, distanceKm, formatDate, formatDistance, regionToBbox, type Region } from '../../src/lib/geo';
+import { AMENITY_DESIGN, MONO, SOURCE_LABELS } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot } from '../../src/types/parking';
 
@@ -34,7 +35,7 @@ const DEFAULT_REGION: Region = {
 };
 
 type StatusFilter = 'all' | 'APPROVED' | 'PENDING';
-type SortBy = 'trust' | 'votes' | 'recent';
+type SortBy = 'trust' | 'recent';
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
     { id: 'all', label: 'Todos' },
@@ -44,7 +45,6 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 
 const SORTS: { id: SortBy; label: string }[] = [
     { id: 'trust', label: 'Confiança' },
-    { id: 'votes', label: 'Votos' },
     { id: 'recent', label: 'Novos' },
 ];
 
@@ -148,6 +148,19 @@ export default function DiscoverScreen() {
         return () => clearTimeout(timer);
     }, [search]);
 
+    const verifiedCount = useMemo(
+        () => spots.filter((s) => s.status === 'APPROVED').length,
+        [spots]
+    );
+
+    const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || sortBy !== 'trust';
+
+    const clearFilters = () => {
+        setSearch('');
+        setStatusFilter('all');
+        setSortBy('trust');
+    };
+
     const visible = useMemo(() => {
         const source = searchResults ?? spots;
         const q = search.trim().toLowerCase();
@@ -158,7 +171,6 @@ export default function DiscoverScreen() {
         });
         return [...filtered].sort((a, b) => {
             if (sortBy === 'recent') return b.createdAt.localeCompare(a.createdAt);
-            // 'votes' não existe por spot na API; trustScore é o proxy mais próximo
             return b.trustScore - a.trustScore;
         });
     }, [spots, searchResults, search, statusFilter, sortBy]);
@@ -177,59 +189,69 @@ export default function DiscoverScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Descobrir estacionamento</Text>
-                <View style={styles.searchBox}>
-                    <Ionicons name="search" size={16} color={colors.textMuted} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Procurar por nome ou rua…"
-                        placeholderTextColor={colors.textMuted}
-                        value={search}
-                        onChangeText={setSearch}
-                    />
-                </View>
-                <View style={styles.filterRow}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                        {STATUS_FILTERS.map((f) => {
-                            const active = statusFilter === f.id;
-                            return (
-                                <Pressable
-                                    key={f.id}
-                                    onPress={() => setStatusFilter(f.id)}
-                                    style={[styles.filterChip, active && styles.filterChipActive]}
-                                >
-                                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                        {f.label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </ScrollView>
-                    <View style={styles.sortRow}>
-                        {SORTS.map((s) => {
-                            const active = sortBy === s.id;
-                            return (
-                                <Pressable
-                                    key={s.id}
-                                    onPress={() => setSortBy(s.id)}
-                                    style={[styles.sortBtn, active && styles.sortBtnActive]}
-                                >
-                                    <Text style={[styles.sortText, active && styles.sortTextActive]}>
-                                        {s.label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-                </View>
-            </View>
-
             <FlatList
                 data={isFirstLoad ? [] : visible}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 ItemSeparatorComponent={ListSeparator}
+                ListHeaderComponent={
+                    <View style={styles.listHeader}>
+                        <HeroSection totalSpots={spots.length} verifiedSpots={verifiedCount} />
+                        <SearchBar
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Procurar por nome ou rua…"
+                        />
+                        <View style={styles.filterRow}>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.chips}
+                            >
+                                {STATUS_FILTERS.map((f) => {
+                                    const active = statusFilter === f.id;
+                                    return (
+                                        <Pressable
+                                            key={f.id}
+                                            onPress={() => setStatusFilter(f.id)}
+                                            hitSlop={8}
+                                            style={({ pressed }) => [
+                                                styles.filterChip,
+                                                active && styles.filterChipActive,
+                                                pressed && styles.pressed,
+                                            ]}
+                                        >
+                                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                                {f.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                            <View style={styles.sortRow}>
+                                {SORTS.map((s) => {
+                                    const active = sortBy === s.id;
+                                    return (
+                                        <Pressable
+                                            key={s.id}
+                                            onPress={() => setSortBy(s.id)}
+                                            hitSlop={8}
+                                            style={({ pressed }) => [
+                                                styles.sortBtn,
+                                                active && styles.sortBtnActive,
+                                                pressed && styles.pressed,
+                                            ]}
+                                        >
+                                            <Text style={[styles.sortText, active && styles.sortTextActive]}>
+                                                {s.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    </View>
+                }
                 refreshControl={
                     <RefreshControl
                         refreshing={loading && !isFirstLoad}
@@ -244,7 +266,10 @@ export default function DiscoverScreen() {
                             : null;
                     const amenities = AMENITY_DESIGN.filter((a) => spot[a.key] === true);
                     return (
-                        <Pressable style={styles.card} onPress={() => router.push(`/parking/${spot.id}`)}>
+                        <Pressable
+                            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                            onPress={() => router.push(`/parking/${spot.id}`)}
+                        >
                             <View style={styles.cardTop}>
                                 <View style={styles.cardTitleWrap}>
                                     <Text style={styles.cardName} numberOfLines={1}>{spot.name}</Text>
@@ -268,18 +293,22 @@ export default function DiscoverScreen() {
                                 {spot.capacityRange && (
                                     <Text style={styles.capacity}>{CAPACITY_LABELS[spot.capacityRange]}</Text>
                                 )}
-                                <View style={styles.amenities}>
-                                    {amenities.slice(0, 3).map((a) => (
-                                        <Ionicons key={a.key} name={a.icon} size={12} color={colors.textMuted} />
-                                    ))}
-                                </View>
                             </View>
 
+                            {amenities.length > 0 && (
+                                <View style={styles.amenities}>
+                                    {amenities.slice(0, 3).map((a) => (
+                                        <View key={a.key} style={styles.amenityChip}>
+                                            <Ionicons name={a.icon} size={10} color={colors.textMuted} />
+                                            <Text style={styles.amenityChipText}>{a.label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
                             <View style={styles.cardFooter}>
-                                <Ionicons name="thumbs-up" size={12} color={PALETTE.emerald} />
-                                <Ionicons name="thumbs-down" size={12} color={PALETTE.red} />
                                 <Text style={styles.footerText}>
-                                    por {SOURCE_LABELS[spot.source]} · {spot.createdAt.slice(0, 10)}
+                                    por {SOURCE_LABELS[spot.source]} · {formatDate(spot.createdAt)}
                                 </Text>
                             </View>
                         </Pressable>
@@ -293,6 +322,19 @@ export default function DiscoverScreen() {
                     ) : (
                         <View style={styles.emptyWrap}>
                             <Text style={styles.emptyText}>Nenhum estacionamento corresponde à pesquisa.</Text>
+                            {!hasActiveFilters && (
+                                <Text style={styles.emptyHint}>Experimenta outro nome ou zona.</Text>
+                            )}
+                            {hasActiveFilters && (
+                                <Pressable
+                                    style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}
+                                    onPress={clearFilters}
+                                    hitSlop={8}
+                                    accessibilityRole="button"
+                                >
+                                    <Text style={styles.emptyActionText}>Limpar filtros</Text>
+                                </Pressable>
+                            )}
                         </View>
                     )
                 }
@@ -300,7 +342,7 @@ export default function DiscoverScreen() {
 
             {fetchFailed && (
                 <Pressable
-                    style={styles.errorPill}
+                    style={({ pressed }) => [styles.errorPill, pressed && styles.pressed]}
                     onPress={() => fetchSpots(lastBbox.current)}
                     accessibilityLabel="Sem ligação ao servidor. Tentar de novo"
                 >
@@ -321,33 +363,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    header: {
-        paddingHorizontal: 16,
+    listHeader: {
         paddingTop: 16,
         paddingBottom: 12,
         gap: 12,
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: colors.text,
-    },
-    searchBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: colors.text,
-        padding: 0,
     },
     filterRow: {
         flexDirection: 'row',
@@ -372,7 +391,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     filterChipText: {
         fontSize: 12,
         fontWeight: '500',
-        fontFamily: MONO,
         color: colors.textMuted,
     },
     filterChipTextActive: {
@@ -395,8 +413,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.primary + '1A',
     },
     sortText: {
-        fontSize: 10,
-        fontFamily: MONO,
+        fontSize: 11,
+        fontWeight: '500',
         color: colors.textMuted,
     },
     sortTextActive: {
@@ -405,9 +423,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     listContent: {
         paddingHorizontal: 16,
         paddingBottom: 16,
-    },
-    separator: {
-        height: 12,
     },
     skeletons: {
         gap: 12,
@@ -418,6 +433,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         borderColor: colors.border,
         borderRadius: 12,
         padding: 16,
+    },
+    cardPressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
     cardTop: {
         flexDirection: 'row',
@@ -469,8 +488,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     amenities: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 6,
-        marginLeft: 'auto',
+        marginTop: 8,
+    },
+    amenityChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+    },
+    amenityChipText: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: colors.textMuted,
     },
     cardFooter: {
         flexDirection: 'row',
@@ -485,7 +521,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 10,
         fontFamily: MONO,
         color: colors.textMuted,
-        marginLeft: 'auto',
     },
     emptyWrap: {
         paddingVertical: 48,
@@ -494,6 +529,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     emptyText: {
         fontSize: 14,
         color: colors.textMuted,
+    },
+    emptyHint: {
+        marginTop: 6,
+        fontSize: 12,
+        color: colors.textMuted,
+    },
+    emptyAction: {
+        marginTop: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+    },
+    emptyActionText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.primary,
     },
     errorPill: {
         position: 'absolute',
@@ -511,5 +565,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.white,
         fontSize: 13,
         fontWeight: '600',
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
 });

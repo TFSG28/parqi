@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, type ViewStyle } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 interface SkeletonBoxProps {
@@ -13,6 +13,7 @@ interface SkeletonBoxProps {
  * Caixa animada com shimmer subtil.
  * A pulsação é lenta e de baixa amplitude — sugere carregamento
  * sem distrair nem competir com o conteúdo real.
+ * Respeita a preferência de movimento reduzido (fica estática).
  */
 export function SkeletonBox({ width, height, borderRadius = 8, style }: SkeletonBoxProps) {
     const { colors } = useTheme();
@@ -35,8 +36,16 @@ export function SkeletonBox({ width, height, borderRadius = 8, style }: Skeleton
                 }),
             ]),
         );
-        loop.start();
-        return () => loop.stop();
+        let started = false;
+        AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+            if (!reduce) {
+                loop.start();
+                started = true;
+            }
+        });
+        return () => {
+            if (started) loop.stop();
+        };
     }, [anim]);
 
     const opacity = anim.interpolate({

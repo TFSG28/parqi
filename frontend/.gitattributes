@@ -1,0 +1,4 @@
+# Linhas LF em todo o repositório: ficheiros CRLF com atributos JSX multi-linha
+# provocam hydration mismatches (o parser HTML normaliza \r\n dentro de
+# atributos, o bundle do cliente não). Não voltar a introduzir CRLF.
+* text=auto eol=lf

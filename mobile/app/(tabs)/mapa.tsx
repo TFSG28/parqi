@@ -16,7 +16,7 @@ import { TrustBar } from '../../src/components/TrustBar';
 import { TypeChip } from '../../src/components/TypeChip';
 import { parkingApi } from '../../src/lib/api';
 import { useTheme } from '../../src/context/ThemeContext';
-import { regionToBbox, type Region } from '../../src/lib/geo';
+import { distanceKm, regionToBbox, type Region } from '../../src/lib/geo';
 import { MONO, PALETTE, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
@@ -63,6 +63,9 @@ export default function MapScreen() {
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [stripExpanded, setStripExpanded] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     const fetchSpots = useCallback(async (bbox: string) => {
         lastBbox.current = bbox;
@@ -75,6 +78,7 @@ export default function MapScreen() {
             setFetchFailed(true);
         } finally {
             setLoading(false);
+            setHasLoadedOnce(true);
         }
     }, []);
 
@@ -112,10 +116,27 @@ export default function MapScreen() {
         [spots, typeFilter]
     );
 
-    const nearbySpots = useMemo(
-        () => filteredSpots.filter((s) => s.status === 'APPROVED').slice(0, 10),
-        [filteredSpots]
-    );
+    // "Perto de ti" é honesto: ordena por distância real quando há localização.
+    const nearbySpots = useMemo(() => {
+        const approved = filteredSpots.filter((s) => s.status === 'APPROVED');
+        if (!userLocation) {
+            return approved.slice(0, 10);
+        }
+        return approved
+            .filter((s) => s.latitude !== null && s.longitude !== null)
+            .map((s) => ({
+                spot: s,
+                dist: distanceKm(userLocation.latitude, userLocation.longitude, s.latitude!, s.longitude!),
+            }))
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, 10)
+            .map(({ spot }) => spot);
+    }, [filteredSpots, userLocation]);
+
+    // Peeks de 6 cartões; "Ver todos" expande para a lista completa da zona.
+    const nearbyPeek = useMemo(() => nearbySpots.slice(0, 6), [nearbySpots]);
+    const visibleNearby = stripExpanded ? nearbySpots : nearbyPeek;
+    const hiddenNearby = Math.max(0, nearbySpots.length - nearbyPeek.length);
 
     // Pins por estado: primário = verificado, âmbar = pendente, vermelho = sinalizado
     const markers = useMemo(
@@ -144,6 +165,15 @@ export default function MapScreen() {
         fetchTimer.current = setTimeout(() => fetchSpots(bbox), 400);
     };
 
+    // Limpa o timer pendente ao sair do ecrã (evita fetch após unmount)
+    useEffect(() => {
+        return () => {
+            if (fetchTimer.current) {
+                clearTimeout(fetchTimer.current);
+            }
+        };
+    }, []);
+
     const centerOnUser = async () => {
         try {
             const perm = await Location.getForegroundPermissionsAsync();
@@ -167,40 +197,70 @@ export default function MapScreen() {
             {/* Header: pesquisa + loading */}
             <View style={styles.header}>
                 <Pressable
-                    style={styles.searchBox}
+                    style={({ pressed }) => [styles.searchBox, pressed && styles.pressed]}
                     onPress={() => router.push('/(tabs)')}
                     accessibilityRole="button"
                     accessibilityLabel="Pesquisar estacionamentos"
                 >
                     <Ionicons name="search" size={16} color={colors.textMuted} />
-                    <Text style={styles.searchText}>Lisboa, Portugal</Text>
+                    <Text style={styles.searchText}>Procurar estacionamento</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
                 </Pressable>
-                {loading && <ActivityIndicator color={colors.primary} size="small" />}
             </View>
 
-            {/* Chips de filtro por tipo */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.chipsScroll}
-                contentContainerStyle={styles.chips}
-            >
-                {TYPE_FILTERS.map((t) => {
-                    const active = typeFilter === t;
-                    const label = t === 'all' ? 'Todos os tipos' : TYPE_DESIGN[t].label;
-                    return (
-                        <Pressable
-                            key={t}
-                            onPress={() => setTypeFilter(t)}
-                            style={[styles.filterChip, active && styles.filterChipActive]}
-                        >
-                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                {label}
-                            </Text>
-                        </Pressable>
-                    );
-                })}
-            </ScrollView>
+            {/* Filtro por tipo: um controlo recolhido; a linha de chips só aparece ao abrir */}
+            <View style={styles.filtersWrap}>
+                <Pressable
+                    style={({ pressed }) => [styles.filterToggle, pressed && styles.pressed]}
+                    onPress={() => setFiltersOpen((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Filtrar por tipo"
+                    accessibilityState={{ expanded: filtersOpen }}
+                    hitSlop={8}
+                >
+                    <Ionicons name="funnel-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.filterToggleText}>
+                        {typeFilter === 'all' ? 'Filtrar' : `Filtrar · ${TYPE_DESIGN[typeFilter].label}`}
+                    </Text>
+                    <Ionicons
+                        name={filtersOpen ? 'chevron-up' : 'chevron-down'}
+                        size={14}
+                        color={colors.textMuted}
+                    />
+                </Pressable>
+                {filtersOpen && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.chipsScroll}
+                        contentContainerStyle={styles.chips}
+                    >
+                        {TYPE_FILTERS.map((t) => {
+                            const active = typeFilter === t;
+                            const label = t === 'all' ? 'Todos os tipos' : TYPE_DESIGN[t].label;
+                            return (
+                                <Pressable
+                                    key={t}
+                                    onPress={() => {
+                                        setTypeFilter(t);
+                                        setFiltersOpen(false);
+                                    }}
+                                    hitSlop={8}
+                                    style={({ pressed }) => [
+                                        styles.filterChip,
+                                        active && styles.filterChipActive,
+                                        pressed && styles.pressed,
+                                    ]}
+                                >
+                                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                        {label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+            </View>
 
             {/* Mapa */}
             <View style={styles.mapWrap}>
@@ -212,10 +272,22 @@ export default function MapScreen() {
                     markers={markers}
                     userLocation={userLocation}
                     layer={mapLayer}
+                    brandColor={colors.primary}
+                    accentColor={colors.accent}
                     onMarkerPress={(id) => router.push(`/parking/${id}`)}
                     onBoundsChange={handleBoundsChange}
                     style={styles.map}
                 />
+
+                {/* Estado da carga: diz o que está a acontecer quando a zona muda */}
+                {loading && (
+                    <View style={styles.refreshPill}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={styles.refreshPillText}>
+                            {hasLoadedOnce ? 'A atualizar zona…' : 'A carregar zona…'}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Legenda */}
                 <View style={styles.legend}>
@@ -236,9 +308,14 @@ export default function MapScreen() {
                 <View style={styles.controls}>
                     <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
                     <Pressable
-                        style={[styles.controlBtn, styles.controlBtnActive]}
+                        style={({ pressed }) => [
+                            styles.controlBtn,
+                            styles.controlBtnActive,
+                            pressed && styles.pressed,
+                        ]}
                         onPress={centerOnUser}
                         accessibilityLabel="Centrar na minha localização"
+                        hitSlop={6}
                     >
                         <Ionicons name="navigate" size={16} color={colors.primary} />
                     </Pressable>
@@ -248,17 +325,19 @@ export default function MapScreen() {
             {/* Nearby strip */}
             <View style={styles.nearbySection}>
                 <Text style={styles.nearbyTitle}>
-                    PERTO DE TI · {nearbySpots.length} VERIFICADOS
+                    {userLocation
+                        ? `Perto de ti · ${nearbySpots.length} verificados`
+                        : `Verificados nesta zona · ${nearbySpots.length}`}
                 </Text>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.nearbyList}
                 >
-                    {nearbySpots.map((spot) => (
+                    {visibleNearby.map((spot) => (
                         <Pressable
                             key={spot.id}
-                            style={styles.nearbyCard}
+                            style={({ pressed }) => [styles.nearbyCard, pressed && styles.nearbyCardPressed]}
                             onPress={() => router.push(`/parking/${spot.id}`)}
                         >
                             <Text style={styles.nearbyName} numberOfLines={1}>{spot.name}</Text>
@@ -267,10 +346,25 @@ export default function MapScreen() {
                             </View>
                             <View style={styles.nearbyMeta}>
                                 <TypeChip type={spot.parkingType} />
-                                <Text style={styles.nearbyPrice}>{priceLabel(spot.isFree)}</Text>
+                                <Text style={styles.nearbyPrice} numberOfLines={1}>{priceLabel(spot.isFree)}</Text>
                             </View>
                         </Pressable>
                     ))}
+                    {hiddenNearby > 0 && (
+                        <Pressable
+                            style={({ pressed }) => [styles.seeAllCard, pressed && styles.pressed]}
+                            onPress={() => setStripExpanded((v) => !v)}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                                stripExpanded ? 'Recolher lista' : 'Ver todos os estacionamentos perto de ti'
+                            }
+                            hitSlop={8}
+                        >
+                            <Text style={styles.seeAllText}>
+                                {stripExpanded ? 'Recolher' : `Ver todos (+${hiddenNearby})`}
+                            </Text>
+                        </Pressable>
+                    )}
                     {nearbySpots.length === 0 && !loading && (
                         <Text style={styles.nearbyEmpty}>Sem estacionamentos verificados nesta zona.</Text>
                     )}
@@ -279,7 +373,7 @@ export default function MapScreen() {
 
             {fetchFailed && (
                 <Pressable
-                    style={styles.errorPill}
+                    style={({ pressed }) => [styles.errorPill, pressed && styles.pressed]}
                     onPress={() => fetchSpots(lastBbox.current)}
                     accessibilityLabel="Sem ligação ao servidor. Tentar de novo"
                 >
@@ -317,16 +411,38 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         paddingVertical: 9,
     },
     searchText: {
+        flex: 1,
         fontSize: 14,
         color: colors.textMuted,
+    },
+    filtersWrap: {
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        gap: 8,
+    },
+    filterToggle: {
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    filterToggleText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: colors.text,
     },
     chipsScroll: {
         flexGrow: 0,
     },
     chips: {
-        paddingHorizontal: 16,
-        paddingBottom: 12,
         gap: 8,
+        paddingRight: 8,
     },
     filterChip: {
         paddingHorizontal: 12,
@@ -343,7 +459,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     filterChipText: {
         fontSize: 12,
         fontWeight: '500',
-        fontFamily: MONO,
         color: colors.textMuted,
     },
     filterChipTextActive: {
@@ -359,6 +474,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     map: {
         flex: 1,
+    },
+    refreshPill: {
+        position: 'absolute',
+        top: 12,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: colors.card + 'E6',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        shadowColor: '#000',
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
+    },
+    refreshPillText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.text,
     },
     legend: {
         position: 'absolute',
@@ -420,9 +559,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         paddingBottom: 8,
     },
     nearbyTitle: {
-        fontSize: 11,
-        fontFamily: MONO,
-        letterSpacing: 1.5,
+        fontSize: 12,
+        fontWeight: '600',
         color: colors.textMuted,
         paddingHorizontal: 16,
         marginBottom: 8,
@@ -432,21 +570,42 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         gap: 12,
     },
     nearbyCard: {
-        width: 160,
+        width: 132,
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: 12,
-        padding: 12,
+        padding: 10,
+    },
+    nearbyCardPressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.98 }],
     },
     nearbyName: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: colors.text,
-        marginBottom: 8,
+        marginBottom: 6,
     },
     nearbyTrust: {
-        marginBottom: 8,
+        marginBottom: 6,
+    },
+    seeAllCard: {
+        width: 92,
+        minHeight: 60,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+    },
+    seeAllText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: colors.primary,
+        textAlign: 'center',
     },
     nearbyMeta: {
         flexDirection: 'row',
@@ -479,5 +638,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.white,
         fontSize: 13,
         fontWeight: '600',
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
 });

@@ -35,6 +35,7 @@ export function SearchBar({ value, onChangeText, placeholder = 'Procurar estacio
                 {value.length > 0 && (
                     <Pressable
                         onPress={() => onChangeText('')}
+                        style={({ pressed }) => pressed && styles.pressed}
                         accessibilityLabel="Limpar pesquisa"
                         hitSlop={8}
                     >
@@ -65,5 +66,8 @@ const createStyles = (colors: ThemeColors) =>
             fontSize: 14,
             color: colors.text,
             padding: 0,
+        },
+        pressed: {
+            opacity: 0.6,
         },
     });

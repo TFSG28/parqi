@@ -30,7 +30,7 @@ describe('Button Component', () => {
   it('deve mostrar texto de carregamento quando isLoading é true', () => {
     render(<Button isLoading>Clique aqui</Button>);
     
-    expect(screen.getByText('Carregando...')).toBeInTheDocument();
+    expect(screen.getByText('A carregar...')).toBeInTheDocument();
   });
 
   it('não deve chamar onClick quando desabilitado', () => {

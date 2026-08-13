@@ -15,10 +15,14 @@ export function Chip({ label, selected, onPress }: ChipProps) {
     return (
         <Pressable
             onPress={onPress}
-            style={[styles.chip, selected && styles.chipSelected]}
+            style={({ pressed }) => [
+                styles.chip,
+                selected && styles.chipSelected,
+                pressed && styles.chipPressed,
+            ]}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            hitSlop={6}
+            hitSlop={8}
         >
             <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
         </Pressable>
@@ -35,10 +39,14 @@ const createStyles = (colors: ThemeColors) =>
             borderColor: colors.border,
             backgroundColor: colors.card,
         },
-        chipSelected: {
-            backgroundColor: colors.primary,
-            borderColor: colors.primary,
-        },
+    chipSelected: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    chipPressed: {
+        opacity: 0.7,
+        transform: [{ scale: 0.97 }],
+    },
         label: {
             fontSize: 13,
             color: colors.text,

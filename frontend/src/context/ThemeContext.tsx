@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo, useCallback } from 'react'
@@ -8,7 +7,6 @@ type Theme = 'light' | 'dark'
 type ThemeContextType = {
   theme: Theme
   toggleTheme: () => void
-  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -18,48 +16,31 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>('light')
-  const [mounted, setMounted] = useState(false)
+  // Inicializado de forma preguiçosa a partir do localStorage / preferência do
+  // sistema; o efeito só sincroniza a classe .dark com o DOM (sem setState).
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'light'
+    const saved = localStorage.getItem('theme') as Theme | null
+    if (saved === 'light' || saved === 'dark') return saved
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
 
   const toggleTheme = useCallback(() => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [theme])
+    setTheme((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light'
+      localStorage.setItem('theme', next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
-    setMounted(true)
-    const savedTheme = localStorage.getItem('theme') as Theme | null
-
-    if (savedTheme) {
-      setTheme(savedTheme)
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else {
-        document.documentElement.classList.remove('dark')
-      }
-    } else {
-      const prefersDark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-      const systemTheme = prefersDark ? 'dark' : 'light'
-      setTheme(systemTheme)
-
-      if (systemTheme === 'dark') {
-        document.documentElement.classList.add('dark')
-      }
-    }
-  }, [])
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
 
   const contextValue = useMemo(() => ({
     theme,
-    toggleTheme,
-    mounted
-  }), [theme, toggleTheme, mounted])
+    toggleTheme
+  }), [theme, toggleTheme])
 
   return (
     <ThemeContext.Provider value={contextValue}>

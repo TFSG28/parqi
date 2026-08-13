@@ -22,6 +22,7 @@ import { UpdateParkingUseCase } from '../../../modules/parking/application/useca
 import { ListParkingUseCase } from '../../../modules/parking/application/usecases/ListParking.usecase';
 import { GetParkingUseCase } from '../../../modules/parking/application/usecases/GetParking.usecase';
 import { VoteParkingUseCase } from '../../../modules/parking/application/usecases/VoteParking.usecase';
+import { DeleteVoteUseCase } from '../../../modules/parking/application/usecases/DeleteVote.usecase';
 import { ModerateParkingUseCase } from '../../../modules/parking/application/usecases/ModerateParking.usecase';
 import { DeleteParkingUseCase } from '../../../modules/parking/application/usecases/DeleteParking.usecase';
 import { SuggestParkingUseCase } from '../../../modules/parking/application/usecases/SuggestParking.usecase';
@@ -53,6 +54,7 @@ export function setupParkingContainer() {
     container.register(PARKING_TOKENS.ListParkingUseCase, ListParkingUseCase);
     container.register(PARKING_TOKENS.GetParkingUseCase, GetParkingUseCase);
     container.register(PARKING_TOKENS.VoteParkingUseCase, VoteParkingUseCase);
+    container.register(PARKING_TOKENS.DeleteVoteUseCase, DeleteVoteUseCase);
     container.register(PARKING_TOKENS.ModerateParkingUseCase, ModerateParkingUseCase);
     container.register(PARKING_TOKENS.DeleteParkingUseCase, DeleteParkingUseCase);
     container.register(PARKING_TOKENS.SuggestParkingUseCase, SuggestParkingUseCase);

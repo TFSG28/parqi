@@ -45,8 +45,8 @@ export function HeroSection({ totalSpots, verifiedSpots }: Readonly<HeroSectionP
 
                 <View style={styles.statsRow}>
                     <View style={styles.statPill}>
-                        <Ionicons name="shield-checkmark" size={14} color={colors.success} />
-                        <Text style={[styles.statText, { color: colors.success }]}>
+                        <Ionicons name="shield-checkmark" size={14} color="#A7F3D0" />
+                        <Text style={styles.statText}>
                             {verifiedSpots} verificados
                         </Text>
                     </View>
@@ -54,7 +54,7 @@ export function HeroSection({ totalSpots, verifiedSpots }: Readonly<HeroSectionP
 
                 {!user && (
                     <Pressable
-                        style={styles.cta}
+                        style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
                         onPress={() => router.push('/login')}
                         accessibilityRole="button"
                         accessibilityLabel="Entrar ou criar conta na comunidade Parqi"
@@ -73,8 +73,8 @@ const createStyles = (colors: ThemeColors) =>
             marginBottom: 8,
             borderRadius: 16,
             backgroundColor: colors.heroBg,
-            shadowColor: colors.heroBg,
-            shadowOpacity: 0.12,
+            shadowColor: '#000',
+            shadowOpacity: 0.10,
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 3 },
             elevation: 3,
@@ -90,7 +90,7 @@ const createStyles = (colors: ThemeColors) =>
         },
         subtitle: {
             fontSize: 13,
-            color: 'rgba(255,255,255,0.65)',
+            color: 'rgba(255,255,255,0.75)',
             lineHeight: 19,
         },
         statsRow: {
@@ -110,6 +110,7 @@ const createStyles = (colors: ThemeColors) =>
         statText: {
             fontSize: 12,
             fontWeight: '600',
+            color: '#A7F3D0',
         },
         cta: {
             alignItems: 'center',
@@ -118,13 +119,17 @@ const createStyles = (colors: ThemeColors) =>
             // Outline branco translúcido em vez de laranja sólido —
             // mantém o convite à ação sem competir visualmente.
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.35)',
+            borderColor: 'rgba(255,255,255,0.40)',
             paddingVertical: 10,
             borderRadius: 12,
         },
         ctaText: {
             fontWeight: '600',
             fontSize: 13,
-            color: 'rgba(255,255,255,0.90)',
+            color: 'rgba(255,255,255,0.92)',
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
         },
     });

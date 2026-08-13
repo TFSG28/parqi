@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface ScrollRevealProps {
   children: ReactNode;

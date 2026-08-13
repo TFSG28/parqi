@@ -68,12 +68,17 @@ export function MapLayerPicker({ onChange, style }: MapLayerPickerProps) {
         <View style={[styles.wrap, style]}>
             {open && (
                 <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.menuTitle, { color: colors.textMuted }]}>Camadas do mapa</Text>
                     {LAYER_OPTIONS.map((opt) => {
                         const active = layer === opt.id;
                         return (
                             <Pressable
                                 key={opt.id}
-                                style={[styles.option, active && { backgroundColor: colors.background }]}
+                                style={({ pressed }) => [
+                                    styles.option,
+                                    active && { backgroundColor: colors.background },
+                                    pressed && styles.pressed,
+                                ]}
                                 onPress={() => select(opt.id)}
                             >
                                 <View style={[styles.swatch, { backgroundColor: opt.swatch }]} />
@@ -87,9 +92,14 @@ export function MapLayerPicker({ onChange, style }: MapLayerPickerProps) {
                 </View>
             )}
             <Pressable
-                style={[styles.fab, { backgroundColor: colors.white }]}
+                style={({ pressed }) => [
+                    styles.fab,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    pressed && styles.pressed,
+                ]}
                 onPress={() => setOpen((v) => !v)}
                 accessibilityLabel="Camadas do mapa"
+                accessibilityState={{ expanded: open }}
                 hitSlop={6}
             >
                 <Ionicons name="layers" size={20} color={colors.primary} />
@@ -104,11 +114,12 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     fab: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
         shadowColor: '#000',
         shadowOpacity: 0.15,
         shadowRadius: 6,
@@ -119,12 +130,21 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         paddingVertical: 6,
-        minWidth: 148,
+        minWidth: 158,
         shadowColor: '#000',
         shadowOpacity: 0.18,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 4 },
         elevation: 8,
+    },
+    menuTitle: {
+        fontSize: 10,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+        paddingBottom: 4,
     },
     option: {
         flexDirection: 'row',
@@ -145,5 +165,9 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 13,
         fontWeight: '600',
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.98 }],
     },
 });

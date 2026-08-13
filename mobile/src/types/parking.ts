@@ -39,6 +39,8 @@ export interface ParkingSpot {
     createdAt: string;
     updatedAt: string;
     geometry: Geometry | null;
+    /** Voto do utilizador autenticado (só presente no GET de detalhe autenticado). */
+    myVote?: 'up' | 'down' | null;
 }
 
 export interface User {

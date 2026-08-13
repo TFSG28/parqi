@@ -1,6 +1,8 @@
 import {
     distanceKm,
+    formatDate,
     formatDistance,
+    formatScore,
     formatTrust,
     regionToBbox,
     trustColorKey,
@@ -55,5 +57,19 @@ describe('formatação', () => {
         expect(formatDistance(0.25)).toBe('250 m');
         expect(formatDistance(1.5)).toBe('1,5 km');
         expect(formatDistance(12.34)).toBe('12,3 km');
+    });
+
+    it('formatScore usa vírgula decimal PT e arredonda a uma casa', () => {
+        expect(formatScore(9.2)).toBe('9,2');
+        expect(formatScore(5)).toBe('5,0');
+        expect(formatScore(7.34)).toBe('7,3');
+    });
+
+    it('formatDate converte ISO em dd/mm/aaaa e tolera entradas parciais', () => {
+        expect(formatDate('2024-01-15')).toBe('15/01/2024');
+        expect(formatDate('2024-01-15T10:30:00.000Z')).toBe('15/01/2024');
+        expect(formatDate('')).toBe('');
+        expect(formatDate('garbage')).toBe('garbage');
+        expect(formatDate(undefined as unknown as string)).toBe(undefined as unknown as string);
     });
 });

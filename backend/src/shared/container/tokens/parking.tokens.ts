@@ -21,6 +21,7 @@ export const PARKING_TOKENS = {
     ListParkingUseCase: Symbol.for('ListParkingUseCase'),
     GetParkingUseCase: Symbol.for('GetParkingUseCase'),
     VoteParkingUseCase: Symbol.for('VoteParkingUseCase'),
+    DeleteVoteUseCase: Symbol.for('DeleteVoteUseCase'),
     ModerateParkingUseCase: Symbol.for('ModerateParkingUseCase'),
     DeleteParkingUseCase: Symbol.for('DeleteParkingUseCase'),
     SuggestParkingUseCase: Symbol.for('SuggestParkingUseCase'),

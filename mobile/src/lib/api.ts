@@ -22,10 +22,8 @@ import type {
  *  2. host do Metro (IP LAN) — telemóvel físico em desenvolvimento
  *  3. 10.0.2.2 (emulador Android) / localhost (simulador iOS)
  */
-function resolveApiUrl(): string {
-    const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
-    if (fromEnv) return fromEnv;
-
+/** URL de dev deduzida do host do Metro (IP da LAN para telemóveis físicos). */
+function devApiUrl(): string {
     const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
     const host = hostUri?.split(':')[0];
     if (host && host !== 'localhost' && host !== '127.0.0.1') {
@@ -37,6 +35,28 @@ function resolveApiUrl(): string {
     return 'http://localhost:3001/api/v1';
 }
 
+/** localhost / 127.0.0.1 / ::1 — URLs que só funcionam na própria máquina. */
+function isLoopbackUrl(url: string): boolean {
+    return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/.test(url);
+}
+
+function resolveApiUrl(): string {
+    const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+    if (fromEnv) {
+        // Em dev, um URL do .env com localhost nunca chega ao backend num telemóvel
+        // físico (aponta para o próprio aparelho). Se o Metro está num IP da LAN,
+        // preferimos esse — é o único que o aparelho consegue alcançar.
+        if (__DEV__ && isLoopbackUrl(fromEnv)) {
+            const auto = devApiUrl();
+            if (!isLoopbackUrl(auto)) {
+                return auto;
+            }
+        }
+        return fromEnv;
+    }
+    return devApiUrl();
+}
+
 export const API_URL = resolveApiUrl();
 
 if (__DEV__) {
@@ -45,6 +65,16 @@ if (__DEV__) {
 }
 
 const TOKEN_KEY = 'parqi.access_token';
+
+/**
+ * Chamado quando a API devolve 401 (sessão expirada ou inválida), para o
+ * estado global limpar o utilizador. Regista-se a partir do AuthContext.
+ */
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+    unauthorizedHandler = handler;
+}
 
 export async function getToken(): Promise<string | null> {
     try {
@@ -77,6 +107,15 @@ export class ApiError extends Error {
     }
 }
 
+// Mensagem amigável quando o servidor devolve resposta sem `message` legível.
+function friendlyFallback(status: number): string {
+    if (status === 404) return 'Não encontrado.';
+    if (status === 409) return 'Já existe um registo com estes dados.';
+    if (status === 429) return 'Muitos pedidos de seguida. Espera um pouco e tenta de novo.';
+    if (status >= 500) return 'Algo correu mal no servidor. Tenta de novo daqui a pouco.';
+    return 'Não foi possível completar o pedido. Tenta de novo.';
+}
+
 interface Envelope<T> {
     status?: string;
     data?: T;
@@ -100,7 +139,12 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
     const json = (await response.json().catch(() => null)) as Envelope<T> | null;
 
     if (!response.ok) {
-        throw new ApiError(json?.message ?? `Erro ${response.status}`, response.status, json?.details);
+        if (response.status === 401) {
+            // Sessão expirada: limpa o token local e avisa o contexto de auth
+            await setToken(null);
+            unauthorizedHandler?.();
+        }
+        throw new ApiError(json?.message ?? friendlyFallback(response.status), response.status, json?.details);
     }
 
     return (json?.data ?? json) as T;
@@ -177,6 +221,8 @@ export const parkingApi = {
     update: (id: string, data: SpotFields) => api.patch<ParkingSpot>(`/parking/${id}`, data),
     vote: (id: string, value: 1 | -1, reason?: string) =>
         api.post<ParkingSpot>(`/parking/${id}/vote`, { value, reason }),
+    /** Anula o voto do utilizador atual; idempotente. */
+    unvote: (id: string) => api.delete<ParkingSpot>(`/parking/${id}/vote`),
     suggest: (id: string, data: SuggestInput) =>
         api.post<SuggestResult>(`/parking/${id}/suggest`, data),
     stats: () => api.get<ContributorStats>('/user/me/stats'),

@@ -8,6 +8,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
  * (o SDK Google renderiza preto em alguns dispositivos com a chave partilhada).
  *
  * Suporta várias camadas de tiles: Padrão, Satélite, Dark, Light e Topo.
+ * As cores de marca (clusters, polígonos, localização) seguem o tema ativo.
  */
 
 export type MapLayer = 'standard' | 'satellite' | 'dark' | 'light' | 'topo';
@@ -41,6 +42,10 @@ export interface OsmMapProps {
     interactive?: boolean;
     /** Camada de tiles (default: Padrão/OSM). */
     layer?: MapLayer;
+    /** Cor da marca (clusters, polígonos, localização do utilizador). Default azul claro. */
+    brandColor?: string;
+    /** Cor de destaque (linhas na via). Default laranja. */
+    accentColor?: string;
     onMarkerPress?: (id: string) => void;
     onMapPress?: (coordinate: { latitude: number; longitude: number }) => void;
     /** bbox "minLon,minLat,maxLon,maxLat" após mover/zoom. */
@@ -88,7 +93,9 @@ function buildHtml(
     polygon: [number, number][],
     polyline: [number, number][],
     userLocation: OsmMapProps['userLocation'],
-    layer: MapLayer
+    layer: MapLayer,
+    brandColor: string,
+    accentColor: string
 ): string {
     return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -128,6 +135,8 @@ function switchLayer(name) {
 }
 switchLayer('${layer}');
 
+let COLORS = { brand: '${brandColor}', accent: '${accentColor}' };
+
 function pinIcon(m) {
     const text = m.textColor || '#FFFFFF';
     if (m.kind === 'dot') {
@@ -157,7 +166,7 @@ const markerLayer = ${cluster}
               const size = n < 10 ? 38 : n < 100 ? 44 : 52;
               return L.divIcon({
                   className: 'parqi-cluster',
-                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#0647AC;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
+                  html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + COLORS.brand + ';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui,sans-serif;font-weight:700;font-size:13px">' + n + '</div>',
                   iconSize: [size, size],
               });
           },
@@ -168,12 +177,17 @@ markerLayer.addTo(map);
 let poly = null;
 let line = null;
 let userDot = null;
+let currentMarkers = [];
+let currentPolygon = [];
+let currentPolyline = [];
+let currentUser = null;
 
 function post(payload) {
     window.ReactNativeWebView.postMessage(JSON.stringify(payload));
 }
 
 function updateMarkers(list) {
+    currentMarkers = list;
     markerLayer.clearLayers();
     list.forEach(function (m) {
         L.marker([m.latitude, m.longitude], { icon: pinIcon(m) })
@@ -186,26 +200,38 @@ function updateMarkers(list) {
 }
 
 function setPolygon(ring) {
+    currentPolygon = ring || [];
     if (poly) { poly.remove(); poly = null; }
-    if (ring && ring.length > 1) {
-        poly = L.polygon(ring, { color: '#0647AC', weight: 2, fillColor: '#0647AC', fillOpacity: 0.2 }).addTo(map);
+    if (currentPolygon.length > 1) {
+        poly = L.polygon(currentPolygon, { color: COLORS.brand, weight: 2, fillColor: COLORS.brand, fillOpacity: 0.2 }).addTo(map);
     }
 }
 
 function setPolyline(pts) {
+    currentPolyline = pts || [];
     if (line) { line.remove(); line = null; }
-    if (pts && pts.length > 1) {
-        line = L.polyline(pts, { color: '#FF6900', weight: 5, opacity: 0.9, dashArray: '1 8', lineCap: 'round' }).addTo(map);
+    if (currentPolyline.length > 1) {
+        line = L.polyline(currentPolyline, { color: COLORS.accent, weight: 5, opacity: 0.9, dashArray: '1 8', lineCap: 'round' }).addTo(map);
     }
 }
 
 function setUser(u) {
+    currentUser = u || null;
     if (userDot) { userDot.remove(); userDot = null; }
-    if (u) {
-        userDot = L.circleMarker([u.latitude, u.longitude], {
-            radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#0647AC', fillOpacity: 1,
+    if (currentUser) {
+        userDot = L.circleMarker([currentUser.latitude, currentUser.longitude], {
+            radius: 7, color: '#FFFFFF', weight: 2, fillColor: COLORS.brand, fillOpacity: 1,
         }).addTo(map);
     }
+}
+
+function setColors(brand, accent) {
+    COLORS.brand = brand;
+    COLORS.accent = accent;
+    setPolygon(currentPolygon);
+    setPolyline(currentPolyline);
+    setUser(currentUser);
+    updateMarkers(currentMarkers);
 }
 
 function centerOn(lat, lng, z) { map.setView([lat, lng], z || map.getZoom()); }
@@ -236,6 +262,8 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
         userLocation = null,
         interactive = true,
         layer = 'standard',
+        brandColor = '#0647AC',
+        accentColor = '#FF6900',
         onMarkerPress,
         onMapPress,
         onBoundsChange,
@@ -247,7 +275,7 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
     const loaded = useRef(false);
     // HTML construído uma vez; atualizações seguem por injectJavaScript (sem recarregar o mapa)
     const html = useRef(
-        buildHtml(center, zoom, interactive, cluster, markers, polygon, polyline, userLocation, layer)
+        buildHtml(center, zoom, interactive, cluster, markers, polygon, polyline, userLocation, layer, brandColor, accentColor)
     ).current;
 
     // injectJavaScript antes do WebView carregar perde-se; onLoadEnd resincroniza tudo
@@ -268,6 +296,11 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
     useEffect(() => {
         inject(`switchLayer('${layer}');`);
     }, [layer]);
+
+    // Cores da marca seguem o tema ativo (muda sem recarregar o mapa)
+    useEffect(() => {
+        inject(`setColors('${brandColor}', '${accentColor}');`);
+    }, [brandColor, accentColor]);
 
     useEffect(() => {
         inject(`updateMarkers(${JSON.stringify(markers)});`);
@@ -292,6 +325,7 @@ export const OsmMap = forwardRef<OsmMapHandle, OsmMapProps>(function OsmMap(
         inject(
             `centerOn(${center.latitude}, ${center.longitude});` +
             `switchLayer('${layer}');` +
+            `setColors('${brandColor}', '${accentColor}');` +
             `updateMarkers(${JSON.stringify(markers)});` +
             `setPolygon(${JSON.stringify(polygon)});` +
             `setPolyline(${JSON.stringify(polyline)});` +

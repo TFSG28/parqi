@@ -27,13 +27,14 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'right' })
     }
   };
 
+  // Seta como quadrado rodado (sem triângulos de borda — mais nítido e sem seams).
   const arrowClasses = position === 'left'
-    ? "absolute -right-1 top-1/2 transform -translate-y-1/2 w-0 h-0 border-t-4 border-t-transparent border-b-4 border-b-transparent border-l-4 border-l-gray-800"
-    : "absolute -left-1 top-1/2 transform -translate-y-1/2 w-0 h-0 border-t-4 border-t-transparent border-b-4 border-b-transparent border-r-4 border-r-gray-800";
+    ? "absolute -right-1.5 top-1/2 size-3 -translate-y-1/2 rotate-45 bg-ink"
+    : "absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rotate-45 bg-ink";
 
   const tooltipClasses = position === 'left'
-    ? "fixed z-50 px-3 py-2 bg-gray-800 text-white text-sm rounded-md shadow-lg transform -translate-y-1/2 -translate-x-full"
-    : "fixed z-50 px-3 py-2 bg-gray-800 text-white text-sm rounded-md shadow-lg transform -translate-y-1/2";
+    ? "fixed z-50 px-3 py-2 bg-ink text-white text-sm rounded-md shadow-lg transform -translate-y-1/2 -translate-x-full"
+    : "fixed z-50 px-3 py-2 bg-ink text-white text-sm rounded-md shadow-lg transform -translate-y-1/2";
 
   return (
     <div
@@ -52,7 +53,7 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'right' })
             pointerEvents: 'none',
           }}
         >
-          <div className={arrowClasses}></div>
+          <div className={arrowClasses} aria-hidden />
           {text}
         </div>
       )}

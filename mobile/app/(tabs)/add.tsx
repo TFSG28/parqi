@@ -49,7 +49,7 @@ const CAPACITY_OPTIONS: { range: CapacityRange; label: string }[] = [
 const NEXT_STEPS = [
     'A comunidade vai confirmar ou reportar a tua submissão',
     'A confiança cresce automaticamente com os votos',
-    'Chega a 7.0 de confiança para ficares Verificado',
+    'Chega a 5.0 de confiança para ficares Verificado',
     'A tua reputação cresce com cada contribuição correta',
 ];
 
@@ -135,10 +135,20 @@ export default function AddSpotScreen() {
             });
             setSubmitted(true);
         } catch (error) {
-            Alert.alert(
-                'Erro',
-                error instanceof ApiError ? error.message : 'Não foi possível submeter o estacionamento.'
-            );
+            if (error instanceof ApiError && error.status === 409 && error.details?.existingId) {
+                Alert.alert('Já existe', `${error.message} Ver o existente?`, [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Ver',
+                        onPress: () => router.replace(`/parking/${error.details!.existingId as string}`),
+                    },
+                ]);
+            } else {
+                Alert.alert(
+                    'Erro',
+                    error instanceof ApiError ? error.message : 'Não foi possível submeter o estacionamento.'
+                );
+            }
         } finally {
             setSubmitting(false);
         }
@@ -158,7 +168,7 @@ export default function AddSpotScreen() {
                     ESTADO · <Text style={{ color: PALETTE.amber }}>A AGUARDAR VALIDAÇÃO</Text>
                 </Text>
                 <View style={styles.nextCard}>
-                    <Text style={styles.sectionLabel}>O QUE ACONTECE A SEGUIR</Text>
+                    <Text style={styles.sectionLabel}>O que acontece a seguir</Text>
                     {NEXT_STEPS.map((s, i) => (
                         <View
                             key={s}
@@ -169,7 +179,10 @@ export default function AddSpotScreen() {
                         </View>
                     ))}
                 </View>
-                <Pressable style={styles.primaryBtn} onPress={reset}>
+                <Pressable
+                    style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+                    onPress={reset}
+                >
                     <Text style={styles.primaryBtnText}>Adicionar outro estacionamento</Text>
                 </Pressable>
             </ScrollView>
@@ -198,6 +211,15 @@ export default function AddSpotScreen() {
                         />
                     ))}
                 </View>
+                <Pressable
+                    onPress={() => router.push('/contribute')}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Modo avançado: desenhar área ou via no mapa"
+                    style={({ pressed }) => pressed && styles.pressed}
+                >
+                    <Text style={styles.advancedLink}>Modo avançado: desenhar área ou via</Text>
+                </Pressable>
             </View>
 
             <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
@@ -210,6 +232,8 @@ export default function AddSpotScreen() {
                                 center={location}
                                 zoom={15}
                                 markers={[{ id: 'pin', ...location, color: colors.primary }]}
+                                brandColor={colors.primary}
+                                accentColor={colors.accent}
                                 onMapPress={(coord) => setPoint(coord)}
                                 style={styles.map}
                             />
@@ -220,17 +244,8 @@ export default function AddSpotScreen() {
                                     placeholderTextColor={colors.textMuted}
                                     value={name}
                                     onChangeText={setName}
+                                    maxLength={120}
                                 />
-                            </View>
-                        </View>
-                        <View style={styles.coordsRow}>
-                            <View style={styles.coordCell}>
-                                <Text style={styles.coordLabel}>Latitude</Text>
-                                <Text style={styles.coordValue}>{location.latitude.toFixed(4)}</Text>
-                            </View>
-                            <View style={styles.coordCell}>
-                                <Text style={styles.coordLabel}>Longitude</Text>
-                                <Text style={styles.coordValue}>{location.longitude.toFixed(4)}</Text>
                             </View>
                         </View>
                         <Text style={styles.mapHint}>Toca no mapa para marcar a localização exata.</Text>
@@ -247,7 +262,11 @@ export default function AddSpotScreen() {
                                     <Pressable
                                         key={type}
                                         onPress={() => setSpotType(type)}
-                                        style={[styles.typeCard, active && styles.optionActive]}
+                                        style={({ pressed }) => [
+                                            styles.typeCard,
+                                            active && styles.optionActive,
+                                            pressed && styles.pressed,
+                                        ]}
                                     >
                                         <Ionicons
                                             name={icon}
@@ -270,7 +289,11 @@ export default function AddSpotScreen() {
                                     <Pressable
                                         key={label}
                                         onPress={() => setIsFree(v)}
-                                        style={[styles.pricingBtn, active && styles.optionActive]}
+                                        style={({ pressed }) => [
+                                            styles.pricingBtn,
+                                            active && styles.optionActive,
+                                            pressed && styles.pressed,
+                                        ]}
                                     >
                                         <Text style={[styles.pricingText, active && { color: colors.primary }]}>
                                             {label}
@@ -288,7 +311,11 @@ export default function AddSpotScreen() {
                                     <Pressable
                                         key={range}
                                         onPress={() => setCapacity(active ? null : range)}
-                                        style={[styles.capacityBtn, active && styles.optionActive]}
+                                        style={({ pressed }) => [
+                                            styles.capacityBtn,
+                                            active && styles.optionActive,
+                                            pressed && styles.pressed,
+                                        ]}
                                     >
                                         <Text style={[styles.capacityText, active && { color: colors.primary }]}>
                                             {label}
@@ -310,7 +337,11 @@ export default function AddSpotScreen() {
                                     <Pressable
                                         key={key}
                                         onPress={() => toggleAmenity(key)}
-                                        style={[styles.amenityCard, active && styles.optionActive]}
+                                        style={({ pressed }) => [
+                                            styles.amenityCard,
+                                            active && styles.optionActive,
+                                            pressed && styles.pressed,
+                                        ]}
                                     >
                                         <Ionicons
                                             name={icon}
@@ -334,12 +365,12 @@ export default function AddSpotScreen() {
                         </View>
 
                         <View style={styles.antiSpamCard}>
-                            <Text style={styles.sectionLabel}>VERIFICAÇÃO ANTI-SPAM</Text>
+                            <Text style={styles.sectionLabel}>Verificação anti-spam</Text>
                             <Text style={styles.antiSpamText}>
                                 Confirma que este estacionamento fica em Portugal e não numa autoestrada ou túnel.
                             </Text>
                             <Pressable
-                                style={styles.checkboxRow}
+                                style={({ pressed }) => [styles.checkboxRow, pressed && styles.pressed]}
                                 onPress={() => setConfirmed((c) => !c)}
                                 accessibilityRole="checkbox"
                                 accessibilityState={{ checked: confirmed }}
@@ -365,14 +396,20 @@ export default function AddSpotScreen() {
             <View style={styles.actions}>
                 {step > 1 && (
                     <Pressable
-                        style={styles.backBtn}
+                        style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
                         onPress={() => setStep((s) => (s - 1) as Step)}
+                        hitSlop={8}
                     >
                         <Text style={styles.backBtnText}>Voltar</Text>
                     </Pressable>
                 )}
                 <Pressable
-                    style={[styles.primaryBtn, styles.actionBtn, (!canContinue() || submitting) && styles.btnDisabled]}
+                    style={({ pressed }) => [
+                        styles.primaryBtn,
+                        styles.actionBtn,
+                        (!canContinue() || submitting) && styles.btnDisabled,
+                        pressed && !submitting && canContinue() && styles.pressed,
+                    ]}
                     onPress={handleContinue}
                     disabled={!canContinue() || submitting}
                 >
@@ -461,31 +498,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 14,
         color: colors.text,
     },
-    coordsRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 8,
-    },
-    coordCell: {
-        flex: 1,
-    },
-    coordLabel: {
-        fontSize: 11,
-        fontFamily: MONO,
-        color: colors.textMuted,
-        marginBottom: 4,
-    },
-    coordValue: {
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 13,
-        fontFamily: MONO,
-        color: colors.text,
-    },
     mapHint: {
         fontSize: 11,
         fontFamily: MONO,
@@ -513,9 +525,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.primary + '1A',
     },
     typeLabel: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '500',
-        fontFamily: MONO,
         color: colors.textMuted,
     },
     pricingRow: {
@@ -535,7 +546,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     pricingText: {
         fontSize: 14,
         fontWeight: '500',
-        fontFamily: MONO,
         color: colors.textMuted,
     },
     capacityGrid: {
@@ -595,11 +605,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         marginBottom: 12,
     },
     sectionLabel: {
-        fontSize: 11,
-        fontFamily: MONO,
-        letterSpacing: 1.5,
-        color: colors.textMuted,
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text,
         marginBottom: 8,
+    },
+    advancedLink: {
+        alignSelf: 'flex-end',
+        fontSize: 11,
+        color: colors.textMuted,
+        textDecorationLine: 'underline',
+        marginTop: 6,
     },
     antiSpamText: {
         fontSize: 12,
@@ -666,6 +682,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     btnDisabled: {
         opacity: 0.5,
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
     primaryBtnText: {
         fontSize: 14,

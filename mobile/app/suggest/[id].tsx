@@ -46,11 +46,6 @@ function text(value: string | null | undefined): string {
     return value ?? '';
 }
 
-/** null, false e '' não fazem parte do diff. */
-function includeField(value: unknown): boolean {
-    return value !== null && value !== undefined && value !== false && value !== '';
-}
-
 export default function SuggestScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { user } = useAuth();
@@ -64,7 +59,7 @@ export default function SuggestScreen() {
     const [description, setDescription] = useState('');
     const [parkingType, setParkingType] = useState<ParkingType>('SURFACE');
     const [capacityRange, setCapacityRange] = useState<CapacityRange | null>(null);
-    const [isFree, setIsFree] = useState(false);
+    const [isFree, setIsFree] = useState<boolean | null>(null);
     const [details, setDetails] = useState({
         hasPregnantSpaces: false,
         hasDisabledSpaces: false,
@@ -90,7 +85,7 @@ export default function SuggestScreen() {
             setDescription(text(spot.description));
             setParkingType(spot.parkingType);
             setCapacityRange(spot.capacityRange);
-            setIsFree(spot.isFree ?? false);
+            setIsFree(spot.isFree);
             setDetails({
                 hasPregnantSpaces: spot.hasPregnantSpaces ?? false,
                 hasDisabledSpaces: spot.hasDisabledSpaces ?? false,
@@ -117,7 +112,7 @@ export default function SuggestScreen() {
         if (newDescription !== spot.description) diff.description = newDescription;
         if (parkingType !== spot.parkingType) diff.parkingType = parkingType;
         if (capacityRange !== spot.capacityRange) diff.capacityRange = capacityRange;
-        if (isFree !== (spot.isFree ?? false)) diff.isFree = isFree;
+        if (isFree !== spot.isFree) diff.isFree = isFree;
         for (const field of DETAIL_FIELDS) {
             const current = spot[field.key] ?? false;
             if (details[field.key] !== current) {
@@ -148,7 +143,7 @@ export default function SuggestScreen() {
             } else {
                 Alert.alert(
                     'Sugestão enviada',
-                    'A tua sugestão entrou na fila de revisão. Obrigado por melhorares o parqi!',
+                    'A tua sugestão entrou na fila de revisão. Obrigado por melhorares o Parqi!',
                     [{ text: 'OK', onPress: () => router.back() }]
                 );
             }
@@ -174,7 +169,10 @@ export default function SuggestScreen() {
         return (
             <View style={styles.center}>
                 <Text style={styles.notFound}>Estacionamento não encontrado.</Text>
-                <Pressable onPress={() => router.back()}>
+                <Pressable
+                    onPress={() => router.back()}
+                    style={({ pressed }) => pressed && styles.pressed}
+                >
                     <Text style={styles.notFoundLink}>Voltar</Text>
                 </Pressable>
             </View>
@@ -225,9 +223,16 @@ export default function SuggestScreen() {
                     ))}
                 </View>
 
-                <View style={styles.switchRow}>
-                    <Text style={styles.label}>Gratuito</Text>
-                    <Switch value={isFree} onValueChange={setIsFree} trackColor={{ true: colors.primary }} />
+                <Text style={styles.label}>Custo</Text>
+                <View style={styles.chipRow}>
+                    {[{ v: true, label: 'Grátis' }, { v: false, label: 'Pago' }, { v: null, label: 'Desconhecido' }].map(({ v, label }) => (
+                        <Chip
+                            key={label}
+                            label={label}
+                            selected={isFree === v}
+                            onPress={() => setIsFree(v)}
+                        />
+                    ))}
                 </View>
 
                 <Text style={styles.label}>Detalhes</Text>
@@ -267,7 +272,11 @@ export default function SuggestScreen() {
                 />
 
                 <Pressable
-                    style={[styles.submitButton, submitting && styles.buttonDisabled]}
+                    style={({ pressed }) => [
+                        styles.submitButton,
+                        submitting && styles.buttonDisabled,
+                        pressed && !submitting && styles.pressed,
+                    ]}
                     onPress={submit}
                     disabled={submitting}
                 >
@@ -381,5 +390,9 @@ const createStyles = (colors: ThemeColors) =>
         },
         buttonDisabled: {
             opacity: 0.6,
+        },
+        pressed: {
+            opacity: 0.85,
+            transform: [{ scale: 0.99 }],
         },
     });

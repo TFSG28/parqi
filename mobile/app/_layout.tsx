@@ -1,14 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Image, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
 import { FavoritesProvider } from '../src/context/FavoritesContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { registerForPushNotifications } from '../src/services/notifications';
 
-function HeaderLogo() {
+function HeaderLogo({ title }: Readonly<{ title?: string }>) {
     return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Image
@@ -16,6 +16,9 @@ function HeaderLogo() {
                 style={{ width: 28, height: 28, borderRadius: 6 }}
                 resizeMode="contain"
             />
+            {title ? (
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>{title}</Text>
+            ) : null}
         </View>
     );
 }
@@ -34,8 +37,9 @@ function AppContent() {
                 screenOptions={{
                     headerStyle: { backgroundColor: colors.bar },
                     headerTintColor: colors.white,
-                    headerTitle: () => <HeaderLogo />,
-                    headerTitleStyle: { fontWeight: '700' },
+                    headerTitle: ({ children }) => (
+                        <HeaderLogo title={typeof children === 'string' ? children : undefined} />
+                    ),
                     headerShadowVisible: false,
                     contentStyle: { backgroundColor: colors.background },
                 }}

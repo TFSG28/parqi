@@ -25,6 +25,28 @@ export function alpha10(hex: string): string {
     return hex + '1A';
 }
 
+/**
+ * Texto legível por tema para as cores da paleta.
+ * No claro os tons 400 são demasiado claros para texto (1.6–3.8:1 a 10px);
+ * no escuro funcionam bem como texto claro sobre fundo escuro.
+ */
+const THEME_TEXT: Record<string, { light: string; dark: string }> = {
+    [PALETTE.emerald]: { light: '#047857', dark: PALETTE.emerald },
+    [PALETTE.amber]: { light: '#B45309', dark: PALETTE.amber },
+    [PALETTE.amberDeep]: { light: '#B45309', dark: PALETTE.amberDeep },
+    [PALETTE.red]: { light: '#B91C1C', dark: PALETTE.red },
+    [PALETTE.redDeep]: { light: '#B91C1C', dark: PALETTE.redDeep },
+    [PALETTE.sky]: { light: '#0369A1', dark: PALETTE.sky },
+    [PALETTE.violet]: { light: '#6D28D9', dark: PALETTE.violet },
+    [PALETTE.blue]: { light: '#1D4ED8', dark: PALETTE.blue },
+    [PALETTE.orange]: { light: '#C2410C', dark: PALETTE.orange },
+};
+
+/** Devolve a variante legível de uma cor da paleta para o tema ativo. */
+export function themedText(color: string, scheme: 'light' | 'dark'): string {
+    return THEME_TEXT[color]?.[scheme] ?? color;
+}
+
 export const STATUS_DESIGN: Record<
     ContributionStatus,
     { color: string; icon: IoniconName; label: string }

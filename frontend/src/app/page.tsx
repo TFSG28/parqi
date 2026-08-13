@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import ScrollReveal from "@/components/feature/ScrollReveal";
+import ThemeToggle from "@/components/feature/ThemeToggle";
 
 const PILLARS = [
   {
@@ -20,6 +21,33 @@ const PILLARS = [
     accent: false,
     title: "Confiança que se vê",
     text: "Cada lugar mostra uma pontuação de confiança alimentada por confirmações da comunidade, e as contribuições passam por validação antes de aparecer no mapa.",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "Como funciona a confiança (0–10)?",
+    a: "Cada voto ajusta a pontuação: +1,5 por confirmação e −2 por reporte. A partir de 5 o lugar fica Verificado; abaixo de 3 entra em revisão.",
+  },
+  {
+    q: "Como funciona o peso dos votos?",
+    a: "Contas novas e utilizadores sem confiança votam com peso 0,5. A partir da reputação 5 (Confiável) passas a votar com peso total.",
+  },
+  {
+    q: "Posso alterar ou anular o meu voto?",
+    a: "Sim. Na app, toca outra vez no teu voto para o anular, ou vota no sentido contrário para o mudar. A confiança é recalculada de imediato.",
+  },
+  {
+    q: "Quem pode adicionar estacionamentos?",
+    a: "Qualquer pessoa com conta e email validado. Contribuições de contas novas entram na fila de moderação antes de aparecerem no mapa.",
+  },
+  {
+    q: "De onde vêm os dados oficiais?",
+    a: "Importamos dados públicos da OpenStreetMap, Geoapify e câmaras municipais. Esses lugares têm confiança base mais alta que os da comunidade.",
+  },
+  {
+    q: "Como elimino a minha conta?",
+    a: "Na app, em Perfil → Eliminar conta, com confirmação por palavra-passe. As contribuições já validadas ficam no mapa, anonimizadas.",
   },
 ];
 
@@ -81,7 +109,7 @@ function MapScene({ className }: Readonly<{ className?: string }>) {
           fontFamily="var(--font-display)"
           fontWeight="800"
           fontSize="34"
-          fill="#3b6bff"
+          fill="var(--color-brand)"
         >
           P
         </text>
@@ -103,11 +131,6 @@ const jsonLd = {
     price: '0',
     priceCurrency: 'EUR',
   },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '4.5',
-    ratingCount: '1',
-  },
 };
 
 export default function Home() {
@@ -120,7 +143,7 @@ export default function Home() {
       />
 
       {/* Herói: a página abre como um sinal de estacionamento */}
-      <section className="bg-brand text-white">
+      <section className="bg-brand-deep text-white">
         <div className="mx-auto max-w-5xl px-6">
           <header className="flex items-center gap-3 py-8">
             <Image
@@ -131,7 +154,10 @@ export default function Home() {
               className="h-9 w-9 rounded-[22%]"
               priority
             />
-            <span className="font-display text-2xl font-bold tracking-tight">parqi</span>
+            <span className="font-display text-2xl font-bold tracking-tight">Parqi</span>
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </header>
 
           <div className="grid items-center gap-14 pt-[clamp(1.5rem,6vh,4rem)] pb-[clamp(4rem,10vh,7rem)] md:grid-cols-[3fr_2fr]">
@@ -141,13 +167,13 @@ export default function Home() {
                 <br />
                 sem dar voltas.
               </h1>
-              <p className="rise rise-2 mt-8 max-w-[36ch] text-lg leading-relaxed text-mist">
+              <p className="rise rise-2 mt-8 max-w-[36ch] text-lg leading-relaxed text-on-brand">
                 O Parqi junta dados públicos e uma comunidade de condutores para
                 te mostrar onde estacionar em Portugal, com a rota no Google
                 Maps a um toque.
               </p>
               <p className="rise rise-3 mt-10 flex flex-wrap items-center gap-3 text-sm">
-                <span className="text-mist">Brevemente em</span>
+                <span className="text-on-brand">Brevemente em</span>
                 <span className="store-badge rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
                   App Store
                 </span>
@@ -171,7 +197,7 @@ export default function Home() {
           {PILLARS.map((pillar) => (
             <article key={pillar.title} className="sr-item grid grid-cols-[auto_1fr] gap-x-6">
               <span
-                className={`inline-flex h-12 w-12 select-none items-center justify-center rounded-[22%] font-display text-2xl font-bold ${pillar.accent ? "bg-accent text-ink" : "bg-brand text-white"
+                className={`inline-flex h-12 w-12 select-none items-center justify-center rounded-[22%] font-display text-2xl font-bold ${pillar.accent ? "bg-accent text-on-accent" : "bg-brand text-white"
                   }`}
                 aria-hidden
               >
@@ -196,8 +222,35 @@ export default function Home() {
         </ScrollReveal>
       </section>
 
+      {/* Perguntas frequentes — disclosure nativa (<details>), funciona sem JS */}
+      <section className="mx-auto max-w-3xl px-6 pb-[clamp(4rem,10vh,7rem)]">
+        <ScrollReveal>
+          <h2 className="sr-solo font-display text-4xl font-bold tracking-tight">Perguntas frequentes</h2>
+        </ScrollReveal>
+
+        <ScrollReveal className="mt-10 space-y-3">
+          {FAQ_ITEMS.map((item) => (
+            <details
+              key={item.q}
+              className="sr-item group rounded-xl border border-border bg-surface px-5 py-4"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <span
+                  aria-hidden
+                  className="text-xl leading-none text-brand transition-transform duration-200 motion-reduce:transition-none group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <p className="mt-3 max-w-[62ch] leading-relaxed text-ink-soft">{item.a}</p>
+            </details>
+          ))}
+        </ScrollReveal>
+      </section>
+
       {/* Rodapé: fecho em azul, como o herói */}
-      <footer className="bg-brand text-white">
+      <footer className="bg-brand-deep text-white">
         <ScrollReveal threshold={0.2}>
           <div className="sr-solo mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 px-6 py-12">
             <span className="flex items-center gap-3">
@@ -207,19 +260,19 @@ export default function Home() {
             <nav className="flex flex-wrap gap-x-6 gap-y-2">
               <Link
                 href="/termos"
-                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+                className="text-on-brand underline underline-offset-4 transition-colors hover:text-white"
               >
                 Termos e Condições
               </Link>
               <Link
                 href="/privacidade"
-                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+                className="text-on-brand underline underline-offset-4 transition-colors hover:text-white"
               >
                 Privacidade
               </Link>
               <a
                 href="mailto:geral@parqi.pt"
-                className="text-mist underline underline-offset-4 transition-colors hover:text-white"
+                className="text-on-brand underline underline-offset-4 transition-colors hover:text-white"
               >
                 geral@parqi.pt
               </a>

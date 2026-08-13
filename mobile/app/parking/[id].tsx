@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -8,6 +9,7 @@ import {
     Linking,
     Modal,
     Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -23,8 +25,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
-import { CAPACITY_LABELS, directionsUrl } from '../../src/lib/geo';
-import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, trustColor } from '../../src/theme/design';
+import { CAPACITY_LABELS, directionsUrl, formatDate, formatScore } from '../../src/lib/geo';
+import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, themedText, trustColor } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
 
@@ -35,10 +37,26 @@ const HERO_IMAGES: Partial<Record<ParkingType, string>> = {
 };
 const HERO_DEFAULT = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&h=300&fit=crop&auto=format';
 
+/** Ícone de fallback do hero por tipo, quando a imagem remota falha. */
+const HERO_ICONS: Record<ParkingType, keyof typeof Ionicons.glyphMap> = {
+    SURFACE: 'car-outline',
+    UNDERGROUND: 'lock-closed-outline',
+    MULTI_STORY: 'layers-outline',
+    STREET: 'navigate-outline',
+    OTHER: 'location-outline',
+};
+
 function priceLabel(isFree: boolean | null): string {
     if (isFree === true) return 'GRÁTIS';
     if (isFree === false) return 'PAGO';
     return '—';
+}
+
+function trustCaption(score: number): string {
+    // Os limiares espelham o TrustCalculator: aprovado a 5, sinalizado abaixo de 3.
+    if (score >= 8) return 'Bem verificado pela comunidade.';
+    if (score >= 5) return 'Verificado pela comunidade.';
+    return 'Em verificação. Confirma antes de ir.';
 }
 
 /** Leaflet usa pares [lat, lng]; o GeoJSON vem [lng, lat]. */
@@ -62,13 +80,19 @@ interface VoteButtonProps {
 }
 
 function VoteButton({ dir, voted, voting, onPress, styles, mutedColor }: Readonly<VoteButtonProps>) {
+    const { resolvedScheme } = useTheme();
     const isUp = dir === 'up';
     const active = voted === dir;
-    const activeColor = isUp ? PALETTE.emerald : PALETTE.red;
+    const activeColor = themedText(isUp ? PALETTE.emerald : PALETTE.red, resolvedScheme);
     const activeStyle = isUp ? styles.voteBtnUp : styles.voteBtnDown;
     return (
         <Pressable
-            style={[styles.voteBtn, active && activeStyle, voting && styles.disabled]}
+            style={({ pressed }) => [
+                styles.voteBtn,
+                active && activeStyle,
+                voting && styles.disabled,
+                pressed && styles.votePressed,
+            ]}
             onPress={onPress}
             disabled={voting}
         >
@@ -85,18 +109,10 @@ function VoteButton({ dir, voted, voting, onPress, styles, mutedColor }: Readonl
 }
 
 function submissionRowsOf(spot: ParkingSpot): { label: string; value: string }[] {
-    const rows = [
+    return [
         { label: 'Adicionado por', value: SOURCE_LABELS[spot.source] },
-        { label: 'Data', value: spot.createdAt.slice(0, 10) },
-        { label: 'Fonte', value: SOURCE_LABELS[spot.source] },
+        { label: 'Data', value: formatDate(spot.createdAt) },
     ];
-    if (spot.latitude !== null && spot.longitude !== null) {
-        rows.push({
-            label: 'Coordenadas',
-            value: `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`,
-        });
-    }
-    return rows;
 }
 
 export default function ParkingDetailScreen() {
@@ -112,25 +128,33 @@ export default function ParkingDetailScreen() {
     const [notFound, setNotFound] = useState(false);
     const [voting, setVoting] = useState(false);
     const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+    const [heroFailed, setHeroFailed] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [reasonModal, setReasonModal] = useState(false);
     const [reason, setReason] = useState('');
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (opts?: { refresh?: boolean }) => {
         if (!id) return;
-        setLoading(true);
+        if (opts?.refresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
         try {
             const fresh = await parkingApi.get(id);
             setSpot(fresh);
+            setVoted(fresh.myVote ?? null);
             refreshFavorite(fresh);
             setNotFound(false);
         } catch (error) {
             if (error instanceof ApiError && error.status === 404) {
                 setNotFound(true);
             } else {
-                Alert.alert('Erro', 'Não foi possível carregar o estacionamento.');
+                Alert.alert('Erro', opts?.refresh ? 'Não foi possível atualizar.' : 'Não foi possível carregar o estacionamento.');
             }
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     }, [id, refreshFavorite]);
 
@@ -152,6 +176,7 @@ export default function ParkingDetailScreen() {
         try {
             setSpot(await parkingApi.vote(spot.id, value, voteReason));
             setVoted(value === 1 ? 'up' : 'down');
+            Haptics.selectionAsync().catch(() => {});
         } catch (error) {
             Alert.alert('Erro', error instanceof ApiError ? error.message : 'Não foi possível votar.');
         } finally {
@@ -161,8 +186,27 @@ export default function ParkingDetailScreen() {
         }
     };
 
+    const doUnvote = async () => {
+        if (!spot) return;
+        setVoting(true);
+        try {
+            setSpot(await parkingApi.unvote(spot.id));
+            setVoted(null);
+            Haptics.selectionAsync().catch(() => {});
+        } catch (error) {
+            Alert.alert('Erro', error instanceof ApiError ? error.message : 'Não foi possível anular o voto.');
+        } finally {
+            setVoting(false);
+        }
+    };
+
     const handleVote = (value: 1 | -1) => {
         if (!requireAuth()) return;
+        // Tocar no voto ativo anula-o
+        if ((voted === 'up' && value === 1) || (voted === 'down' && value === -1)) {
+            doUnvote();
+            return;
+        }
         if (value === -1) {
             setReasonModal(true);
             return;
@@ -197,7 +241,10 @@ export default function ParkingDetailScreen() {
             <View style={styles.center}>
                 <Stack.Screen options={{ headerShown: false }} />
                 <Text style={styles.emptyTitle}>Estacionamento não encontrado</Text>
-                <Pressable style={styles.primaryButton} onPress={() => router.back()}>
+                <Pressable
+                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+                    onPress={() => router.back()}
+                >
                     <Text style={styles.primaryButtonText}>Voltar</Text>
                 </Pressable>
             </View>
@@ -217,15 +264,35 @@ export default function ParkingDetailScreen() {
     const submissionRows = submissionRowsOf(spot);
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={() => load({ refresh: true })}
+                    tintColor={colors.primary}
+                />
+            }
+        >
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Hero */}
             <View style={styles.hero}>
-                <Image source={{ uri: heroUri }} style={styles.heroImage} />
+                {heroFailed ? (
+                    <View style={styles.heroFallback}>
+                        <Ionicons name={HERO_ICONS[spot.parkingType]} size={44} color={colors.primary} />
+                    </View>
+                ) : (
+                    <Image
+                        source={{ uri: heroUri }}
+                        style={styles.heroImage}
+                        onError={() => setHeroFailed(true)}
+                    />
+                )}
                 <View style={styles.heroOverlay} />
                 <Pressable
-                    style={[styles.backBtn, { top: insets.top + 8 }]}
+                    style={({ pressed }) => [styles.backBtn, { top: insets.top + 8 }, pressed && styles.pressed]}
                     onPress={() => router.back()}
                     accessibilityRole="button"
                     accessibilityLabel="Voltar"
@@ -236,8 +303,11 @@ export default function ParkingDetailScreen() {
                     <StatusBadge status={spot.status} />
                 </View>
                 <Pressable
-                    style={styles.favBtn}
-                    onPress={() => toggleFavorite(spot)}
+                    style={({ pressed }) => [styles.favBtn, pressed && styles.pressed]}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        toggleFavorite(spot);
+                    }}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel={isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -272,19 +342,20 @@ export default function ParkingDetailScreen() {
                 {/* Trust score */}
                 <View style={styles.card}>
                     <View style={styles.trustHeader}>
-                        <Text style={styles.sectionLabel}>CONFIANÇA DA COMUNIDADE</Text>
+                        <Text style={styles.sectionLabel}>Confiança da comunidade</Text>
                         <Text style={[styles.trustValue, { color: scoreColor }]}>
-                            {spot.trustScore.toFixed(1)}
+                            {formatScore(spot.trustScore)}
                             <Text style={styles.trustMax}>/10</Text>
                         </Text>
                     </View>
                     <TrustBar trustScore={spot.trustScore} />
+                    <Text style={styles.trustCaption}>{trustCaption(spot.trustScore)}</Text>
                 </View>
 
                 {/* Amenities */}
                 {amenities.length > 0 && (
                     <View style={styles.card}>
-                        <Text style={styles.sectionLabel}>COMODIDADES</Text>
+                        <Text style={styles.sectionLabel}>Comodidades</Text>
                         <View style={styles.amenityGrid}>
                             {amenities.map((a) => (
                                 <View key={a.key} style={styles.amenityCell}>
@@ -298,27 +369,38 @@ export default function ParkingDetailScreen() {
 
                 {/* Votos da comunidade */}
                 <View style={styles.card}>
-                    <Text style={styles.sectionLabel}>VOTOS DA COMUNIDADE</Text>
-                    <View style={styles.voteRow}>
-                        <VoteButton
-                            dir="up"
-                            voted={voted}
-                            voting={voting}
-                            onPress={() => handleVote(1)}
-                            styles={styles}
-                            mutedColor={colors.textMuted}
-                        />
-                        <VoteButton
-                            dir="down"
-                            voted={voted}
-                            voting={voting}
-                            onPress={() => handleVote(-1)}
-                            styles={styles}
-                            mutedColor={colors.textMuted}
-                        />
-                    </View>
-                    {!user && (
-                        <Text style={styles.authHint}>Inicia sessão para votar.</Text>
+                    <Text style={styles.sectionLabel}>Votos da comunidade</Text>
+                    {isOwner ? (
+                        <Text style={styles.ownerVoteHint}>
+                            Este estacionamento é teu — a comunidade decide.
+                        </Text>
+                    ) : (
+                        <>
+                            <View style={styles.voteRow}>
+                                <VoteButton
+                                    dir="up"
+                                    voted={voted}
+                                    voting={voting}
+                                    onPress={() => handleVote(1)}
+                                    styles={styles}
+                                    mutedColor={colors.textMuted}
+                                />
+                                <VoteButton
+                                    dir="down"
+                                    voted={voted}
+                                    voting={voting}
+                                    onPress={() => handleVote(-1)}
+                                    styles={styles}
+                                    mutedColor={colors.textMuted}
+                                />
+                            </View>
+                            {voted && (
+                                <Text style={styles.undoHint}>Toca no teu voto para o anular.</Text>
+                            )}
+                            {!user && (
+                                <Text style={styles.authHint}>Inicia sessão para votar.</Text>
+                            )}
+                        </>
                     )}
                 </View>
 
@@ -330,6 +412,8 @@ export default function ParkingDetailScreen() {
                         interactive={false}
                         polygon={polygonRing}
                         polyline={linePoints}
+                        brandColor={colors.primary}
+                        accentColor={colors.accent}
                         markers={
                             spot.latitude !== null && spot.longitude !== null
                                 ? [{ id: spot.id, latitude: spot.latitude, longitude: spot.longitude, color: colors.primary }]
@@ -341,7 +425,7 @@ export default function ParkingDetailScreen() {
 
                 {/* Submission info */}
                 <View style={styles.card}>
-                    <Text style={styles.sectionLabel}>INFORMAÇÃO DA SUBMISSÃO</Text>
+                    <Text style={styles.sectionLabel}>Informação da submissão</Text>
                     <View style={styles.infoList}>
                         {submissionRows.map(({ label, value }) => (
                             <View key={label} style={styles.infoRow}>
@@ -353,11 +437,17 @@ export default function ParkingDetailScreen() {
                 </View>
 
                 {/* Ações */}
-                <Pressable style={styles.routeBtn} onPress={openRoute}>
+                <Pressable
+                    style={({ pressed }) => [styles.routeBtn, pressed && styles.pressed]}
+                    onPress={openRoute}
+                >
                     <Ionicons name="navigate" size={16} color={colors.white} />
                     <Text style={styles.routeText}>Rota</Text>
                 </Pressable>
-                <Pressable style={styles.suggestBtn} onPress={openSuggest}>
+                <Pressable
+                    style={({ pressed }) => [styles.suggestBtn, pressed && styles.pressed]}
+                    onPress={openSuggest}
+                >
                     <Ionicons
                         name={isOwner ? 'create-outline' : 'git-compare-outline'}
                         size={16}
@@ -384,7 +474,10 @@ export default function ParkingDetailScreen() {
                             multiline
                         />
                         <View style={styles.modalActions}>
-                            <Pressable style={styles.modalCancel} onPress={() => setReasonModal(false)}>
+                            <Pressable
+                                style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]}
+                                onPress={() => setReasonModal(false)}
+                            >
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </Pressable>
                             <Pressable
@@ -430,6 +523,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         width: '100%',
         height: '100%',
         opacity: 0.55,
+    },
+    heroFallback: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary + '14',
     },
     heroOverlay: {
         position: 'absolute',
@@ -516,10 +616,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         padding: 16,
     },
     sectionLabel: {
-        fontSize: 11,
-        fontFamily: MONO,
-        letterSpacing: 1.5,
-        color: colors.textMuted,
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text,
         marginBottom: 10,
     },
     trustHeader: {
@@ -537,6 +636,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 13,
         fontWeight: '400',
         color: colors.textMuted,
+    },
+    trustCaption: {
+        fontSize: 11,
+        color: colors.textMuted,
+        marginTop: 8,
     },
     amenityGrid: {
         flexDirection: 'row',
@@ -582,6 +686,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: PALETTE.red + '1A',
         borderColor: PALETTE.red + '66',
     },
+    votePressed: {
+        opacity: 0.7,
+        transform: [{ scale: 0.98 }],
+    },
     voteText: {
         fontSize: 13,
         fontWeight: '500',
@@ -593,6 +701,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.textMuted,
         marginTop: 10,
         textAlign: 'center',
+    },
+    undoHint: {
+        fontSize: 11,
+        color: colors.primary,
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    ownerVoteHint: {
+        fontSize: 12,
+        color: colors.textMuted,
+        textAlign: 'center',
+    },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
     mapCard: {
         borderRadius: 12,
