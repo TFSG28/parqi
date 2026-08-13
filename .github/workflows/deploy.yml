@@ -58,7 +58,20 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      # Valores de teste (CI): satisfazem a validação de env.ts (que faz
+      # process.exit(1) sem eles). Os unit specs fazem mock das dependências;
+      # o spec de integração usa apenas a BD local do serviço.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/parqi?schema=public
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: parqi
+      DATABASE_HOST: localhost
+      DATABASE_PORT: "5432"
+      JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      EMAIL: ci@parqi.pt
+      EMAIL_PASS: ci-password
+      FRONT_URL: http://localhost:3000
     steps:
       - name: Checkout
         uses: actions/checkout@v5
