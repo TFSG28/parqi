@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import 'dotenv/config';
+import { logger } from '../shared/utils/logger';
 
 export const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -81,7 +82,7 @@ export const sendEmail = async (to: string, subject: string, content: string) =>
         });
         return true;
     } catch (error) {
-        console.error("Erro ao enviar email:", error);
+        logger.error({ error, to }, 'Erro ao enviar email');
         return false;
     }
 };

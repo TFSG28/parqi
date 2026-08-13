@@ -123,6 +123,14 @@ interface Envelope<T> {
     details?: Record<string, unknown>;
 }
 
+/** Tempo máximo de espera por resposta; evita spinners infinitos com a rede presa. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+const NETWORK_ERROR_MESSAGE =
+    'Não foi possível ligar ao servidor. Verifica a ligação e tenta de novo.';
+const TIMEOUT_ERROR_MESSAGE =
+    'O servidor demorou demasiado a responder. Tenta de novo daqui a pouco.';
+
 async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const token = await getToken();
@@ -130,11 +138,29 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
         headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${path}`, {
-        method: init.method ?? 'GET',
-        headers,
-        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    });
+    // AbortController: falhas de rede e timeouts viram ApiError com mensagem
+    // amigável, em vez de um TypeError cru que nenhum ecrã sabe mostrar.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+        response = await fetch(`${API_URL}${path}`, {
+            method: init.method ?? 'GET',
+            headers,
+            body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+            signal: controller.signal,
+        });
+    } catch (error) {
+        const timedOut = error instanceof Error && error.name === 'AbortError';
+        throw new ApiError(
+            timedOut ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE,
+            0,
+            { timedOut }
+        );
+    } finally {
+        clearTimeout(timeout);
+    }
 
     const json = (await response.json().catch(() => null)) as Envelope<T> | null;
 

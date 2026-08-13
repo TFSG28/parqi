@@ -18,6 +18,14 @@ export default defineConfig({
                 '**/*.spec.ts',
                 '**/*.test.ts',
             ],
+            // Porteira anti-regressão: a cobertura nunca pode descer abaixo destes
+            // mínimos. Sobem à medida que os use cases ganham specs.
+            thresholds: {
+                statements: 35,
+                branches: 27,
+                functions: 31,
+                lines: 61,
+            },
         },
     },
     resolve: {

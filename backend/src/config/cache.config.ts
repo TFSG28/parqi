@@ -10,6 +10,9 @@ interface CacheEntry<T> {
     expiresAt: number;
 }
 
+/** Teto de entradas em memória; acima disso expulsa as mais antigas (FIFO). */
+const MAX_ENTRIES = 5_000;
+
 class MemoryCache {
     private store = new Map<string, CacheEntry<unknown>>();
     private readonly defaultTTL: number;
@@ -34,6 +37,16 @@ class MemoryCache {
             value,
             expiresAt: Date.now() + ttl,
         });
+        // Sem teto, o Map crescia sem limite entre prunes de 5 min. Com teto,
+        // picos de escrita nunca podem esgotar a memória do processo.
+        if (this.store.size > MAX_ENTRIES) {
+            const overflow = this.store.size - MAX_ENTRIES;
+            let evicted = 0;
+            for (const oldest of this.store.keys()) {
+                this.store.delete(oldest);
+                if (++evicted >= overflow) break;
+            }
+        }
     }
 
     del(key: string): void {
@@ -73,8 +86,9 @@ class MemoryCache {
 /** Singleton da cache da aplicação. */
 export const cache = new MemoryCache(300);
 
-// Cron leve de limpeza (a cada 5 min)
-if (typeof setInterval !== 'undefined') {
+// Cron leve de limpeza (a cada 5 min) — fora de testes para não manter o
+// processo vivo nem poluir a execução.
+if (typeof setInterval !== 'undefined' && process.env.NODE_ENV !== 'test') {
     setInterval(
         () => {
             const pruned = cache.prune();

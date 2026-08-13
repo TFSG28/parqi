@@ -15,6 +15,21 @@ on:
         options:
           - quality
           - production
+      deploy_backend:
+        description: "Deploy backend (cPanel)"
+        required: true
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: "Deploy frontend (cPanel)"
+        required: true
+        type: boolean
+        default: true
+      deploy_mobile:
+        description: "Construir e publicar APK Android (GitHub Release)"
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-${{ github.ref_name }}
@@ -23,7 +38,7 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------------------
   # Quality gates — run on every push and pull request. Deploy jobs depend on
-  # these, so a broken build/test/lint blocks the deploy.
+  # the gate of the part they deploy, so a broken build blocks that part.
   # ---------------------------------------------------------------------------
   quality-backend:
     name: Backend (lint · test · build)
@@ -78,36 +93,9 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
 
-  # ---------------------------------------------------------------------------
-  # Deploy — only on pushes to quality/production and manual dispatch.
-  # ---------------------------------------------------------------------------
-  set-environment:
-    if: github.event_name != 'pull_request'
-    needs: [quality-backend, quality-frontend]
+  quality-mobile:
+    name: Mobile (typecheck · test)
     runs-on: ubuntu-latest
-    outputs:
-      env_name: ${{ steps.resolve.outputs.env_name }}
-    steps:
-      - name: Resolver nome do environment
-        id: resolve
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "env_name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "env_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          fi
-
-  deploy-frontend:
-    if: github.event_name != 'pull_request'
-    needs: set-environment
-    runs-on: ubuntu-latest
-    environment: ${{ needs.set-environment.outputs.env_name }}
-    env:
-      CPANEL_HOST: ${{ secrets.FRONTEND_CPANEL_HOST }}
-      CPANEL_USER: ${{ secrets.FRONTEND_CPANEL_USER }}
-      CPANEL_API_TOKEN: ${{ secrets.FRONTEND_CPANEL_API_TOKEN }}
-      DEPLOY_PATH: ${{ secrets.FRONTEND_DEPLOY_PATH }}
-      ZIP_FILE: deploy.zip
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -117,43 +105,62 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: mobile
         run: npm ci
 
-      # Tests already ran in quality-frontend; just produce the build artifact.
-      - name: Build
-        working-directory: frontend
-        run: npx next build
-        env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      - name: Typecheck
+        working-directory: mobile
+        run: npx tsc --noEmit
 
-      - name: Preparar standalone bundle
-        working-directory: frontend
-        run: |
-          cp -r public .next/standalone/public
-          cp -r .next/static .next/standalone/.next/static
-          cd .next/standalone
-          zip -rq ../../../deploy.zip .
+      - name: Test
+        working-directory: mobile
+        run: npx jest --ci
 
-      - name: Upload zip para cPanel
-        run: bash .github/scripts/cpanel-deploy.sh upload
-
-      - name: Extrair zip no servidor
-        run: bash .github/scripts/cpanel-deploy.sh extract
-
-      - name: Restart Passenger (frontend)
-        run: bash .github/scripts/cpanel-deploy.sh restart
-
-      - name: Limpar zip do servidor
-        if: success()
-        run: bash .github/scripts/cpanel-deploy.sh cleanup
-
-  deploy-backend:
+  # ---------------------------------------------------------------------------
+  # Resolve o environment e QUAIS partes correm — controlo de deploy por parte
+  # (backend / frontend / mobile). Em push o mobile nunca corre sozinho: só por
+  # dispatch manual.
+  # ---------------------------------------------------------------------------
+  set-environment:
     if: github.event_name != 'pull_request'
-    needs: set-environment
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{ steps.resolve.outputs.env_name }}
+      part_backend: ${{ steps.resolve.outputs.part_backend }}
+      part_frontend: ${{ steps.resolve.outputs.part_frontend }}
+      part_mobile: ${{ steps.resolve.outputs.part_mobile }}
+    steps:
+      - name: Resolver environment e partes a deployar
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env_name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            echo "part_backend=${{ inputs.deploy_backend }}" >> "$GITHUB_OUTPUT"
+            echo "part_frontend=${{ inputs.deploy_frontend }}" >> "$GITHUB_OUTPUT"
+            echo "part_mobile=${{ inputs.deploy_mobile }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "quality" ]; then
+            # quality só tem backend (apip.cesar.wearemateria.com); o frontend
+            # ainda não tem destino. O mobile é sempre manual (dispatch).
+            echo "env_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "part_backend=true" >> "$GITHUB_OUTPUT"
+            echo "part_frontend=false" >> "$GITHUB_OUTPUT"
+            echo "part_mobile=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "env_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "part_backend=true" >> "$GITHUB_OUTPUT"
+            echo "part_frontend=true" >> "$GITHUB_OUTPUT"
+            echo "part_mobile=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Deploy — cPanel (backend) e cPanel (frontend), cada um só se selecionado.
+  # ---------------------------------------------------------------------------
+  deploy-backend:
+    if: github.event_name != 'pull_request' && needs.set-environment.outputs.part_backend == 'true'
+    needs: [quality-backend, set-environment]
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
@@ -220,3 +227,132 @@ jobs:
       - name: Limpar zip do servidor
         if: success()
         run: bash .github/scripts/cpanel-deploy.sh cleanup
+
+  deploy-frontend:
+    if: github.event_name != 'pull_request' && needs.set-environment.outputs.part_frontend == 'true'
+    needs: [quality-frontend, set-environment]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    env:
+      CPANEL_HOST: ${{ secrets.FRONTEND_CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.FRONTEND_CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.FRONTEND_CPANEL_API_TOKEN }}
+      DEPLOY_PATH: ${{ secrets.FRONTEND_DEPLOY_PATH }}
+      ZIP_FILE: deploy.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Tests already ran in quality-frontend; just produce the build artifact.
+      - name: Build
+        working-directory: frontend
+        run: npx next build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+
+      - name: Preparar standalone bundle
+        working-directory: frontend
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cd .next/standalone
+          zip -rq ../../../deploy.zip .
+
+      - name: Upload zip para cPanel
+        run: bash .github/scripts/cpanel-deploy.sh upload
+
+      - name: Extrair zip no servidor
+        run: bash .github/scripts/cpanel-deploy.sh extract
+
+      - name: Restart Passenger (frontend)
+        run: bash .github/scripts/cpanel-deploy.sh restart
+
+      - name: Limpar zip do servidor
+        if: success()
+        run: bash .github/scripts/cpanel-deploy.sh cleanup
+
+  # ---------------------------------------------------------------------------
+  # Release mobile — APK Android publicado como GitHub Release. Só por dispatch
+  # manual (deploy_mobile). O android/ é gitignored: gera-se com expo prebuild
+  # e compila-se com gradle. APK assinado com a debug keystore (instalável,
+  # suficiente para distribuição interna).
+  # ---------------------------------------------------------------------------
+  release-mobile:
+    if: github.event_name != 'pull_request' && needs.set-environment.outputs.part_mobile == 'true'
+    needs: [quality-mobile, set-environment]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    permissions:
+      contents: write
+    env:
+      # O APK embute a API em build-time via EXPO_PUBLIC_*. Default: quality
+      # (apip.cesar.wearemateria.com); por environment pode-se apontar outro.
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://apip.cesar.wearemateria.com/api/v1' }}
+      EXPO_PUBLIC_MAP_PROVIDER: ${{ vars.EXPO_PUBLIC_MAP_PROVIDER || 'osm' }}
+      EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
+      EXPO_PUBLIC_PROJECT_ID: ${{ vars.EXPO_PUBLIC_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # Gera o projeto nativo (android/ está no .gitignore) e compila o APK.
+      - name: Prebuild e compilar APK
+        working-directory: mobile
+        run: |
+          npx expo prebuild --platform android --no-install
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Preparar artefacto APK
+        working-directory: mobile
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          SHA=$(git rev-parse --short HEAD)
+          ENV_NAME="${{ needs.set-environment.outputs.env_name }}"
+          cp android/app/build/outputs/apk/release/app-release.apk "parqi-v${VERSION}-${ENV_NAME}-${SHA}.apk"
+          echo "APK_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "APK_SHA=${SHA}" >> "$GITHUB_ENV"
+          echo "APK_ENV=${ENV_NAME}" >> "$GITHUB_ENV"
+          echo "APK_FILE=parqi-v${VERSION}-${ENV_NAME}-${SHA}.apk" >> "$GITHUB_ENV"
+
+      - name: Publicar release com APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-v${{ env.APK_VERSION }}-${{ env.APK_ENV }}-${{ env.APK_SHA }}
+          name: "Parqi Android ${{ env.APK_ENV }} v${{ env.APK_VERSION }}"
+          files: mobile/${{ env.APK_FILE }}
+          body: |
+            APK de **${{ env.APK_ENV }}** — v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
+
+            - API: `${{ env.EXPO_PUBLIC_API_URL }}`
+            - Mapa: `${{ env.EXPO_PUBLIC_MAP_PROVIDER }}`
+            - Assinado com debug keystore (distribuição interna)
+          prerelease: ${{ needs.set-environment.outputs.env_name == 'quality' }}
