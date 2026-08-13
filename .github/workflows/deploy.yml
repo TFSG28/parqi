@@ -43,6 +43,22 @@ jobs:
   quality-backend:
     name: Backend (lint · test · build)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: parqi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d parqi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/parqi?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -58,7 +74,15 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      # Chains: vitest run -> eslint -> prisma generate -> tsc.
+      # PostGIS + schema antes dos testes: o spec do user controller é de
+      # integração e usa a BD real; prisma generate precisa de DATABASE_URL.
+      - name: Preparar base de dados (PostGIS + schema)
+        working-directory: backend
+        run: |
+          npm run db-extensions
+          npx prisma db push
+
+      # Chains: prisma generate -> vitest run -> eslint -> tsc.
       # vitest is scoped to unit specs; Playwright e2e runs separately.
       - name: Lint, test & typecheck
         working-directory: backend
