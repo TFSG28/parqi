@@ -201,10 +201,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
-      CPANEL_HOST: ${{ secrets.BACKEND_CPANEL_HOST }}
-      CPANEL_USER: ${{ secrets.BACKEND_CPANEL_USER }}
-      CPANEL_API_TOKEN: ${{ secrets.BACKEND_CPANEL_API_TOKEN }}
-      DEPLOY_PATH: ${{ secrets.BACKEND_DEPLOY_PATH }}
+      # Segredos do cPanel (quality/production): nomes sem prefixo.
+      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+      DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
       ZIP_FILE: deploy.zip
       # prisma generate nao liga a BD: so precisa que a variavel exista para o
       # prisma.config.ts carregar. A URL real e definida no cPanel (runtime).
