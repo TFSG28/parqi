@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     pin: {
         width: 30,
         height: 30,
-        borderRadius: 8,
+        borderRadius: 15,
         borderWidth: 2,
         borderColor: '#FFFFFF',
         alignItems: 'center',

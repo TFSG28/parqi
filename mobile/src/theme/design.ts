@@ -52,17 +52,26 @@ export const STATUS_DESIGN: Record<
     { color: string; icon: IoniconName; label: string }
 > = {
     APPROVED: { color: PALETTE.emerald, icon: 'checkmark-circle', label: 'Verificado' },
-    PENDING: { color: PALETTE.amber, icon: 'time', label: 'Em verificação' },
+    PENDING: { color: PALETTE.amber, icon: 'time', label: 'Em revisão' },
     FLAGGED: { color: PALETTE.red, icon: 'warning', label: 'Sinalizado' },
     REJECTED: { color: PALETTE.red, icon: 'close-circle', label: 'Rejeitado' },
 };
 
+/** Cores por tipo (tons 500) como o TYPE_COLOR do design v2, usadas nos dots/ícones. */
+export const TYPE_COLOR: Record<ParkingType, string> = {
+    SURFACE: '#0EA5E9',
+    UNDERGROUND: '#8B5CF6',
+    MULTI_STORY: '#06B6D4',
+    STREET: '#F59E0B',
+    OTHER: '#64748B',
+};
+
 export const TYPE_DESIGN: Record<ParkingType, { color: string; label: string }> = {
-    SURFACE: { color: PALETTE.sky, label: 'Ao ar livre' },
-    UNDERGROUND: { color: PALETTE.violet, label: 'Subterrâneo' },
-    MULTI_STORY: { color: PALETTE.blue, label: 'Em edifício' },
-    STREET: { color: PALETTE.orange, label: 'Na via' },
-    OTHER: { color: PALETTE.blue, label: 'Outro' },
+    SURFACE: { color: TYPE_COLOR.SURFACE, label: 'Superfície' },
+    UNDERGROUND: { color: TYPE_COLOR.UNDERGROUND, label: 'Subterrâneo' },
+    MULTI_STORY: { color: TYPE_COLOR.MULTI_STORY, label: 'Parque Elevado' },
+    STREET: { color: TYPE_COLOR.STREET, label: 'Via Pública' },
+    OTHER: { color: TYPE_COLOR.OTHER, label: 'Outro' },
 };
 
 /** Cor da TrustBar do design: ≥8 primária, ≥5 âmbar, resto vermelho. */
@@ -84,8 +93,8 @@ export const AMENITY_DESIGN: {
     icon: IoniconName;
     label: string;
 }[] = [
-        { key: 'hasEvCharging', icon: 'battery-charging', label: 'Carregamento elétrico' },
-        { key: 'hasDisabledSpaces', icon: 'accessibility', label: 'Mobilidade reduzida' },
+        { key: 'hasEvCharging', icon: 'battery-charging', label: 'EV Charging' },
+        { key: 'hasDisabledSpaces', icon: 'accessibility', label: 'Acessibilidade' },
         { key: 'hasPregnantSpaces', icon: 'woman', label: 'Grávidas' },
         { key: 'isCovered', icon: 'umbrella', label: 'Coberto' },
     ];

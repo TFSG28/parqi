@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image,
     Linking,
     Modal,
     Pressable,
@@ -18,37 +17,21 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppMap } from '../../src/components/AppMap';
+import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { StatusBadge } from '../../src/components/StatusBadge';
 import { TrustBar } from '../../src/components/TrustBar';
-import { TypeChip } from '../../src/components/TypeChip';
 import { useAuth } from '../../src/context/AuthContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
 import { CAPACITY_LABELS, directionsUrl, formatDate, formatScore } from '../../src/lib/geo';
-import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, themedText, trustColor } from '../../src/theme/design';
+import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, themedText, trustColor, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
-import type { ParkingSpot, ParkingType } from '../../src/types/parking';
-
-/** Imagens hero por tipo, as mesmas do design. */
-const HERO_IMAGES: Partial<Record<ParkingType, string>> = {
-    UNDERGROUND: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=600&h=300&fit=crop&auto=format',
-    MULTI_STORY: 'https://images.unsplash.com/photo-1590674899484-13da64c9c3d7?w=600&h=300&fit=crop&auto=format',
-};
-const HERO_DEFAULT = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&h=300&fit=crop&auto=format';
-
-/** Ícone de fallback do hero por tipo, quando a imagem remota falha. */
-const HERO_ICONS: Record<ParkingType, keyof typeof Ionicons.glyphMap> = {
-    SURFACE: 'car-outline',
-    UNDERGROUND: 'lock-closed-outline',
-    MULTI_STORY: 'layers-outline',
-    STREET: 'navigate-outline',
-    OTHER: 'location-outline',
-};
+import type { ParkingSpot } from '../../src/types/parking';
 
 function priceLabel(isFree: boolean | null): string {
-    if (isFree === true) return 'GRÁTIS';
-    if (isFree === false) return 'PAGO';
+    if (isFree === true) return 'Gratuito';
+    if (isFree === false) return 'Pago';
     return '—';
 }
 
@@ -56,7 +39,7 @@ function trustCaption(score: number): string {
     // Os limiares espelham o TrustCalculator: aprovado a 5, sinalizado abaixo de 3.
     if (score >= 8) return 'Bem verificado pela comunidade.';
     if (score >= 5) return 'Verificado pela comunidade.';
-    return 'Em verificação. Confirma antes de ir.';
+    return 'Em revisão. Confirma antes de ir.';
 }
 
 /** Leaflet usa pares [lat, lng]; o GeoJSON vem [lng, lat]. */
@@ -108,13 +91,6 @@ function VoteButton({ dir, voted, voting, onPress, styles, mutedColor }: Readonl
     );
 }
 
-function submissionRowsOf(spot: ParkingSpot): { label: string; value: string }[] {
-    return [
-        { label: 'Adicionado por', value: SOURCE_LABELS[spot.source] },
-        { label: 'Data', value: formatDate(spot.createdAt) },
-    ];
-}
-
 export default function ParkingDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
@@ -128,7 +104,6 @@ export default function ParkingDetailScreen() {
     const [notFound, setNotFound] = useState(false);
     const [voting, setVoting] = useState(false);
     const [voted, setVoted] = useState<'up' | 'down' | null>(null);
-    const [heroFailed, setHeroFailed] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [reasonModal, setReasonModal] = useState(false);
     const [reason, setReason] = useState('');
@@ -252,7 +227,6 @@ export default function ParkingDetailScreen() {
     }
 
     const isOwner = user?.id === spot.contributorId;
-    const heroUri = HERO_IMAGES[spot.parkingType] ?? HERO_DEFAULT;
     const scoreColor = trustColor(spot.trustScore, colors.primary);
     const amenities = AMENITY_DESIGN.filter((a) => spot[a.key] === true);
     const polygonRing = polygonRingOf(spot);
@@ -261,7 +235,13 @@ export default function ParkingDetailScreen() {
         latitude: spot.latitude ?? 41.4426,
         longitude: spot.longitude ?? -8.2914,
     };
-    const submissionRows = submissionRowsOf(spot);
+
+    const keyFacts: { label: string; value: string; highlight?: boolean }[] = [
+        { label: 'Tipo', value: TYPE_DESIGN[spot.parkingType].label },
+        { label: 'Capacidade', value: spot.capacityRange ? CAPACITY_LABELS[spot.capacityRange] : '—' },
+        { label: 'Tarifa', value: priceLabel(spot.isFree), highlight: spot.isFree === true },
+        { label: 'Adicionado', value: formatDate(spot.createdAt) },
+    ];
 
     return (
         <ScrollView
@@ -277,69 +257,68 @@ export default function ParkingDetailScreen() {
         >
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Hero */}
-            <View style={styles.hero}>
-                {heroFailed ? (
-                    <View style={styles.heroFallback}>
-                        <Ionicons name={HERO_ICONS[spot.parkingType]} size={44} color={colors.primary} />
-                    </View>
-                ) : (
-                    <Image
-                        source={{ uri: heroUri }}
-                        style={styles.heroImage}
-                        onError={() => setHeroFailed(true)}
-                    />
-                )}
-                <View style={styles.heroOverlay} />
-                <Pressable
-                    style={({ pressed }) => [styles.backBtn, { top: insets.top + 8 }, pressed && styles.pressed]}
-                    onPress={() => router.back()}
-                    accessibilityRole="button"
-                    accessibilityLabel="Voltar"
-                >
-                    <Ionicons name="arrow-back" size={18} color={colors.text} />
-                </Pressable>
-                <View style={[styles.heroStatus, { top: insets.top + 8 }]}>
-                    <StatusBadge status={spot.status} />
+            {/* Hero — gradiente na cor da confiança, como no design v2 */}
+            <View style={[styles.hero, { paddingTop: insets.top + 12, backgroundColor: scoreColor + '14' }]}>
+                <View style={styles.heroRow}>
+                    <Pressable
+                        style={({ pressed }) => [styles.backLink, pressed && styles.pressed]}
+                        onPress={() => router.back()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Voltar"
+                        hitSlop={8}
+                    >
+                        <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
+                        <Text style={styles.backLinkText}>Voltar</Text>
+                    </Pressable>
+                    <Pressable
+                        style={({ pressed }) => [styles.favBtn, pressed && styles.pressed]}
+                        onPress={() => {
+                            Haptics.selectionAsync().catch(() => {});
+                            toggleFavorite(spot);
+                        }}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    >
+                        <Ionicons
+                            name={isFavorite(spot.id) ? 'heart' : 'heart-outline'}
+                            size={16}
+                            color={isFavorite(spot.id) ? colors.accent : colors.textMuted}
+                        />
+                    </Pressable>
                 </View>
-                <Pressable
-                    style={({ pressed }) => [styles.favBtn, pressed && styles.pressed]}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        toggleFavorite(spot);
-                    }}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={isFavorite(spot.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                >
-                    <Ionicons
-                        name={isFavorite(spot.id) ? 'heart' : 'heart-outline'}
-                        size={20}
-                        color={isFavorite(spot.id) ? colors.accent : colors.text}
-                    />
-                </Pressable>
+
+                <View style={styles.heroBody}>
+                    <View style={styles.heroTitleWrap}>
+                        <StatusBadge status={spot.status} />
+                        <Text style={styles.name}>{spot.name}</Text>
+                        {spot.description ? (
+                            <Text style={styles.address}>{spot.description}</Text>
+                        ) : null}
+                    </View>
+                    <View style={styles.heroScore}>
+                        <ScoreBadge score={spot.trustScore} large />
+                        <Text style={styles.heroScoreLabel}>CONFIANÇA</Text>
+                    </View>
+                </View>
             </View>
 
             <View style={styles.body}>
-                {/* Título */}
-                <View style={styles.titleBlock}>
-                    <Text style={styles.name}>{spot.name}</Text>
-                    {spot.description ? (
-                        <Text style={styles.address}>{spot.description}</Text>
-                    ) : null}
-                    <View style={styles.titleMeta}>
-                        <TypeChip type={spot.parkingType} />
-                        <Text style={styles.price}>{priceLabel(spot.isFree)}</Text>
-                        {spot.capacityRange && (
-                            <Text style={styles.capacity}>· {CAPACITY_LABELS[spot.capacityRange]}</Text>
-                        )}
+                {/* Factos-chave */}
+                <View style={styles.card}>
+                    <View style={styles.factsGrid}>
+                        {keyFacts.map(({ label, value, highlight }) => (
+                            <View key={label} style={styles.factCell}>
+                                <Text style={styles.factLabel}>{label}</Text>
+                                <Text style={[styles.factValue, highlight && { color: colors.primary }]}>
+                                    {value}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
-                    {spot.requiresReview && (
-                        <Text style={styles.reviewHint}>A aguardar revisão manual</Text>
-                    )}
                 </View>
 
-                {/* Trust score */}
+                {/* Confiança */}
                 <View style={styles.card}>
                     <View style={styles.trustHeader}>
                         <Text style={styles.sectionLabel}>Confiança da comunidade</Text>
@@ -352,7 +331,7 @@ export default function ParkingDetailScreen() {
                     <Text style={styles.trustCaption}>{trustCaption(spot.trustScore)}</Text>
                 </View>
 
-                {/* Amenities */}
+                {/* Comodidades */}
                 {amenities.length > 0 && (
                     <View style={styles.card}>
                         <Text style={styles.sectionLabel}>Comodidades</Text>
@@ -404,6 +383,19 @@ export default function ParkingDetailScreen() {
                     )}
                 </View>
 
+                {/* Localização */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>Localização</Text>
+                    {spot.latitude !== null && spot.longitude !== null ? (
+                        <Text style={styles.coords}>
+                            {spot.latitude.toFixed(5)}°N, {Math.abs(spot.longitude).toFixed(5)}°O
+                        </Text>
+                    ) : (
+                        <Text style={styles.coords}>Coordenadas não disponíveis</Text>
+                    )}
+                    <Text style={styles.submittedBy}>Submetido por {SOURCE_LABELS[spot.source]}</Text>
+                </View>
+
                 {/* Mapa */}
                 <View style={styles.mapCard}>
                     <AppMap
@@ -421,19 +413,6 @@ export default function ParkingDetailScreen() {
                         }
                         style={styles.mapPreview}
                     />
-                </View>
-
-                {/* Submission info */}
-                <View style={styles.card}>
-                    <Text style={styles.sectionLabel}>Informação da submissão</Text>
-                    <View style={styles.infoList}>
-                        {submissionRows.map(({ label, value }) => (
-                            <View key={label} style={styles.infoRow}>
-                                <Text style={styles.infoLabel}>{label}</Text>
-                                <Text style={styles.infoValue}>{value}</Text>
-                            </View>
-                        ))}
-                    </View>
                 </View>
 
                 {/* Ações */}
@@ -516,110 +495,99 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.textMuted,
     },
     hero: {
-        height: 190,
-        backgroundColor: colors.card,
+        paddingHorizontal: 16,
+        paddingBottom: 28,
     },
-    heroImage: {
-        width: '100%',
-        height: '100%',
-        opacity: 0.55,
-    },
-    heroFallback: {
-        width: '100%',
-        height: '100%',
+    heroRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.primary + '14',
+        justifyContent: 'space-between',
+        marginBottom: 20,
     },
-    heroOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.background + '66',
-    },
-    backBtn: {
-        position: 'absolute',
-        left: 16,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.card + 'E6',
-        borderWidth: 1,
-        borderColor: colors.border,
+    backLink: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 6,
     },
-    heroStatus: {
-        position: 'absolute',
-        right: 16,
+    backLinkText: {
+        fontSize: 14,
+        color: colors.textMuted,
     },
     favBtn: {
-        position: 'absolute',
-        right: 16,
-        bottom: 12,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.card + 'E6',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.card + 'CC',
         borderWidth: 1,
         borderColor: colors.border,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    body: {
-        paddingHorizontal: 16,
+    heroBody: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
         gap: 12,
-        marginTop: -8,
     },
-    titleBlock: {
-        marginBottom: 4,
+    heroTitleWrap: {
+        flex: 1,
+        minWidth: 0,
     },
     name: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
         color: colors.text,
+        marginTop: 8,
+        lineHeight: 29,
     },
     address: {
         fontSize: 14,
         color: colors.textMuted,
-        marginTop: 2,
+        marginTop: 4,
     },
-    titleMeta: {
-        flexDirection: 'row',
+    heroScore: {
         alignItems: 'center',
-        gap: 8,
-        marginTop: 8,
+        gap: 4,
     },
-    price: {
-        fontSize: 12,
-        fontWeight: '700',
+    heroScoreLabel: {
+        fontSize: 10,
         fontFamily: MONO,
-        color: colors.primary,
-    },
-    capacity: {
-        fontSize: 12,
-        fontFamily: MONO,
+        letterSpacing: 1,
         color: colors.textMuted,
     },
-    reviewHint: {
-        fontSize: 12,
-        color: PALETTE.amber,
-        marginTop: 6,
+    body: {
+        paddingHorizontal: 16,
+        gap: 12,
     },
     card: {
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
     },
     sectionLabel: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
         color: colors.text,
         marginBottom: 10,
+    },
+    factsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        rowGap: 16,
+    },
+    factCell: {
+        width: '50%',
+    },
+    factLabel: {
+        fontSize: 12,
+        color: colors.textMuted,
+        marginBottom: 4,
+    },
+    factValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.text,
     },
     trustHeader: {
         flexDirection: 'row',
@@ -628,7 +596,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         marginBottom: 8,
     },
     trustValue: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '700',
         fontFamily: MONO,
     },
@@ -654,7 +622,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         backgroundColor: colors.background,
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 12,
         paddingVertical: 10,
     },
@@ -673,8 +641,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        paddingVertical: 10,
-        borderRadius: 8,
+        paddingVertical: 12,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: colors.border,
     },
@@ -692,8 +660,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     voteText: {
         fontSize: 13,
-        fontWeight: '500',
-        fontFamily: MONO,
+        fontWeight: '600',
         color: colors.textMuted,
     },
     authHint: {
@@ -717,8 +684,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         opacity: 0.85,
         transform: [{ scale: 0.99 }],
     },
+    coords: {
+        fontSize: 12,
+        fontFamily: MONO,
+        color: colors.textMuted,
+    },
+    submittedBy: {
+        fontSize: 12,
+        color: colors.textMuted,
+        marginTop: 4,
+    },
     mapCard: {
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.border,
         overflow: 'hidden',
@@ -726,30 +703,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     mapPreview: {
         height: 160,
     },
-    infoList: {
-        gap: 8,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    infoLabel: {
-        fontSize: 12,
-        color: colors.textMuted,
-    },
-    infoValue: {
-        fontSize: 12,
-        fontFamily: MONO,
-        color: colors.text,
-    },
     routeBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
         paddingVertical: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         backgroundColor: colors.primary,
     },
     routeText: {

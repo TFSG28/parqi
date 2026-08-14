@@ -149,7 +149,7 @@ function pinIcon(m) {
     }
     return L.divIcon({
         className: 'parqi-pin',
-        html: '<div style="width:30px;height:30px;border-radius:8px;background:' + m.color + ';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:' + text + ';font-family:system-ui,sans-serif;font-weight:800;font-size:16px;line-height:1">P</div>',
+        html: '<div style="width:30px;height:30px;border-radius:50%;background:' + m.color + ';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:' + text + ';font-family:system-ui,sans-serif;font-weight:800;font-size:16px;line-height:1">P</div>',
         iconSize: [30, 30],
         iconAnchor: [15, 15],
     });

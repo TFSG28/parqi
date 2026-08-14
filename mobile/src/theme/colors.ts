@@ -1,6 +1,6 @@
 /**
- * Tema Parqi (design_example/src/styles/theme.css):
- * claro = azul #0647AC sobre fundos frios; escuro = laranja #FF6900 sobre azul-noite.
+ * Tema Parqi v2 (design_example_v2/src/styles/theme.css):
+ * claro = azul #0647AC sobre fundos neutros #f5f5f7; escuro = laranja #FF6900 sobre #111111.
  */
 
 export const LIGHT = {
@@ -13,32 +13,35 @@ export const LIGHT = {
     // Texto/ícones sobre laranja: branco, como no design (primary-foreground)
     onAccent: '#FFFFFF',
     white: '#FFFFFF',
-    background: '#F4F7FC',
+    background: '#F5F5F7',
     card: '#FFFFFF',
-    text: '#0D1A2E',
-    textMuted: '#5A7099',
-    // rgba(6,71,172,0.14) achatada sobre branco
-    border: '#DCE5F3',
+    // v2 muted: fundo de superfícies subtis (toggle, chips inativos)
+    muted: '#EBEBED',
+    text: '#111111',
+    textMuted: '#8A8A8E',
+    // rgba(0,0,0,0.08) do design achatado sobre o fundo
+    border: '#E3E3E6',
     success: '#059669',
-    danger: '#DC2626',
+    danger: '#E5303A',
 } as const;
 
 export const DARK: ThemeColors = {
     // No escuro a marca vira laranja, como no design
     primary: '#FF6900',
-    // Barras no escuro: superfície azul-noite (card) com texto claro
-    bar: '#131826',
+    // Barras no escuro: superfície (card) com texto claro
+    bar: '#1C1C1E',
     // Card hero no escuro: um nível acima do card para se destacar do fundo
-    heroBg: '#1A2030',
+    heroBg: '#1C1C1E',
     accent: '#FF6900',
     onAccent: '#FFFFFF',
     white: '#FFFFFF',
-    background: '#0B0F1A',
-    card: '#131826',
-    text: '#E8EDF5',
-    textMuted: '#6B7FA0',
-    // rgba(255,105,0,0.15) achatada sobre o fundo
-    border: '#31221C',
+    background: '#111111',
+    card: '#1C1C1E',
+    muted: '#242426',
+    text: '#F0EDE8',
+    textMuted: '#878785',
+    // rgba(255,255,255,0.08) do design achatado sobre o fundo
+    border: '#2A2A2C',
     success: '#34D399',
     danger: '#EF4444',
 };
