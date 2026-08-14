@@ -50,16 +50,18 @@ export function SearchBar({ value, onChangeText, placeholder = 'Procurar estacio
 const createStyles = (colors: ThemeColors) =>
     StyleSheet.create({
         wrapper: {
-            marginBottom: 8,
+            marginBottom: 4,
         },
         bar: {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
             backgroundColor: colors.card,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
         },
         input: {
             flex: 1,

@@ -275,10 +275,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
-      # Conta cPanel partilhada (host/user/token); caminho próprio por app.
-      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
-      CPANEL_USER: ${{ secrets.CPANEL_USER }}
-      CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+      CPANEL_HOST: ${{ secrets.FRONTEND_CPANEL_HOST }}
+      CPANEL_USER: ${{ secrets.FRONTEND_CPANEL_USER }}
+      CPANEL_API_TOKEN: ${{ secrets.FRONTEND_CPANEL_API_TOKEN }}
       DEPLOY_PATH: ${{ secrets.FRONTEND_DEPLOY_PATH }}
       ZIP_FILE: deploy.zip
     steps:

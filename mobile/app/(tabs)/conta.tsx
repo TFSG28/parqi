@@ -26,16 +26,26 @@ import type { ThemeColors } from '../../src/theme/colors';
 import type { ContributorStats } from '../../src/types/parking';
 
 function levelLabel(rep: ContributorStats['reputation'] | undefined): string {
-    if (rep?.isTrusted) return 'Contribuidor de confiança';
+    if (rep?.isTrusted) return 'Utilizador de Confiança';
     if (rep?.isNew) return 'Novo membro';
     return 'Contribuidor';
 }
 
+function initialsOf(name: string): string {
+    return name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p.charAt(0).toUpperCase())
+        .join('');
+}
+
 const PERKS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
-    { icon: 'trending-up', text: 'Votos com peso total (contas novas: 0,5×)' },
-    { icon: 'chatbubble-outline', text: 'Edições aplicadas de imediato' },
-    { icon: 'eye-outline', text: 'Vê detalhes de estacionamentos sinalizados' },
-    { icon: 'shield-outline', text: 'Sem fila de moderação' },
+    { icon: 'trending-up', text: 'Peso de voto 1,4× (padrão: 1×)' },
+    { icon: 'shield-checkmark', text: 'Fila de moderação ignorada' },
+    { icon: 'chatbubble-outline', text: 'Sugestões de melhoria diretas' },
+    { icon: 'speedometer-outline', text: 'Limite: 10 submissões por dia' },
 ];
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
@@ -142,7 +152,7 @@ export default function ProfileScreen() {
             list.push({ icon: 'shield-checkmark', label: 'De confiança', color: PALETTE.emerald });
         }
         if (stats.total >= 10) {
-            list.push({ icon: 'flash', label: '10 estacionamentos', color: PALETTE.violet });
+            list.push({ icon: 'flash', label: '10 locais', color: PALETTE.violet });
         }
         if (stats.approved >= 1) {
             list.push({ icon: 'star', label: 'Contribuidor', color: PALETTE.amber });
@@ -150,17 +160,18 @@ export default function ProfileScreen() {
         return list;
     }, [stats]);
 
-    const quality = stats
-        ? [
-            { label: 'Aprovadas', count: stats.approved, color: colors.primary },
-            { label: 'Em verificação', count: stats.pending, color: PALETTE.amberDeep },
-            { label: 'Sinalizadas', count: stats.flagged + stats.rejected, color: PALETTE.redDeep },
-        ]
-        : [];
-
     const showRepSpinner = statsLoading && !stats;
     const repScoreText = rep ? formatScore(rep.score) : '—';
     const trustedMark = rep?.isTrusted ? '✓' : '';
+
+    const statCards: { label: string; value: string; color: string }[] = stats
+        ? [
+            { label: 'Locais adicionados', value: String(stats.total), color: colors.primary },
+            { label: 'Verificados', value: String(stats.approved), color: '#10B981' },
+            { label: 'Votos dados', value: String(stats.votesGiven), color: colors.text },
+            { label: 'Taxa de aprovação', value: `${Math.round(stats.approvedRate)}%`, color: PALETTE.amberDeep },
+        ]
+        : [];
 
     return (
         <View style={styles.container}>
@@ -178,13 +189,13 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-                {/* Avatar + nome */}
+                {/* Avatar + nome, como no design v2 */}
                 <View style={styles.identity}>
                     <View style={styles.avatar}>
                         {user ? (
-                            <Text style={styles.avatarText}>{user.name.trim().charAt(0).toUpperCase()}</Text>
+                            <Text style={styles.avatarText}>{initialsOf(user.name) || '?'}</Text>
                         ) : (
-                            <Ionicons name="person" size={26} color={colors.primary} />
+                            <Ionicons name="person" size={26} color={colors.white} />
                         )}
                     </View>
                     <View style={styles.identityInfo}>
@@ -192,7 +203,10 @@ export default function ProfileScreen() {
                         {user ? (
                             <>
                                 <Text style={styles.handle} numberOfLines={1}>{handle}</Text>
-                                <Text style={styles.level} numberOfLines={1}>{level}</Text>
+                                <View style={styles.trustPill}>
+                                    <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
+                                    <Text style={styles.trustPillText}>{level}</Text>
+                                </View>
                             </>
                         ) : (
                             <Text style={styles.handle}>Entra para votar e adicionar estacionamentos.</Text>
@@ -255,25 +269,22 @@ export default function ProfileScreen() {
                         {/* Reputação */}
                         <View style={styles.card}>
                             <View style={styles.repHeader}>
-                                <Text style={styles.sectionLabelIdentity}>REPUTAÇÃO</Text>
+                                <Text style={styles.sectionLabel}>Reputação</Text>
                                 {showRepSpinner ? (
                                     <ActivityIndicator size="small" color={colors.primary} />
                                 ) : (
-                                    <Text style={styles.repValue}>
-                                        {repScoreText}
-                                        <Text style={styles.repMax}>/10</Text>
-                                    </Text>
+                                    <Text style={styles.repValue}>{repScoreText}</Text>
                                 )}
                             </View>
                             <View style={styles.repTrack}>
                                 <View style={[styles.repFill, { width: `${repPct}%` }]} />
                             </View>
                             <View style={styles.repScale}>
-                                <Text style={styles.repScaleText}>Novo (0)</Text>
+                                <Text style={styles.repScaleText}>Novo</Text>
                                 <Text style={[styles.repScaleText, { color: colors.primary }]}>
-                                    Confiável ≥5 {trustedMark}
+                                    ≥ 5 Confiança {trustedMark}
                                 </Text>
-                                <Text style={styles.repScaleText}>Perito (10)</Text>
+                                <Text style={styles.repScaleText}>Expert</Text>
                             </View>
                             {statsError && (
                                 <Pressable
@@ -286,27 +297,19 @@ export default function ProfileScreen() {
                             )}
                         </View>
 
-                        {/* Stats grid */}
-                        {stats && (
+                        {/* Stats grid — valores a cores, como no design v2 */}
+                        {statCards.length > 0 && (
                             <View style={styles.statsGrid}>
-                                {[
-                                    { label: 'Total', value: stats.total, icon: 'location-outline' as const, color: PALETTE.sky },
-                                    { label: 'Aprovadas', value: stats.approved, icon: 'checkmark-circle-outline' as const, color: PALETTE.emerald },
-                                    { label: 'Em verificação', value: stats.pending, icon: 'time-outline' as const, color: PALETTE.amber },
-                                    { label: 'Votos dados', value: stats.votesGiven, icon: 'thumbs-up-outline' as const, color: PALETTE.violet },
-                                ].map(({ label, value, icon, color }) => (
+                                {statCards.map(({ label, value, color }) => (
                                     <View key={label} style={styles.statCard}>
-                                        <Ionicons name={icon} size={16} color={color} />
-                                        <View>
-                                            <Text style={styles.statValue}>{value}</Text>
-                                            <Text style={styles.statLabel}>{label}</Text>
-                                        </View>
+                                        <Text style={[styles.statValue, { color }]}>{value}</Text>
+                                        <Text style={styles.statLabel}>{label}</Text>
                                     </View>
                                 ))}
                             </View>
                         )}
 
-                        {/* Badges */}
+                        {/* Distintivos */}
                         {badges.length > 0 && (
                             <View style={styles.card}>
                                 <Text style={styles.sectionLabel}>Distintivos</Text>
@@ -327,46 +330,15 @@ export default function ProfileScreen() {
                             </View>
                         )}
 
-                        {/* Qualidade das contribuições */}
-                        {stats && stats.total > 0 && (
-                            <View style={styles.card}>
-                                <Text style={styles.sectionLabel}>Qualidade das contribuições</Text>
-                                <View style={styles.qualityList}>
-                                    {quality.map(({ label, count, color }) => {
-                                        const textColor = themedText(color, resolvedScheme);
-                                        return (
-                                            <View key={label}>
-                                                <View style={styles.qualityHeader}>
-                                                    <Text style={styles.qualityLabel}>{label}</Text>
-                                                    <Text style={[styles.qualityCount, { color: textColor }]}>
-                                                        {count}/{stats.total}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.qualityTrack}>
-                                                    <View
-                                                        style={[
-                                                            styles.qualityFill,
-                                                            { width: `${(count / stats.total) * 100}%`, backgroundColor: color },
-                                                        ]}
-                                                    />
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Perks */}
+                        {/* Privilégios ativos */}
                         {rep?.isTrusted && (
                             <View style={styles.card}>
-                                <Text style={styles.sectionLabel}>Vantagens de utilizador confiável</Text>
-                                {PERKS.map(({ icon, text }, i) => (
-                                    <View
-                                        key={text}
-                                        style={[styles.perkRow, i < PERKS.length - 1 && styles.perkBorder]}
-                                    >
-                                        <Ionicons name={icon} size={14} color={colors.primary} />
+                                <Text style={styles.sectionLabel}>Privilégios ativos</Text>
+                                {PERKS.map(({ icon, text }) => (
+                                    <View key={text} style={styles.perkRow}>
+                                        <View style={styles.perkIcon}>
+                                            <Ionicons name={icon} size={13} color={colors.primary} />
+                                        </View>
                                         <Text style={styles.perkText}>{text}</Text>
                                     </View>
                                 ))}
@@ -524,18 +496,18 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 16,
-            paddingTop: 16,
+            paddingTop: 12,
             paddingBottom: 8,
         },
         title: {
-            fontSize: 16,
-            fontWeight: '600',
+            fontSize: 20,
+            fontWeight: '800',
             color: colors.text,
         },
         iconBtn: {
             width: 36,
             height: 36,
-            borderRadius: 8,
+            borderRadius: 12,
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
@@ -565,38 +537,45 @@ const createStyles = (colors: ThemeColors) =>
             width: 64,
             height: 64,
             borderRadius: 16,
-            backgroundColor: colors.primary + '26',
-            borderWidth: 1,
-            borderColor: colors.primary + '4D',
+            backgroundColor: colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
         },
         avatarText: {
             fontSize: 24,
-            fontWeight: '700',
-            color: colors.primary,
+            fontWeight: '800',
+            color: colors.white,
         },
         name: {
-            fontSize: 15,
-            fontWeight: '700',
+            fontSize: 20,
+            fontWeight: '800',
             color: colors.text,
         },
         handle: {
-            fontSize: 12,
-            fontFamily: MONO,
+            fontSize: 14,
             color: colors.textMuted,
-            marginTop: 1,
-        },
-        level: {
-            fontSize: 12,
-            fontFamily: MONO,
-            color: colors.primary,
             marginTop: 2,
+        },
+        trustPill: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            alignSelf: 'flex-start',
+            gap: 5,
+            marginTop: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+            backgroundColor: colors.primary + '1A',
+        },
+        trustPillText: {
+            fontSize: 12,
+            fontWeight: '600',
+            color: colors.primary,
         },
         primaryBtn: {
             alignItems: 'center',
             paddingVertical: 14,
-            borderRadius: 12,
+            borderRadius: 16,
             backgroundColor: colors.primary,
         },
         primaryBtnText: {
@@ -613,7 +592,7 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: 'center',
             gap: 8,
             backgroundColor: alpha10(PALETTE.amber),
-            borderRadius: 12,
+            borderRadius: 16,
             padding: 12,
         },
         favEmpty: {
@@ -651,39 +630,26 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: 12,
+            borderRadius: 16,
             padding: 16,
         },
         sectionLabel: {
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: '600',
             color: colors.text,
-            marginBottom: 10,
-        },
-        // Momento de identidade: só a reputação mantém o rótulo mono maiúsculo
-        sectionLabelIdentity: {
-            fontSize: 11,
-            fontFamily: MONO,
-            letterSpacing: 1.5,
-            color: colors.textMuted,
             marginBottom: 10,
         },
         repHeader: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: 8,
+            marginBottom: 10,
         },
         repValue: {
-            fontSize: 24,
-            fontWeight: '700',
+            fontSize: 28,
+            fontWeight: '800',
             fontFamily: MONO,
             color: colors.primary,
-        },
-        repMax: {
-            fontSize: 13,
-            fontWeight: '400',
-            color: colors.textMuted,
         },
         repTrack: {
             height: 8,
@@ -719,29 +685,27 @@ const createStyles = (colors: ThemeColors) =>
         statsGrid: {
             flexDirection: 'row',
             flexWrap: 'wrap',
-            gap: 8,
+            gap: 10,
         },
         statCard: {
             width: '48%',
             flexGrow: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 12,
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
+            borderRadius: 16,
+            padding: 14,
         },
         statValue: {
-            fontSize: 17,
-            fontWeight: '700',
+            fontSize: 24,
+            fontWeight: '800',
             fontFamily: MONO,
-            color: colors.text,
+            marginBottom: 2,
         },
         statLabel: {
-            fontSize: 11,
+            fontSize: 12,
             color: colors.textMuted,
+            lineHeight: 16,
         },
         badgeRow: {
             flexDirection: 'row',
@@ -758,47 +722,25 @@ const createStyles = (colors: ThemeColors) =>
         },
         badgeText: {
             fontSize: 12,
-            fontWeight: '500',
-            fontFamily: MONO,
-        },
-        qualityList: {
-            gap: 10,
-        },
-        qualityHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginBottom: 4,
-        },
-        qualityLabel: {
-            fontSize: 12,
-            color: colors.textMuted,
-        },
-        qualityCount: {
-            fontSize: 12,
-            fontFamily: MONO,
-        },
-        qualityTrack: {
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: colors.border,
-            overflow: 'hidden',
-        },
-        qualityFill: {
-            height: '100%',
-            borderRadius: 3,
+            fontWeight: '600',
         },
         perkRow: {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 12,
-            paddingVertical: 8,
+            paddingVertical: 6,
         },
-        perkBorder: {
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
+        perkIcon: {
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: colors.primary + '1A',
+            alignItems: 'center',
+            justifyContent: 'center',
         },
         perkText: {
-            fontSize: 12,
+            flex: 1,
+            fontSize: 13,
             color: colors.textMuted,
         },
         aboutRow: {
@@ -826,7 +768,7 @@ const createStyles = (colors: ThemeColors) =>
             justifyContent: 'center',
             gap: 8,
             paddingVertical: 14,
-            borderRadius: 12,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.border,
         },

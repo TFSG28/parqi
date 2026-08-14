@@ -18,7 +18,7 @@ import { AppMap, type AppMapHandle } from '../../src/components/AppMap';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
-import { AMENITY_DESIGN, MONO, PALETTE, TYPE_DESIGN } from '../../src/theme/design';
+import { AMENITY_DESIGN, MONO, PALETTE, TYPE_COLOR, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { CapacityRange, ParkingType } from '../../src/types/parking';
 
@@ -31,12 +31,13 @@ interface LatLng {
 
 const DEFAULT_LOCATION: LatLng = { latitude: 38.7369, longitude: -9.1427 };
 
-const TYPE_OPTIONS: { type: ParkingType; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { type: 'SURFACE', icon: 'map-outline' },
-    { type: 'UNDERGROUND', icon: 'lock-closed-outline' },
-    { type: 'MULTI_STORY', icon: 'layers-outline' },
-    { type: 'STREET', icon: 'navigate-outline' },
+const STEPS: { id: Step; label: string }[] = [
+    { id: 1, label: 'Localização' },
+    { id: 2, label: 'Tipo' },
+    { id: 3, label: 'Detalhes' },
 ];
+
+const TYPE_OPTIONS: ParkingType[] = ['SURFACE', 'UNDERGROUND', 'MULTI_STORY', 'STREET'];
 
 const CAPACITY_OPTIONS: { range: CapacityRange; label: string }[] = [
     { range: 'RANGE_1_5', label: '<5' },
@@ -44,13 +45,6 @@ const CAPACITY_OPTIONS: { range: CapacityRange; label: string }[] = [
     { range: 'RANGE_21_50', label: '21–50' },
     { range: 'RANGE_51_100', label: '51–100' },
     { range: 'RANGE_100_PLUS', label: '100+' },
-];
-
-const NEXT_STEPS = [
-    'A comunidade vai confirmar ou reportar a tua submissão',
-    'A confiança cresce automaticamente com os votos',
-    'Chega a 5.0 de confiança para ficares Verificado',
-    'A tua reputação cresce com cada contribuição correta',
 ];
 
 export default function AddSpotScreen() {
@@ -158,23 +152,27 @@ export default function AddSpotScreen() {
         return (
             <ScrollView style={styles.container} contentContainerStyle={styles.successContent}>
                 <View style={styles.successIcon}>
-                    <Ionicons name="checkmark-circle" size={36} color={colors.primary} />
+                    <Ionicons name="checkmark" size={36} color={colors.white} />
                 </View>
-                <Text style={styles.successTitle}>Estacionamento submetido!</Text>
+                <Text style={styles.successTitle}>Submetido!</Text>
                 <Text style={styles.successSubtitle}>
-                    A tua contribuição está em revisão pela comunidade.
+                    O teu local foi enviado para validação pela comunidade.
                 </Text>
-                <Text style={styles.successStatus}>
-                    ESTADO · <Text style={{ color: PALETTE.amber }}>A AGUARDAR VALIDAÇÃO</Text>
-                </Text>
+                <View style={styles.successPill}>
+                    <Ionicons name="time" size={12} color={PALETTE.amberDeep} />
+                    <Text style={styles.successPillText}>Em revisão</Text>
+                </View>
                 <View style={styles.nextCard}>
-                    <Text style={styles.sectionLabel}>O que acontece a seguir</Text>
-                    {NEXT_STEPS.map((s, i) => (
-                        <View
-                            key={s}
-                            style={[styles.nextRow, i < NEXT_STEPS.length - 1 && styles.nextRowBorder]}
-                        >
-                            <Text style={styles.nextNum}>{String(i + 1).padStart(2, '0')}</Text>
+                    {[
+                        'Votos positivos aumentam a confiança (+1,5)',
+                        'Votos negativos diminuem (−2,0)',
+                        'Confiança ≥ 5 → estado Verificado',
+                        'Aparece no mapa para toda a comunidade',
+                    ].map((s, i) => (
+                        <View key={s} style={styles.nextRow}>
+                            <View style={styles.nextNumCircle}>
+                                <Text style={styles.nextNum}>{i + 1}</Text>
+                            </View>
                             <Text style={styles.nextText}>{s}</Text>
                         </View>
                     ))}
@@ -183,7 +181,7 @@ export default function AddSpotScreen() {
                     style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
                     onPress={reset}
                 >
-                    <Text style={styles.primaryBtnText}>Adicionar outro estacionamento</Text>
+                    <Text style={styles.primaryBtnText}>Adicionar outro local</Text>
                 </Pressable>
             </ScrollView>
         );
@@ -194,21 +192,19 @@ export default function AddSpotScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            {/* Header + progresso */}
+            {/* Header + progresso com labels, como no design v2 */}
             <View style={styles.header}>
-                <View style={styles.headerRow}>
-                    <Text style={styles.title}>Adicionar estacionamento</Text>
-                    <Text style={styles.stepLabel}>Passo {step} de 3</Text>
-                </View>
-                <View style={styles.progress}>
-                    {([1, 2, 3] as Step[]).map((s) => (
-                        <View
-                            key={s}
-                            style={[
-                                styles.progressSegment,
-                                { backgroundColor: s <= step ? colors.primary : colors.border },
-                            ]}
-                        />
+                <Text style={styles.title}>Adicionar Local</Text>
+                <View style={styles.steps}>
+                    {STEPS.map(({ id, label }) => (
+                        <View key={id} style={styles.step}>
+                            <View
+                                style={[styles.stepSegment, { backgroundColor: id <= step ? colors.primary : colors.border }]}
+                            />
+                            <Text style={[styles.stepLabel, id === step && { color: colors.primary }]}>
+                                {label}
+                            </Text>
+                        </View>
                     ))}
                 </View>
                 <Pressable
@@ -224,8 +220,7 @@ export default function AddSpotScreen() {
 
             <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
                 {step === 1 && (
-                    <View>
-                        <Text style={styles.stepHint}>Onde fica o estacionamento?</Text>
+                    <View style={styles.stepBody}>
                         <View style={styles.mapCard}>
                             <AppMap
                                 ref={mapRef}
@@ -237,53 +232,73 @@ export default function AddSpotScreen() {
                                 onMapPress={(coord) => setPoint(coord)}
                                 style={styles.map}
                             />
-                            <View style={styles.mapFooter}>
+                        </View>
+                        <Text style={styles.mapHint}>Toca no mapa para marcar a posição exata.</Text>
+
+                        <View style={styles.fieldGroup}>
+                            <Text style={styles.fieldLabel}>NOME</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="ex.: Parque Marquês…"
+                                placeholderTextColor={colors.textMuted}
+                                value={name}
+                                onChangeText={setName}
+                                maxLength={120}
+                            />
+                        </View>
+
+                        <View style={styles.coordRow}>
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>LATITUDE</Text>
                                 <TextInput
-                                    style={styles.input}
-                                    placeholder="Nome (ex.: Parque Marquês)…"
-                                    placeholderTextColor={colors.textMuted}
-                                    value={name}
-                                    onChangeText={setName}
-                                    maxLength={120}
+                                    style={[styles.input, styles.coordInput]}
+                                    value={location.latitude.toFixed(5)}
+                                    editable={false}
+                                />
+                            </View>
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>LONGITUDE</Text>
+                                <TextInput
+                                    style={[styles.input, styles.coordInput]}
+                                    value={location.longitude.toFixed(5)}
+                                    editable={false}
                                 />
                             </View>
                         </View>
-                        <Text style={styles.mapHint}>Toca no mapa para marcar a localização exata.</Text>
                     </View>
                 )}
 
                 {step === 2 && (
-                    <View>
-                        <Text style={styles.stepHint}>Que tipo de estacionamento é?</Text>
+                    <View style={styles.stepBody}>
+                        <Text style={styles.stepHint}>TIPO DE ESTACIONAMENTO</Text>
                         <View style={styles.typeGrid}>
-                            {TYPE_OPTIONS.map(({ type, icon }) => {
-                                const active = spotType === type;
+                            {TYPE_OPTIONS.map((t) => {
+                                const active = spotType === t;
+                                const color = TYPE_COLOR[t];
                                 return (
                                     <Pressable
-                                        key={type}
-                                        onPress={() => setSpotType(type)}
+                                        key={t}
+                                        onPress={() => setSpotType(t)}
                                         style={({ pressed }) => [
                                             styles.typeCard,
                                             active && styles.optionActive,
                                             pressed && styles.pressed,
                                         ]}
                                     >
-                                        <Ionicons
-                                            name={icon}
-                                            size={20}
-                                            color={active ? colors.primary : colors.textMuted}
-                                        />
+                                        <View style={[styles.typeIcon, { backgroundColor: color + '18' }]}>
+                                            <Ionicons name="location" size={18} color={color} />
+                                        </View>
                                         <Text style={[styles.typeLabel, active && { color: colors.primary }]}>
-                                            {TYPE_DESIGN[type].label}
+                                            {TYPE_DESIGN[t].label}
                                         </Text>
                                     </Pressable>
                                 );
                             })}
                         </View>
 
-                        <Text style={styles.stepHint}>Custo</Text>
+                        <Text style={styles.stepHint}>TARIFA</Text>
                         <View style={styles.pricingRow}>
-                            {[{ v: true, label: 'Grátis' }, { v: false, label: 'Pago' }].map(({ v, label }) => {
+                            {[{ v: true, label: 'Gratuito' }, { v: false, label: 'Pago' }].map(({ v, label }) => {
                                 const active = isFree === v;
                                 return (
                                     <Pressable
@@ -302,8 +317,15 @@ export default function AddSpotScreen() {
                                 );
                             })}
                         </View>
+                        {isFree === false && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="ex.: €1,50/h"
+                                placeholderTextColor={colors.textMuted}
+                            />
+                        )}
 
-                        <Text style={styles.stepHint}>Lotação</Text>
+                        <Text style={styles.stepHint}>CAPACIDADE</Text>
                         <View style={styles.capacityGrid}>
                             {CAPACITY_OPTIONS.map(({ range, label }) => {
                                 const active = capacity === range;
@@ -328,8 +350,8 @@ export default function AddSpotScreen() {
                 )}
 
                 {step === 3 && (
-                    <View>
-                        <Text style={styles.stepHint}>Que comodidades existem?</Text>
+                    <View style={styles.stepBody}>
+                        <Text style={styles.stepHint}>COMODIDADES</Text>
                         <View style={styles.amenityGrid}>
                             {AMENITY_DESIGN.map(({ key, icon, label }) => {
                                 const active = amenities[key] === true;
@@ -400,7 +422,7 @@ export default function AddSpotScreen() {
                         onPress={() => setStep((s) => (s - 1) as Step)}
                         hitSlop={8}
                     >
-                        <Text style={styles.backBtnText}>Voltar</Text>
+                        <Text style={styles.backBtnText}>Anterior</Text>
                     </Pressable>
                 )}
                 <Pressable
@@ -436,30 +458,38 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         paddingTop: 16,
         paddingBottom: 12,
     },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
     title: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 20,
+        fontWeight: '800',
         color: colors.text,
+        marginBottom: 14,
+    },
+    steps: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+    },
+    step: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 4,
+    },
+    stepSegment: {
+        height: 6,
+        width: '100%',
+        borderRadius: 3,
     },
     stepLabel: {
-        fontSize: 12,
-        fontFamily: MONO,
+        fontSize: 10,
+        fontWeight: '500',
         color: colors.textMuted,
     },
-    progress: {
-        flexDirection: 'row',
-        gap: 6,
-    },
-    progressSegment: {
-        flex: 1,
-        height: 4,
-        borderRadius: 2,
+    advancedLink: {
+        alignSelf: 'flex-end',
+        fontSize: 11,
+        color: colors.textMuted,
+        textDecorationLine: 'underline',
+        marginTop: 8,
     },
     body: {
         flex: 1,
@@ -468,46 +498,60 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 16,
     },
+    stepBody: {
+        gap: 14,
+    },
     stepHint: {
-        fontSize: 14,
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 1,
         color: colors.textMuted,
-        marginBottom: 12,
-        marginTop: 4,
     },
     mapCard: {
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 12,
     },
     map: {
         height: 180,
-    },
-    mapFooter: {
-        padding: 12,
-    },
-    input: {
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-        color: colors.text,
     },
     mapHint: {
         fontSize: 11,
         fontFamily: MONO,
         color: colors.textMuted,
     },
+    fieldGroup: {
+        gap: 6,
+    },
+    fieldLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 1,
+        color: colors.textMuted,
+    },
+    input: {
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 14,
+        color: colors.text,
+    },
+    coordRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    coordInput: {
+        fontFamily: MONO,
+    },
     typeGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 16,
+        gap: 10,
     },
     typeCard: {
         width: '48%',
@@ -515,50 +559,56 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
+        borderRadius: 16,
+        borderWidth: 2,
         borderColor: colors.border,
         backgroundColor: colors.card,
     },
     optionActive: {
         borderColor: colors.primary,
-        backgroundColor: colors.primary + '1A',
+        backgroundColor: colors.primary + '0D',
+    },
+    typeIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     typeLabel: {
         fontSize: 13,
-        fontWeight: '500',
-        color: colors.textMuted,
+        fontWeight: '600',
+        color: colors.text,
     },
     pricingRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 16,
+        gap: 10,
     },
     pricingBtn: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 10,
-        borderRadius: 12,
-        borderWidth: 1,
+        paddingVertical: 12,
+        borderRadius: 16,
+        borderWidth: 2,
         borderColor: colors.border,
         backgroundColor: colors.card,
     },
     pricingText: {
         fontSize: 14,
-        fontWeight: '500',
-        color: colors.textMuted,
+        fontWeight: '600',
+        color: colors.text,
     },
     capacityGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 10,
     },
     capacityBtn: {
         flexBasis: '30%',
         flexGrow: 1,
         alignItems: 'center',
-        paddingVertical: 8,
-        borderRadius: 8,
+        paddingVertical: 10,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: colors.border,
         backgroundColor: colors.card,
@@ -571,8 +621,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     amenityGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 20,
+        gap: 10,
     },
     amenityCard: {
         width: '48%',
@@ -582,15 +631,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         gap: 10,
         padding: 12,
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: colors.border,
         backgroundColor: colors.card,
     },
     amenityLabel: {
         fontSize: 12,
         fontWeight: '500',
-        fontFamily: MONO,
-        color: colors.textMuted,
+        color: colors.text,
         flexShrink: 1,
     },
     amenityCheck: {
@@ -600,27 +648,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
-        marginBottom: 12,
+        gap: 10,
     },
     sectionLabel: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
         color: colors.text,
-        marginBottom: 8,
-    },
-    advancedLink: {
-        alignSelf: 'flex-end',
-        fontSize: 11,
-        color: colors.textMuted,
-        textDecorationLine: 'underline',
-        marginTop: 6,
     },
     antiSpamText: {
         fontSize: 12,
         color: colors.textMuted,
-        marginBottom: 12,
     },
     checkboxRow: {
         flexDirection: 'row',
@@ -630,7 +669,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     checkbox: {
         width: 18,
         height: 18,
-        borderRadius: 4,
+        borderRadius: 5,
         borderWidth: 1.5,
         borderColor: colors.border,
         alignItems: 'center',
@@ -661,7 +700,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         paddingVertical: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.border,
     },
@@ -674,7 +713,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         backgroundColor: colors.primary,
     },
     actionBtn: {
@@ -697,60 +736,73 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
     },
     successIcon: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: colors.primary + '1A',
-        borderWidth: 1,
-        borderColor: colors.primary + '4D',
+        width: 80,
+        height: 80,
+        borderRadius: 24,
+        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 24,
     },
     successTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
         color: colors.text,
         marginBottom: 8,
     },
     successSubtitle: {
         fontSize: 14,
         color: colors.textMuted,
-        marginBottom: 4,
+        marginBottom: 12,
         textAlign: 'center',
+        lineHeight: 20,
     },
-    successStatus: {
-        fontSize: 12,
-        fontFamily: MONO,
-        color: colors.textMuted,
+    successPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: PALETTE.amber + '1A',
         marginBottom: 24,
+    },
+    successPillText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: PALETTE.amberDeep,
     },
     nextCard: {
         width: '100%',
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
-        marginBottom: 16,
+        gap: 10,
+        marginBottom: 24,
     },
     nextRow: {
         flexDirection: 'row',
-        gap: 8,
-        paddingVertical: 6,
+        alignItems: 'center',
+        gap: 12,
     },
-    nextRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+    nextNumCircle: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: colors.primary + '1A',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     nextNum: {
-        fontSize: 12,
-        fontFamily: MONO,
+        fontSize: 11,
+        fontWeight: '700',
         color: colors.primary,
     },
     nextText: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 13,
         color: colors.textMuted,
     },
 });

@@ -4,7 +4,9 @@ import express, { type Express } from 'express';
 import userRouter from '../routes/user.routes';
 import { errorHandler } from '../../../../shared/middleware/error-handler.middleware';
 
-describe('User Controller', () => {
+// Spec de integração: bcrypt real + base de dados real. Sob carga (ex.: com
+// cobertura ativada) cada criação passa dos 5s do timeout padrão — sobe o teto.
+describe('User Controller', { timeout: 20_000 }, () => {
   let app: Express;
 
   beforeAll(() => {

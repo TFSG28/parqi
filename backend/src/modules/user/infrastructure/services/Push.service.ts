@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { USER_TOKENS } from '../../../../shared/container/tokens/user.tokens';
 import { IUserRepository } from '../../domain/repositories/IUser.repository';
+import { logger } from '../../../../shared/utils/logger';
 
 /**
  * Notificações push via Expo Push API. Um token por conta (último dispositivo
@@ -44,7 +45,7 @@ export class PushService {
                 }),
             });
         } catch (error) {
-            console.error('[push] falha ao enviar notificação:', error);
+            logger.error({ error, userId }, 'Falha ao enviar notificação push');
         }
     }
 }

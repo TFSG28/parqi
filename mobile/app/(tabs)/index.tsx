@@ -13,17 +13,16 @@ import {
     Text,
     View,
 } from 'react-native';
-import { HeroSection } from '../../src/components/HeroSection';
 import { Onboarding } from '../../src/components/Onboarding';
+import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { SearchBar } from '../../src/components/SearchBar';
 import { SpotCardSkeleton } from '../../src/components/SpotCardSkeleton';
 import { StatusBadge } from '../../src/components/StatusBadge';
-import { TrustBar } from '../../src/components/TrustBar';
 import { TypeChip } from '../../src/components/TypeChip';
 import { parkingApi } from '../../src/lib/api';
 import { useTheme } from '../../src/context/ThemeContext';
-import { CAPACITY_LABELS, distanceKm, formatDate, formatDistance, regionToBbox, type Region } from '../../src/lib/geo';
-import { AMENITY_DESIGN, MONO, SOURCE_LABELS } from '../../src/theme/design';
+import { regionToBbox, type Region } from '../../src/lib/geo';
+import { AMENITY_DESIGN, MONO, TYPE_COLOR } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot } from '../../src/types/parking';
 
@@ -35,27 +34,23 @@ const DEFAULT_REGION: Region = {
 };
 
 type StatusFilter = 'all' | 'APPROVED' | 'PENDING';
-type SortBy = 'trust' | 'recent';
+type SortBy = 'trust' | 'recent' | 'free';
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
     { id: 'all', label: 'Todos' },
     { id: 'APPROVED', label: 'Verificados' },
-    { id: 'PENDING', label: 'Em verificação' },
+    { id: 'PENDING', label: 'Em revisão' },
 ];
 
 const SORTS: { id: SortBy; label: string }[] = [
     { id: 'trust', label: 'Confiança' },
     { id: 'recent', label: 'Novos' },
+    { id: 'free', label: 'Gratuitos' },
 ];
 
-interface LatLng {
-    latitude: number;
-    longitude: number;
-}
-
 function priceLabel(isFree: boolean | null): string {
-    if (isFree === true) return 'GRÁTIS';
-    if (isFree === false) return 'PAGO';
+    if (isFree === true) return 'Gratuito';
+    if (isFree === false) return 'Pago';
     return '—';
 }
 
@@ -68,7 +63,6 @@ export default function DiscoverScreen() {
     const styles = useMemo(() => createStyles(colors), [colors]);
     const lastBbox = useRef(regionToBbox(DEFAULT_REGION));
 
-    const [userLocation, setUserLocation] = useState<LatLng | null>(null);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
@@ -117,12 +111,10 @@ export default function DiscoverScreen() {
                     const last = await Location.getLastKnownPositionAsync();
                     if (last) {
                         const quick = { latitude: last.coords.latitude, longitude: last.coords.longitude };
-                        setUserLocation(quick);
                         fetchSpots(regionToBbox({ ...quick, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                     }
                     const loc = await Location.getCurrentPositionAsync({});
                     const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-                    setUserLocation(coords);
                     fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                 }
             } catch {
@@ -148,11 +140,6 @@ export default function DiscoverScreen() {
         return () => clearTimeout(timer);
     }, [search]);
 
-    const verifiedCount = useMemo(
-        () => spots.filter((s) => s.status === 'APPROVED').length,
-        [spots]
-    );
-
     const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || sortBy !== 'trust';
 
     const clearFilters = () => {
@@ -171,6 +158,7 @@ export default function DiscoverScreen() {
         });
         return [...filtered].sort((a, b) => {
             if (sortBy === 'recent') return b.createdAt.localeCompare(a.createdAt);
+            if (sortBy === 'free') return (a.isFree ? 0 : 1) - (b.isFree ? 0 : 1);
             return b.trustScore - a.trustScore;
         });
     }, [spots, searchResults, search, statusFilter, sortBy]);
@@ -196,60 +184,56 @@ export default function DiscoverScreen() {
                 ItemSeparatorComponent={ListSeparator}
                 ListHeaderComponent={
                     <View style={styles.listHeader}>
-                        <HeroSection totalSpots={spots.length} verifiedSpots={verifiedCount} />
                         <SearchBar
                             value={search}
                             onChangeText={setSearch}
-                            placeholder="Procurar por nome ou rua…"
+                            placeholder="Nome, rua, zona…"
                         />
-                        <View style={styles.filterRow}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.chips}
-                            >
-                                {STATUS_FILTERS.map((f) => {
-                                    const active = statusFilter === f.id;
-                                    return (
-                                        <Pressable
-                                            key={f.id}
-                                            onPress={() => setStatusFilter(f.id)}
-                                            hitSlop={8}
-                                            style={({ pressed }) => [
-                                                styles.filterChip,
-                                                active && styles.filterChipActive,
-                                                pressed && styles.pressed,
-                                            ]}
-                                        >
-                                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                                {f.label}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </ScrollView>
-                            <View style={styles.sortRow}>
-                                {SORTS.map((s) => {
-                                    const active = sortBy === s.id;
-                                    return (
-                                        <Pressable
-                                            key={s.id}
-                                            onPress={() => setSortBy(s.id)}
-                                            hitSlop={8}
-                                            style={({ pressed }) => [
-                                                styles.sortBtn,
-                                                active && styles.sortBtnActive,
-                                                pressed && styles.pressed,
-                                            ]}
-                                        >
-                                            <Text style={[styles.sortText, active && styles.sortTextActive]}>
-                                                {s.label}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        </View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.chips}
+                        >
+                            {STATUS_FILTERS.map((f) => {
+                                const active = statusFilter === f.id;
+                                return (
+                                    <Pressable
+                                        key={f.id}
+                                        onPress={() => setStatusFilter(f.id)}
+                                        hitSlop={8}
+                                        style={({ pressed }) => [
+                                            styles.filterChip,
+                                            active && styles.filterChipActive,
+                                            pressed && styles.pressed,
+                                        ]}
+                                    >
+                                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                            {f.label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                            <View style={styles.sortDivider} />
+                            {SORTS.map((s) => {
+                                const active = sortBy === s.id;
+                                return (
+                                    <Pressable
+                                        key={s.id}
+                                        onPress={() => setSortBy(s.id)}
+                                        hitSlop={8}
+                                        style={({ pressed }) => [
+                                            styles.filterChip,
+                                            active && styles.filterChipActive,
+                                            pressed && styles.pressed,
+                                        ]}
+                                    >
+                                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                            {s.label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </ScrollView>
                     </View>
                 }
                 refreshControl={
@@ -260,57 +244,49 @@ export default function DiscoverScreen() {
                     />
                 }
                 renderItem={({ item: spot }) => {
-                    const dist =
-                        userLocation && spot.latitude !== null && spot.longitude !== null
-                            ? distanceKm(userLocation.latitude, userLocation.longitude, spot.latitude, spot.longitude)
-                            : null;
                     const amenities = AMENITY_DESIGN.filter((a) => spot[a.key] === true);
+                    const typeColor = TYPE_COLOR[spot.parkingType];
                     return (
                         <Pressable
                             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                             onPress={() => router.push(`/parking/${spot.id}`)}
                         >
                             <View style={styles.cardTop}>
+                                <View style={[styles.typeDot, { backgroundColor: typeColor + '18' }]}>
+                                    <Ionicons name="location" size={16} color={typeColor} />
+                                </View>
                                 <View style={styles.cardTitleWrap}>
-                                    <Text style={styles.cardName} numberOfLines={1}>{spot.name}</Text>
+                                    <Text style={styles.cardName} numberOfLines={2}>{spot.name}</Text>
                                     {spot.description ? (
                                         <Text style={styles.cardAddress} numberOfLines={1}>{spot.description}</Text>
                                     ) : null}
                                 </View>
-                                <View style={styles.cardRight}>
-                                    <Text style={styles.price}>{priceLabel(spot.isFree)}</Text>
-                                    {dist !== null && <Text style={styles.distance}>{formatDistance(dist)}</Text>}
-                                </View>
-                            </View>
-
-                            <View style={styles.trustWrap}>
-                                <TrustBar trustScore={spot.trustScore} />
+                                <ScoreBadge score={spot.trustScore} />
                             </View>
 
                             <View style={styles.metaRow}>
                                 <StatusBadge status={spot.status} />
                                 <TypeChip type={spot.parkingType} />
-                                {spot.capacityRange && (
-                                    <Text style={styles.capacity}>{CAPACITY_LABELS[spot.capacityRange]}</Text>
-                                )}
+                                <Text
+                                    style={[styles.price, spot.isFree && { color: colors.primary }]}
+                                >
+                                    {priceLabel(spot.isFree)}
+                                </Text>
                             </View>
 
                             {amenities.length > 0 && (
                                 <View style={styles.amenities}>
-                                    {amenities.slice(0, 3).map((a) => (
-                                        <View key={a.key} style={styles.amenityChip}>
-                                            <Ionicons name={a.icon} size={10} color={colors.textMuted} />
-                                            <Text style={styles.amenityChipText}>{a.label}</Text>
-                                        </View>
+                                    {amenities.map((a) => (
+                                        <Ionicons
+                                            key={a.key}
+                                            name={a.icon}
+                                            size={14}
+                                            color={colors.textMuted}
+                                            accessibilityLabel={a.label}
+                                        />
                                     ))}
                                 </View>
                             )}
-
-                            <View style={styles.cardFooter}>
-                                <Text style={styles.footerText}>
-                                    por {SOURCE_LABELS[spot.source]} · {formatDate(spot.createdAt)}
-                                </Text>
-                            </View>
                         </Pressable>
                     );
                 }}
@@ -364,21 +340,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         justifyContent: 'center',
     },
     listHeader: {
-        paddingTop: 16,
+        paddingTop: 12,
         paddingBottom: 12,
-        gap: 12,
-    },
-    filterRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+        gap: 10,
     },
     chips: {
         gap: 8,
+        paddingRight: 8,
+    },
+    sortDivider: {
+        width: 1,
+        height: 18,
+        backgroundColor: colors.border,
+        marginHorizontal: 2,
     },
     filterChip: {
         paddingHorizontal: 12,
-        paddingVertical: 4,
+        paddingVertical: 6,
         borderRadius: 999,
         borderWidth: 1,
         borderColor: colors.border,
@@ -390,35 +368,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     filterChipText: {
         fontSize: 12,
-        fontWeight: '500',
+        fontWeight: '600',
         color: colors.textMuted,
     },
     filterChipTextActive: {
         color: colors.white,
-    },
-    sortRow: {
-        flexDirection: 'row',
-        gap: 4,
-        marginLeft: 'auto',
-    },
-    sortBtn: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    sortBtnActive: {
-        borderColor: colors.primary + '99',
-        backgroundColor: colors.primary + '1A',
-    },
-    sortText: {
-        fontSize: 11,
-        fontWeight: '500',
-        color: colors.textMuted,
-    },
-    sortTextActive: {
-        color: colors.primary,
     },
     listContent: {
         paddingHorizontal: 16,
@@ -431,8 +385,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 16,
+        padding: 14,
     },
     cardPressed: {
         opacity: 0.85,
@@ -441,86 +395,52 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     cardTop: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 8,
+        gap: 10,
+        marginBottom: 10,
+    },
+    typeDot: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     cardTitleWrap: {
         flex: 1,
-        paddingRight: 12,
+        minWidth: 0,
+        paddingRight: 4,
     },
     cardName: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
         color: colors.text,
+        lineHeight: 18,
     },
     cardAddress: {
         fontSize: 12,
         color: colors.textMuted,
         marginTop: 2,
     },
-    cardRight: {
-        alignItems: 'flex-end',
-    },
-    price: {
-        fontSize: 12,
-        fontWeight: '700',
-        fontFamily: MONO,
-        color: colors.primary,
-    },
-    distance: {
-        fontSize: 10,
-        fontFamily: MONO,
-        color: colors.textMuted,
-        marginTop: 2,
-    },
-    trustWrap: {
-        marginBottom: 10,
-    },
     metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        flexWrap: 'wrap',
         gap: 8,
+        flexWrap: 'wrap',
     },
-    capacity: {
-        fontSize: 10,
+    price: {
+        marginLeft: 'auto',
+        fontSize: 12,
+        fontWeight: '600',
         fontFamily: MONO,
         color: colors.textMuted,
     },
     amenities: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-        marginTop: 8,
-    },
-    amenityChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-    },
-    amenityChipText: {
-        fontSize: 10,
-        fontWeight: '500',
-        color: colors.textMuted,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+        gap: 12,
         marginTop: 10,
         paddingTop: 10,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-    },
-    footerText: {
-        fontSize: 10,
-        fontFamily: MONO,
-        color: colors.textMuted,
     },
     emptyWrap: {
         paddingVertical: 48,

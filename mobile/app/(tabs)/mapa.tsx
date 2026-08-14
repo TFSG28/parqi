@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { MapLayerPicker } from '../../src/components/MapLayerPicker';
 import { AppMap, type AppMapHandle, type MapLayer } from '../../src/components/AppMap';
-import { TrustBar } from '../../src/components/TrustBar';
-import { TypeChip } from '../../src/components/TypeChip';
+import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { parkingApi } from '../../src/lib/api';
 import { useTheme } from '../../src/context/ThemeContext';
 import { distanceKm, regionToBbox, type Region } from '../../src/lib/geo';
@@ -30,11 +29,18 @@ const DEFAULT_REGION: Region = {
 
 type TypeFilter = 'all' | ParkingType;
 
-const TYPE_FILTERS: TypeFilter[] = ['all', 'SURFACE', 'UNDERGROUND', 'MULTI_STORY', 'STREET'];
+/** Rótulos curtos das pills do design v2. */
+const TYPE_FILTERS: { id: TypeFilter; label: string }[] = [
+    { id: 'all', label: 'Todos' },
+    { id: 'SURFACE', label: 'Superfície' },
+    { id: 'UNDERGROUND', label: 'Sub.' },
+    { id: 'MULTI_STORY', label: 'Elevado' },
+    { id: 'STREET', label: 'Via' },
+];
 
 const LEGEND = [
     { colorKey: 'primary' as const, label: 'Verificado' },
-    { color: PALETTE.amberDeep, label: 'Em verificação' },
+    { color: PALETTE.amberDeep, label: 'Em revisão' },
     { color: PALETTE.redDeep, label: 'Sinalizado' },
 ];
 
@@ -44,8 +50,8 @@ interface LatLng {
 }
 
 function priceLabel(isFree: boolean | null): string {
-    if (isFree === true) return 'GRÁTIS';
-    if (isFree === false) return 'PAGO';
+    if (isFree === true) return 'Gratuito';
+    if (isFree === false) return 'Pago';
     return '';
 }
 
@@ -63,7 +69,6 @@ export default function MapScreen() {
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-    const [filtersOpen, setFiltersOpen] = useState(false);
     const [stripExpanded, setStripExpanded] = useState(false);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -116,7 +121,7 @@ export default function MapScreen() {
         [spots, typeFilter]
     );
 
-    // "Perto de ti" é honesto: ordena por distância real quando há localização.
+    // "Próximos" é honesto: ordena por distância real quando há localização.
     const nearbySpots = useMemo(() => {
         const approved = filteredSpots.filter((s) => s.status === 'APPROVED');
         if (!userLocation) {
@@ -138,7 +143,7 @@ export default function MapScreen() {
     const visibleNearby = stripExpanded ? nearbySpots : nearbyPeek;
     const hiddenNearby = Math.max(0, nearbySpots.length - nearbyPeek.length);
 
-    // Pins por estado: primário = verificado, âmbar = pendente, vermelho = sinalizado
+    // Pins por estado: primário = verificado, âmbar = em revisão, vermelho = sinalizado
     const markers = useMemo(
         () =>
             filteredSpots
@@ -146,7 +151,7 @@ export default function MapScreen() {
                 .map((s) => {
                     let color = colors.primary;
                     if (s.status === 'PENDING') color = PALETTE.amberDeep;
-                    else if (s.status === 'FLAGGED') color = PALETTE.redDeep;
+                    else if (s.status === 'FLAGGED' || s.status === 'REJECTED') color = PALETTE.redDeep;
                     return {
                         id: s.id,
                         latitude: s.latitude!,
@@ -194,73 +199,57 @@ export default function MapScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header: pesquisa + loading */}
+            {/* Barra de pesquisa — como no design v2 */}
             <View style={styles.header}>
-                <Pressable
-                    style={({ pressed }) => [styles.searchBox, pressed && styles.pressed]}
-                    onPress={() => router.push('/(tabs)')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Pesquisar estacionamentos"
-                >
-                    <Ionicons name="search" size={16} color={colors.textMuted} />
-                    <Text style={styles.searchText}>Procurar estacionamento</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-                </Pressable>
+                <View style={styles.searchBox}>
+                    <Pressable
+                        style={({ pressed }) => [styles.searchMain, pressed && styles.pressed]}
+                        onPress={() => router.push('/(tabs)')}
+                        accessibilityRole="button"
+                        accessibilityLabel="Pesquisar estacionamentos"
+                    >
+                        <Ionicons name="search" size={16} color={colors.textMuted} />
+                        <Text style={styles.searchText}>Lisboa, Portugal</Text>
+                    </Pressable>
+                    <View style={styles.searchDivider} />
+                    <Pressable
+                        onPress={centerOnUser}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Centrar na minha localização"
+                    >
+                        <Ionicons name="navigate" size={16} color={colors.primary} />
+                    </Pressable>
+                </View>
             </View>
 
-            {/* Filtro por tipo: um controlo recolhido; a linha de chips só aparece ao abrir */}
-            <View style={styles.filtersWrap}>
-                <Pressable
-                    style={({ pressed }) => [styles.filterToggle, pressed && styles.pressed]}
-                    onPress={() => setFiltersOpen((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Filtrar por tipo"
-                    accessibilityState={{ expanded: filtersOpen }}
-                    hitSlop={8}
-                >
-                    <Ionicons name="funnel-outline" size={14} color={colors.textMuted} />
-                    <Text style={styles.filterToggleText}>
-                        {typeFilter === 'all' ? 'Filtrar' : `Filtrar · ${TYPE_DESIGN[typeFilter].label}`}
-                    </Text>
-                    <Ionicons
-                        name={filtersOpen ? 'chevron-up' : 'chevron-down'}
-                        size={14}
-                        color={colors.textMuted}
-                    />
-                </Pressable>
-                {filtersOpen && (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.chipsScroll}
-                        contentContainerStyle={styles.chips}
-                    >
-                        {TYPE_FILTERS.map((t) => {
-                            const active = typeFilter === t;
-                            const label = t === 'all' ? 'Todos os tipos' : TYPE_DESIGN[t].label;
-                            return (
-                                <Pressable
-                                    key={t}
-                                    onPress={() => {
-                                        setTypeFilter(t);
-                                        setFiltersOpen(false);
-                                    }}
-                                    hitSlop={8}
-                                    style={({ pressed }) => [
-                                        styles.filterChip,
-                                        active && styles.filterChipActive,
-                                        pressed && styles.pressed,
-                                    ]}
-                                >
-                                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                        {label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </ScrollView>
-                )}
-            </View>
+            {/* Pills de tipo — sempre visíveis, como no design v2 */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipsScroll}
+                contentContainerStyle={styles.chips}
+            >
+                {TYPE_FILTERS.map(({ id, label }) => {
+                    const active = typeFilter === id;
+                    return (
+                        <Pressable
+                            key={id}
+                            onPress={() => setTypeFilter(id)}
+                            hitSlop={8}
+                            style={({ pressed }) => [
+                                styles.filterChip,
+                                active && styles.filterChipActive,
+                                pressed && styles.pressed,
+                            ]}
+                        >
+                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                {label}
+                            </Text>
+                        </Pressable>
+                    );
+                })}
+            </ScrollView>
 
             {/* Mapa */}
             <View style={styles.mapWrap}>
@@ -322,13 +311,15 @@ export default function MapScreen() {
                 </View>
             </View>
 
-            {/* Nearby strip */}
+            {/* Bottom sheet — próximos, como no design v2 */}
             <View style={styles.nearbySection}>
-                <Text style={styles.nearbyTitle}>
-                    {userLocation
-                        ? `Perto de ti · ${nearbySpots.length} verificados`
-                        : `Verificados nesta zona · ${nearbySpots.length}`}
-                </Text>
+                <View style={styles.nearbyHandle} />
+                <View style={styles.nearbyHeader}>
+                    <Text style={styles.nearbyTitle}>Próximos</Text>
+                    <Text style={styles.nearbyCount}>
+                        {nearbySpots.filter((s) => s.status === 'APPROVED').length} verificados
+                    </Text>
+                </View>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -340,14 +331,14 @@ export default function MapScreen() {
                             style={({ pressed }) => [styles.nearbyCard, pressed && styles.nearbyCardPressed]}
                             onPress={() => router.push(`/parking/${spot.id}`)}
                         >
-                            <Text style={styles.nearbyName} numberOfLines={1}>{spot.name}</Text>
-                            <View style={styles.nearbyTrust}>
-                                <TrustBar trustScore={spot.trustScore} />
+                            <View style={styles.nearbyCardTop}>
+                                <Text style={styles.nearbyName} numberOfLines={2}>{spot.name}</Text>
+                                <ScoreBadge score={spot.trustScore} />
                             </View>
-                            <View style={styles.nearbyMeta}>
-                                <TypeChip type={spot.parkingType} />
-                                <Text style={styles.nearbyPrice} numberOfLines={1}>{priceLabel(spot.isFree)}</Text>
-                            </View>
+                            <Text style={styles.nearbyType}>{TYPE_DESIGN[spot.parkingType].label}</Text>
+                            <Text style={[styles.nearbyPrice, spot.isFree && { color: colors.primary }]}>
+                                {priceLabel(spot.isFree)}
+                            </Text>
                         </Pressable>
                     ))}
                     {hiddenNearby > 0 && (
@@ -395,8 +386,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         gap: 12,
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 12,
+        paddingTop: 12,
+        paddingBottom: 10,
     },
     searchBox: {
         flex: 1,
@@ -404,62 +395,58 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
+    },
+    searchMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     searchText: {
         flex: 1,
         fontSize: 14,
         color: colors.textMuted,
     },
-    filtersWrap: {
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        gap: 8,
-    },
-    filterToggle: {
-        alignSelf: 'flex-start',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.card,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-    },
-    filterToggleText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: colors.text,
+    searchDivider: {
+        width: 1,
+        height: 16,
+        backgroundColor: colors.border,
     },
     chipsScroll: {
         flexGrow: 0,
     },
     chips: {
+        paddingHorizontal: 16,
         gap: 8,
-        paddingRight: 8,
+        paddingBottom: 10,
     },
     filterChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
         borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
         backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     filterChipActive: {
         backgroundColor: colors.primary,
-        borderColor: colors.primary,
+        shadowOpacity: 0.2,
     },
     filterChipText: {
         fontSize: 12,
-        fontWeight: '500',
-        color: colors.textMuted,
+        fontWeight: '600',
+        color: colors.text,
     },
     filterChipTextActive: {
         color: colors.white,
@@ -467,7 +454,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     mapWrap: {
         flex: 1,
         marginHorizontal: 16,
-        borderRadius: 12,
+        borderRadius: 20,
         borderWidth: 1,
         borderColor: colors.border,
         overflow: 'hidden',
@@ -506,7 +493,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.card + 'E6',
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 10,
         paddingVertical: 6,
         gap: 4,
@@ -539,7 +526,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     controlBtn: {
         width: 36,
         height: 36,
-        borderRadius: 8,
+        borderRadius: 12,
         backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
@@ -555,45 +542,83 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.primary + '1A',
     },
     nearbySection: {
-        paddingTop: 12,
-        paddingBottom: 8,
+        backgroundColor: colors.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 10,
+        paddingBottom: 10,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: -4 },
+        elevation: 8,
+    },
+    nearbyHandle: {
+        alignSelf: 'center',
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.border,
+        marginBottom: 10,
+    },
+    nearbyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        marginBottom: 10,
     },
     nearbyTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    nearbyCount: {
         fontSize: 12,
-        fontWeight: '600',
         color: colors.textMuted,
-        paddingHorizontal: 16,
-        marginBottom: 8,
     },
     nearbyList: {
         paddingHorizontal: 16,
         gap: 12,
     },
     nearbyCard: {
-        width: 132,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
-        padding: 10,
+        width: 176,
+        backgroundColor: colors.background,
+        borderRadius: 16,
+        padding: 12,
     },
     nearbyCardPressed: {
         opacity: 0.85,
         transform: [{ scale: 0.98 }],
     },
+    nearbyCardTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 8,
+        marginBottom: 8,
+    },
     nearbyName: {
-        fontSize: 11,
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.text,
+        lineHeight: 16,
+    },
+    nearbyType: {
+        fontSize: 10,
+        color: colors.textMuted,
+        marginBottom: 4,
+    },
+    nearbyPrice: {
+        fontSize: 12,
         fontWeight: '600',
         color: colors.text,
-        marginBottom: 6,
-    },
-    nearbyTrust: {
-        marginBottom: 6,
     },
     seeAllCard: {
-        width: 92,
-        minHeight: 60,
-        borderRadius: 12,
+        width: 96,
+        minHeight: 76,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.border,
         backgroundColor: colors.card,
@@ -606,16 +631,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontWeight: '600',
         color: colors.primary,
         textAlign: 'center',
-    },
-    nearbyMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    nearbyPrice: {
-        fontSize: 10,
-        fontFamily: MONO,
-        color: colors.primary,
     },
     nearbyEmpty: {
         fontSize: 12,

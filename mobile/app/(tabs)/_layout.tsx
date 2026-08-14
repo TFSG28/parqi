@@ -8,10 +8,10 @@ import { useTheme } from '../../src/context/ThemeContext';
 import type { ThemeColors } from '../../src/theme/colors';
 
 const TAB_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
-    mapa: { icon: 'map-outline', label: 'Mapa' },
-    index: { icon: 'search-outline', label: 'Descobrir' },
+    mapa: { icon: 'navigate', label: 'Mapa' },
+    index: { icon: 'search', label: 'Pesquisa' },
     add: { icon: 'add', label: '' },
-    conta: { icon: 'person-outline', label: 'Perfil' },
+    conta: { icon: 'person', label: 'Perfil' },
 };
 
 /** Props do tabBar extraídas do próprio Tabs (evita dependência direta). */
@@ -53,11 +53,7 @@ function DesignTabBar({ state, navigation }: Readonly<TabBarProps>) {
                     >
                         {route.name === 'add' ? (
                             <View style={[styles.addButton, focused && styles.addButtonActive]}>
-                                <Ionicons
-                                    name="add"
-                                    size={22}
-                                    color={focused ? colors.white : colors.textMuted}
-                                />
+                                <Ionicons name="add" size={24} color={colors.white} />
                             </View>
                         ) : (
                             <>
@@ -110,20 +106,20 @@ const createStyles = (colors: ThemeColors) =>
             fontWeight: '600',
         },
         addButton: {
-            width: 40,
-            height: 40,
-            borderRadius: 12,
+            width: 48,
+            height: 48,
+            borderRadius: 16,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: colors.background,
-        },
-        addButtonActive: {
             backgroundColor: colors.primary,
             shadowColor: colors.primary,
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
+            shadowOpacity: 0.35,
+            shadowRadius: 10,
             shadowOffset: { width: 0, height: 4 },
             elevation: 6,
+        },
+        addButtonActive: {
+            transform: [{ scale: 0.95 }],
         },
         pressed: {
             opacity: 0.7,
