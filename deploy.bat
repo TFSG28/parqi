@@ -1,104 +1,49 @@
 @echo off
-REM ============================================================
-REM  Deploy: commit + push the current branch, then merge it into
-REM  the target branch. Pushing to "quality"/"production" triggers
-REM  the GitHub Actions workflow that performs the actual deploy
-REM  (cPanel backend/frontend, APK release).
-REM
-REM  Usage:   deploy.bat "commit message" [target]
-REM  target:  quality (default) | production | main
-REM ============================================================
+REM Use: deploy.bat "commit message" target_branch
+REM runs on current directory
 
-setlocal
+setlocal enabledelayedexpansion
 
 if "%~1"=="" (
-    echo Usage: %0 "commit-message" [target]
-    echo   target: quality ^(default^), production, main
+    echo Usage: %0 "commit-message" target_branch
+    exit /b 1
+)
+
+if "%~2"=="" (
+    echo Usage: %0 "commit-message" target_branch
     exit /b 1
 )
 
 set "MSG=%~1"
-set "TARGET=%~2"
-if "%TARGET%"=="" set "TARGET=quality"
+set "TARGET_BRANCH=%~2"
 
-REM Validar target
-if /i not "%TARGET%"=="quality" if /i not "%TARGET%"=="production" if /i not "%TARGET%"=="main" (
-    echo [ERRO] Target invalido: "%TARGET%". Usa: quality, production ou main.
-    exit /b 1
-)
-
+REM Get current branch
 for /f "tokens=*" %%i in ('git branch --show-current') do set CURRENT_BRANCH=%%i
 
-echo.
-echo Branch atual: %CURRENT_BRANCH%
-echo Target:       %TARGET%
+REM Get repo name
+for /f "tokens=*" %%i in ('git rev-parse --show-toplevel') do set REPO_PATH=%%i
+for %%i in ("%REPO_PATH%") do set REPO_NAME=%%~nxi
 
-REM ------------------------------------------------------------
-REM 1. Commit + push a branch atual
-REM ------------------------------------------------------------
-git add -A
-git diff --cached --quiet
-if errorlevel 1 (
-    echo A commitar e publicar %CURRENT_BRANCH%...
-    git commit -m "%MSG%"
-    if errorlevel 1 (
-        echo [ERRO] Falha no commit.
-        exit /b 1
-    )
-    git push origin "%CURRENT_BRANCH%"
-    if errorlevel 1 (
-        echo [ERRO] Falha no push de %CURRENT_BRANCH%.
-        exit /b 1
-    )
-) else (
-    echo Sem alteracoes para commit em %CURRENT_BRANCH%.
-)
+echo Repo: %REPO_NAME%
+echo Current branch: %CURRENT_BRANCH%
+echo Target branch: %TARGET_BRANCH%
 
-REM ------------------------------------------------------------
-REM 2. Se a branch atual ja e o target, terminou (o push acima ja
-REM    disparou o deploy).
-REM ------------------------------------------------------------
-if /i "%CURRENT_BRANCH%"=="%TARGET%" (
-    echo %TARGET% atualizado - o workflow vai deployar.
+git add .
+git commit -m "%MSG%"
+git push origin "%CURRENT_BRANCH%"
+
+if /i "%CURRENT_BRANCH%"=="%TARGET_BRANCH%" (
+    echo Current branch is the same as target branch, we do not need checkout or merge
+    echo %CURRENT_BRANCH% updated
     exit /b 0
 )
 
-REM ------------------------------------------------------------
-REM 3. Merge para o target
-REM ------------------------------------------------------------
-echo A fazer merge de %CURRENT_BRANCH% para %TARGET%...
-
-git checkout "%TARGET%"
-if errorlevel 1 (
-    echo [ERRO] Nao foi possivel trocar para "%TARGET%". A branch existe?
-    echo         Cria-a com:  git push origin %CURRENT_BRANCH%:%TARGET%
-    exit /b 1
-)
-
-git pull origin "%TARGET%"
-if errorlevel 1 (
-    echo [ERRO] Falha no pull de %TARGET%.
-    exit /b 1
-)
-
+git checkout "%TARGET_BRANCH%"
+git pull origin "%TARGET_BRANCH%"
 git merge --no-edit "%CURRENT_BRANCH%"
-if errorlevel 1 (
-    echo [ERRO] Conflitos no merge para %TARGET%. Resolve e repete o push.
-    exit /b 1
-)
-
-git push origin "%TARGET%"
-if errorlevel 1 (
-    echo [ERRO] Falha no push de %TARGET%.
-    exit /b 1
-)
-
+git push origin "%TARGET_BRANCH%"
 git checkout "%CURRENT_BRANCH%"
-if errorlevel 1 (
-    echo [AVISO] Merge publicado em %TARGET%, mas nao consegui voltar a %CURRENT_BRANCH%.
-    exit /b 1
-)
 
-echo.
-echo Feito - %TARGET% publicado. O workflow vai deployar.
+echo %TARGET_BRANCH% has been updated
+
 endlocal
