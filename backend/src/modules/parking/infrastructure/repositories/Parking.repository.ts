@@ -8,13 +8,14 @@ import type {
     UpdateParkingRepositoryData,
     UserContributionStats,
 } from '../../domain/repositories/IParking.repository';
-import type {
-    ContributionStatus,
-    DataSource,
-    GeoJSONGeometry,
-    ParkingGeometryInput,
-    ParkingSpotEntity,
-    ParkingVoteEntity,
+import {
+    normalizeParkingName,
+    type ContributionStatus,
+    type DataSource,
+    type GeoJSONGeometry,
+    type ParkingGeometryInput,
+    type ParkingSpotEntity,
+    type ParkingVoteEntity,
 } from '../../domain/entities/ParkingSpot.entity';
 import { InvalidParkingActionError } from '../../domain/errors/InvalidParkingAction.error';
 
@@ -159,7 +160,7 @@ export class ParkingRepository implements IParkingRepository {
         return prisma.$transaction(async (tx) => {
             const spot = await tx.parkingSpot.create({
                 data: {
-                    name: data.name,
+                    name: normalizeParkingName(data.name),
                     description: data.description,
                     geometryType: data.geometry.type === 'Point' ? 'POINT' : data.geometry.type === 'LineString' ? 'LINE' : 'POLYGON',
                     parkingType: data.parkingType,
@@ -325,7 +326,7 @@ export class ParkingRepository implements IParkingRepository {
                 await tx.parkingSpot.update({
                     where: { id },
                     data: {
-                        ...(rest.name !== undefined && { name: rest.name }),
+                        ...(rest.name !== undefined && { name: normalizeParkingName(rest.name) }),
                         ...(rest.description !== undefined && { description: rest.description }),
                         ...(rest.parkingType !== undefined && { parkingType: rest.parkingType }),
                         ...(rest.capacityRange !== undefined && { capacityRange: rest.capacityRange }),

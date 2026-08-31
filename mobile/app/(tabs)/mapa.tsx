@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,9 +15,11 @@ import {
 import { AppMap, type AppMapHandle, type MapLayer } from '../../src/components/AppMap';
 import { MapLayerPicker } from '../../src/components/MapLayerPicker';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
+import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { parkingApi } from '../../src/lib/api';
 import { regionToBbox, type Region } from '../../src/lib/geo';
+import { distanceLabel, freshnessLabel, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
 import { PALETTE, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
@@ -45,6 +48,7 @@ interface LatLng {
 
 export default function MapScreen() {
     const { colors, resolvedScheme } = useTheme();
+    const { user } = useAuth();
     const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
     const mapRef = useRef<AppMapHandle>(null);
@@ -60,6 +64,8 @@ export default function MapScreen() {
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
+    const [showingCachedData, setShowingCachedData] = useState(false);
+    const [confirming, setConfirming] = useState(false);
 
     const fetchSpots = useCallback(async (bbox: string) => {
         lastBbox.current = bbox;
@@ -67,8 +73,15 @@ export default function MapScreen() {
         try {
             const items = await parkingApi.list(bbox);
             setSpots(items);
+            setShowingCachedData(false);
             setFetchFailed(false);
+            await writeParkingCache(items);
         } catch {
+            const cached = await readParkingCache();
+            if (cached) {
+                setSpots(cached.items);
+                setShowingCachedData(true);
+            }
             setFetchFailed(true);
         } finally {
             setLoading(false);
@@ -261,6 +274,9 @@ export default function MapScreen() {
                                 {TYPE_DESIGN[selectedSpot.parkingType].label}
                                 {selectedSpot.isFree !== null ? ` · ${selectedSpot.isFree ? 'Gratuito' : 'Pago'}` : ''}
                             </Text>
+                            <Text style={styles.previewFreshness} numberOfLines={1}>
+                                {distanceLabel(selectedSpot, userLocation) ?? 'Distância indisponível'} · {freshnessLabel(selectedSpot.updatedAt)}
+                            </Text>
                         </View>
                         <Pressable
                             style={({ pressed }) => [styles.closePreview, pressed && styles.pressed]}
@@ -270,6 +286,43 @@ export default function MapScreen() {
                             hitSlop={8}
                         >
                             <Ionicons name="close" size={18} color={colors.textMuted} />
+                        </Pressable>
+                    </View>
+                    <Text style={styles.previewTrust} numberOfLines={1}>{trustMessage(selectedSpot)}</Text>
+                    <View style={styles.previewActions}>
+                        <Pressable
+                            style={({ pressed }) => [styles.confirmButton, pressed && styles.pressed, confirming && styles.disabled]}
+                            disabled={confirming}
+                            onPress={async () => {
+                                if (!user) {
+                                    router.push('/login');
+                                    return;
+                                }
+                                setConfirming(true);
+                                try {
+                                    const updated = await parkingApi.vote(selectedSpot.id, 1);
+                                    setSelectedSpot(updated);
+                                    setSpots((current) => current.map((spot) => spot.id === updated.id ? updated : spot));
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                                } catch {
+                                    router.push(`/parking/${selectedSpot.id}`);
+                                } finally {
+                                    setConfirming(false);
+                                }
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Confirmar informação de ${selectedSpot.name}`}
+                        >
+                            <Ionicons name="checkmark" size={15} color={colors.primary} />
+                            <Text style={styles.confirmButtonText}>{confirming ? 'A confirmar…' : 'Confirmar'}</Text>
+                        </Pressable>
+                        <Pressable
+                            style={({ pressed }) => [styles.reportButton, pressed && styles.pressed]}
+                            onPress={() => router.push(`/parking/${selectedSpot.id}`)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Corrigir informação de ${selectedSpot.name}`}
+                        >
+                            <Text style={styles.reportButtonText}>Corrigir</Text>
                         </Pressable>
                     </View>
                     <View style={styles.previewBottom}>
@@ -287,6 +340,15 @@ export default function MapScreen() {
                 </View>
             )}
 
+            <Pressable
+                style={({ pressed }) => [styles.listButton, pressed && styles.pressed]}
+                onPress={() => router.push('/')}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir lista de estacionamentos"
+            >
+                <Ionicons name="list" size={20} color={colors.primary} />
+            </Pressable>
+
             <View style={[styles.mapControls, selectedSpot && styles.mapControlsRaised]}>
                 <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
                 <Pressable
@@ -299,15 +361,17 @@ export default function MapScreen() {
                 </Pressable>
             </View>
 
-            {fetchFailed && (
+            {(fetchFailed || showingCachedData) && (
                 <Pressable
                     style={({ pressed }) => [styles.errorPill, pressed && styles.pressed]}
                     onPress={() => fetchSpots(lastBbox.current)}
                     accessibilityRole="button"
                     accessibilityLabel="Sem ligação ao servidor. Tentar de novo"
                 >
-                    <Ionicons name="cloud-offline" size={17} color={colors.white} />
-                    <Text style={styles.errorPillText}>Sem ligação. Tocar para tentar de novo.</Text>
+                    <Ionicons name={fetchFailed ? "cloud-offline" : "time-outline"} size={17} color={colors.white} />
+                    <Text style={styles.errorPillText}>
+                        {showingCachedData ? 'A mostrar os últimos dados guardados. Tocar para atualizar.' : 'Sem ligação. Tocar para tentar de novo.'}
+                    </Text>
                 </Pressable>
             )}
         </View>
@@ -424,6 +488,22 @@ const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.creat
     filterTextActive: {
         color: colors.white,
     },
+    listButton: {
+        position: 'absolute',
+        left: 14,
+        bottom: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 9,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 5,
+    },
     mapControls: {
         position: 'absolute',
         right: 14,
@@ -496,6 +576,16 @@ const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.creat
         fontSize: 12,
         color: colors.textMuted,
     },
+    previewFreshness: {
+        marginTop: 3,
+        fontSize: 11,
+        color: colors.textMuted,
+    },
+    previewTrust: {
+        marginTop: 12,
+        fontSize: 11,
+        color: colors.textMuted,
+    },
     closePreview: {
         width: 32,
         height: 32,
@@ -503,6 +593,37 @@ const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.creat
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.muted,
+    },
+    previewActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 10,
+    },
+    confirmButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+        backgroundColor: colors.primary + '12',
+    },
+    confirmButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    reportButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+        backgroundColor: colors.background,
+    },
+    reportButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.textMuted,
     },
     previewBottom: {
         flexDirection: 'row',
@@ -541,6 +662,9 @@ const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.creat
         color: colors.white,
         fontSize: 12,
         fontWeight: '700',
+    },
+    disabled: {
+        opacity: 0.5,
     },
     pressed: {
         opacity: 0.82,

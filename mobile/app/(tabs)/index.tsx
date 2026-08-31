@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Linking,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -21,7 +22,8 @@ import { StatusBadge } from '../../src/components/StatusBadge';
 import { TypeChip } from '../../src/components/TypeChip';
 import { parkingApi } from '../../src/lib/api';
 import { useTheme } from '../../src/context/ThemeContext';
-import { regionToBbox, type Region } from '../../src/lib/geo';
+import { directionsUrl, regionToBbox, type Region } from '../../src/lib/geo';
+import { distanceLabel, freshnessLabel, isStale, rankParkingSpots, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
 import { AMENITY_DESIGN, MONO, TYPE_COLOR } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot } from '../../src/types/parking';
@@ -72,6 +74,8 @@ export default function DiscoverScreen() {
     const [sortBy, setSortBy] = useState<SortBy>('trust');
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [onboardingChecked, setOnboardingChecked] = useState(false);
+    const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [showingCachedData, setShowingCachedData] = useState(false);
 
     useEffect(() => {
         AsyncStorage.getItem('parqi.onboarding_done')
@@ -88,8 +92,17 @@ export default function DiscoverScreen() {
         try {
             const items = await parkingApi.list(bbox);
             setSpots(items);
+            setShowingCachedData(false);
             setFetchFailed(false);
+            await writeParkingCache(items);
         } catch {
+            if (spots.length === 0) {
+                const cached = await readParkingCache();
+                if (cached) {
+                    setSpots(cached.items);
+                    setShowingCachedData(true);
+                }
+            }
             setFetchFailed(true);
         } finally {
             setLoading(false);
@@ -111,10 +124,12 @@ export default function DiscoverScreen() {
                     const last = await Location.getLastKnownPositionAsync();
                     if (last) {
                         const quick = { latitude: last.coords.latitude, longitude: last.coords.longitude };
+                        setUserLocation(quick);
                         fetchSpots(regionToBbox({ ...quick, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                     }
                     const loc = await Location.getCurrentPositionAsync({});
                     const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                    setUserLocation(coords);
                     fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                 }
             } catch {
@@ -148,6 +163,11 @@ export default function DiscoverScreen() {
         setSortBy('trust');
     };
 
+    const openRoute = (spot: ParkingSpot) => {
+        if (spot.latitude === null || spot.longitude === null) return;
+        Linking.openURL(directionsUrl(spot.latitude, spot.longitude)).catch(() => {});
+    };
+
     const visible = useMemo(() => {
         const source = searchResults ?? spots;
         const q = search.trim().toLowerCase();
@@ -156,12 +176,12 @@ export default function DiscoverScreen() {
             const matchStatus = statusFilter === 'all' || s.status === statusFilter;
             return matchSearch && matchStatus;
         });
+        if (sortBy === 'trust') return rankParkingSpots(filtered, userLocation);
         return [...filtered].sort((a, b) => {
-            if (sortBy === 'recent') return b.createdAt.localeCompare(a.createdAt);
-            if (sortBy === 'free') return (a.isFree ? 0 : 1) - (b.isFree ? 0 : 1);
-            return b.trustScore - a.trustScore;
+            if (sortBy === 'recent') return b.updatedAt.localeCompare(a.updatedAt);
+            return (a.isFree ? 0 : 1) - (b.isFree ? 0 : 1);
         });
-    }, [spots, searchResults, search, statusFilter, sortBy]);
+    }, [spots, searchResults, search, statusFilter, sortBy, userLocation]);
 
     if (!onboardingChecked) {
         return (
@@ -273,20 +293,46 @@ export default function DiscoverScreen() {
                                     {priceLabel(spot.isFree)}
                                 </Text>
                             </View>
+                            <View style={styles.infoRow}>
+                                <Text style={styles.infoText}>
+                                    {distanceLabel(spot, userLocation) ?? 'Distância indisponível'}
+                                </Text>
+                                <Text style={[styles.infoText, isStale(spot.updatedAt) && styles.infoTextStale]}>
+                                    {freshnessLabel(spot.updatedAt)}
+                                </Text>
+                                <Text style={styles.infoText} numberOfLines={1}>
+                                    {trustMessage(spot)}
+                                </Text>
+                            </View>
 
-                            {amenities.length > 0 && (
-                                <View style={styles.amenities}>
-                                    {amenities.map((a) => (
-                                        <Ionicons
-                                            key={a.key}
-                                            name={a.icon}
-                                            size={14}
-                                            color={colors.textMuted}
-                                            accessibilityLabel={a.label}
-                                        />
-                                    ))}
-                                </View>
-                            )}
+                            <View style={styles.cardFooter}>
+                                {amenities.length > 0 ? (
+                                    <View style={styles.amenities}>
+                                        {amenities.map((a) => (
+                                            <Ionicons
+                                                key={a.key}
+                                                name={a.icon}
+                                                size={14}
+                                                color={colors.textMuted}
+                                                accessibilityLabel={a.label}
+                                            />
+                                        ))}
+                                    </View>
+                                ) : <View />}
+                                <Pressable
+                                    style={({ pressed }) => [styles.routeButton, pressed && styles.pressed]}
+                                    onPress={(event) => {
+                                        event.stopPropagation();
+                                        openRoute(spot);
+                                    }}
+                                    disabled={spot.latitude === null || spot.longitude === null}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Abrir rota para ${spot.name}`}
+                                >
+                                    <Ionicons name="navigate" size={15} color={colors.primary} />
+                                    <Text style={styles.routeButtonText}>Rota</Text>
+                                </Pressable>
+                            </View>
                         </Pressable>
                     );
                 }}
@@ -316,14 +362,17 @@ export default function DiscoverScreen() {
                 }
             />
 
-            {fetchFailed && (
+            {(fetchFailed || showingCachedData) && (
                 <Pressable
                     style={({ pressed }) => [styles.errorPill, pressed && styles.pressed]}
                     onPress={() => fetchSpots(lastBbox.current)}
+                    accessibilityRole="button"
                     accessibilityLabel="Sem ligação ao servidor. Tentar de novo"
                 >
-                    <Ionicons name="cloud-offline" size={18} color={colors.white} />
-                    <Text style={styles.errorPillText}>Sem ligação ao servidor. Tenta de novo.</Text>
+                    <Ionicons name={showingCachedData ? "time-outline" : "cloud-offline"} size={18} color={colors.white} />
+                    <Text style={styles.errorPillText}>
+                        {showingCachedData ? 'A mostrar os últimos dados guardados. Toca para atualizar.' : 'Sem ligação ao servidor. Tenta de novo.'}
+                    </Text>
                 </Pressable>
             )}
         </View>
@@ -434,13 +483,48 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontFamily: MONO,
         color: colors.textMuted,
     },
-    amenities: {
+    infoRow: {
         flexDirection: 'row',
-        gap: 12,
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 10,
+        flexWrap: 'wrap',
+    },
+    infoText: {
+        fontSize: 11,
+        color: colors.textMuted,
+    },
+    infoTextStale: {
+        color: colors.accent,
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
         marginTop: 10,
         paddingTop: 10,
         borderTopWidth: 1,
         borderTopColor: colors.border,
+    },
+    amenities: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 12,
+    },
+    routeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        backgroundColor: colors.primary + '12',
+    },
+    routeButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.primary,
     },
     emptyWrap: {
         paddingVertical: 48,
