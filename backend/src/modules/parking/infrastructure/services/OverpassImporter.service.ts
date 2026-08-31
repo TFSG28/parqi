@@ -11,7 +11,7 @@ import {
 /**
  * Importa estacionamentos do OpenStreetMap via Overpass API.
  * Query: area["name"="<cidade>"]->.a; (node/way["amenity"="parking"](area.a)); out geom;
- * Dedup por (source=OVERPASS, externalId="<type>:<id>"). Polígonos (ways) são guardados como tal.
+ * Dedup por (source=OSM, externalId="<type>:<id>"). Polígonos (ways) são guardados como tal.
  */
 @injectable()
 export class OverpassImporter implements IOverpassImporter {

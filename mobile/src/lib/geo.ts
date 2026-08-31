@@ -48,7 +48,7 @@ export const TYPE_META: Record<ParkingType, { label: string; icon: IoniconName; 
 export const SOURCE_META: Record<DataSource, { label: string; icon: IoniconName; color: string }> = {
     COMMUNITY: { label: 'Comunidade', icon: 'people', color: '#0647AC' },
     MUNICIPAL: { label: 'Câmara municipal', icon: 'business', color: '#16A34A' },
-    OVERPASS: { label: 'OpenStreetMap', icon: 'map', color: '#0EA5E9' },
+    OSM: { label: 'OpenStreetMap', icon: 'map', color: '#0EA5E9' },
     GEOAPIFY: { label: 'Geoapify', icon: 'globe', color: '#7C3AED' },
 };
 

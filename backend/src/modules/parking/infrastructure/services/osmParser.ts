@@ -37,9 +37,8 @@ export function parseOsmElement(element: OverpassElement): ParsedOsmParking | nu
         return null;
     }
 
-    const osmId = `${element.type}/${element.id}`;
     return {
-        name: tags.name?.trim() || `Parque de estacionamento (OSM ${osmId})`,
+        name: normalizeOsmName(tags.name),
         description: null,
         geometry,
         parkingType: mapParkingType(tags.parking),
@@ -50,6 +49,20 @@ export function parseOsmElement(element: OverpassElement): ParsedOsmParking | nu
         hasEvCharging: tags.charging_station === 'yes' ? true : null,
         isCovered: mapBooleanTag(tags.covered),
     };
+}
+
+/** Remove o identificador técnico que versões anteriores acrescentavam ao título. */
+export function normalizeOsmName(value?: string): string {
+    const name = value?.trim();
+    if (!name) {
+        return 'Parque de estacionamento';
+    }
+
+    const cleaned = name
+        .replace(/\s*\(OSM\s+(?:way|node)\/[0-9]+\)\s*$/i, '')
+        .trim();
+
+    return cleaned || 'Parque de estacionamento';
 }
 
 export function extractGeometry(element: OverpassElement): ParkingGeometryInput | null {
@@ -137,7 +150,7 @@ export interface OverpassImportCounts {
 
 /**
  * Loop comum de importação de elementos OSM:
- * dedup por externalId (source=OVERPASS), filtro isInsidePortugal,
+ * dedup por externalId (source=OSM), filtro isInsidePortugal,
  * dedup cross-source (< 25 m de outra fonte) e criação com status APPROVED.
  */
 export async function importOverpassElements(
@@ -149,7 +162,7 @@ export async function importOverpassElements(
     for (const element of elements) {
         try {
             const externalId = `${element.type}:${element.id}`;
-            const exists = await repository.findByExternalId('OVERPASS', externalId);
+            const exists = await repository.findByExternalId('OSM', externalId);
             if (exists) {
                 counts.skipped++;
                 continue;
@@ -171,14 +184,14 @@ export async function importOverpassElements(
 
             // Dedup cross-source (os dados podem repetir-se entre OSM/Geoapify/comunidade)
             const nearby = await repository.findNearby(latitude, longitude, 25);
-            if (nearby.some((spot) => spot.source !== 'OVERPASS')) {
+            if (nearby.some((spot) => spot.source !== 'OSM')) {
                 counts.skipped++;
                 continue;
             }
 
             await repository.create({
                 ...parsed,
-                source: 'OVERPASS',
+                source: 'OSM',
                 externalId,
                 status: 'APPROVED',
                 trustScore: 6,
