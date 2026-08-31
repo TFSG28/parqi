@@ -10,6 +10,15 @@ jest.mock('react-native-maps', () => ({
     Polyline: () => null,
 }));
 
+jest.mock('@maplibre/maplibre-react-native', () => ({
+    __esModule: true,
+    Map: () => null,
+    Camera: () => null,
+    GeoJSONSource: () => null,
+    Layer: () => null,
+    UserLocation: () => null,
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () =>
     require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );

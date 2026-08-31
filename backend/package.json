@@ -21,6 +21,7 @@
     "import:geoapify": "tsx src/scripts/import-geoapify.ts",
     "import:csv": "tsx src/scripts/import-csv.ts",
     "import:data": "tsx src/scripts/import-data.ts",
+    "import:dadosgov": "tsx src/scripts/import-dadosgov.ts",
     "import:caop": "tsx src/scripts/import-caop.ts",
     "set-admin": "tsx src/scripts/set-admin.ts",
     "clean:outside-portugal": "tsx src/scripts/clean-outside-portugal.ts",
