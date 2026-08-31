@@ -39,7 +39,7 @@ enum CapacityRange {
 
 enum DataSource {
     COMMUNITY
-    OVERPASS
+    OSM
     GEOAPIFY
     MUNICIPAL
 }

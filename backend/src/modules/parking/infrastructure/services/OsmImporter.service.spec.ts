@@ -87,7 +87,7 @@ describe('OsmImporter', () => {
         expect(result.imported).toBe(1);
         expect(result.skipped).toBe(1);
         expect(vi.mocked(repository.create).mock.calls[0][0]).toMatchObject({
-            source: 'OVERPASS',
+            source: 'OSM',
             externalId: 'node:1',
             status: 'APPROVED',
             parkingType: 'UNDERGROUND',

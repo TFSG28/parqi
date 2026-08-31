@@ -84,7 +84,7 @@ export function trustColor(score: number, primary: string): string {
 export const SOURCE_LABELS: Record<string, string> = {
     COMMUNITY: 'Comunidade',
     MUNICIPAL: 'Câmara municipal',
-    OVERPASS: 'OpenStreetMap',
+    OSM: 'OpenStreetMap',
     GEOAPIFY: 'Geoapify',
 };
 

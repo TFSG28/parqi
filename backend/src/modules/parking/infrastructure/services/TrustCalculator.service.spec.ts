@@ -10,7 +10,7 @@ describe('TrustCalculator', () => {
         });
 
         it('fontes importadas têm confiança base maior', () => {
-            expect(calculator.baseTrust('OVERPASS')).toBe(6);
+            expect(calculator.baseTrust('OSM')).toBe(6);
             expect(calculator.baseTrust('GEOAPIFY')).toBe(6);
         });
     });
@@ -62,7 +62,7 @@ describe('TrustCalculator', () => {
 
         it('dados importados só são flagados com votos negativos suficientes', () => {
             // 6 (base) - 2 downvotes * 2 = 2 < 3
-            const result = calculator.apply('OVERPASS', 'APPROVED', { upvotes: 0, downvotes: 2 });
+            const result = calculator.apply('OSM', 'APPROVED', { upvotes: 0, downvotes: 2 });
             expect(result.status).toBe('FLAGGED');
         });
     });

@@ -115,7 +115,7 @@ describe('CsvImporter', () => {
 
     it('salta linhas já cobertas por outra fonte (dedup cross-source)', async () => {
         vi.mocked(mockRepository.findNearby).mockResolvedValue([
-            { id: 'osm-spot', source: 'OVERPASS' } as never,
+            { id: 'osm-spot', source: 'OSM' } as never,
         ]);
         const csv = 'name,latitude,longitude\nParque,41.44,-8.29\n';
 

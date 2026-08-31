@@ -77,7 +77,7 @@ export default function TabsLayout() {
             tabBar={renderTabBar}
             screenOptions={{ header: renderHeader }}
         >
-            <Tabs.Screen name="mapa" />
+            <Tabs.Screen name="mapa" options={{ headerShown: false }} />
             <Tabs.Screen name="index" />
             <Tabs.Screen name="add" />
             <Tabs.Screen name="conta" />

@@ -17,7 +17,7 @@ import { importOverpassElements, type OverpassElement } from './osmParser';
  *
  * A bbox é mais ampla do que a fronteira real; o filtro `isInsidePortugal`
  * (fronteira Natural Earth + ilhas) rejeita pontos espanhóis ou no mar.
- * Dedup por (source=OVERPASS, externalId="<type>:<id>") — compatível com o
+ * Dedup por (source=OSM, externalId="<type>:<id>") — compatível com o
  * OverpassImporter (por concelho), pelo que os dois podem coexistir.
  */
 @injectable()

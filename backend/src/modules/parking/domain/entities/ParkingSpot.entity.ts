@@ -7,7 +7,7 @@ export type CapacityRange =
     | 'RANGE_21_50'
     | 'RANGE_51_100'
     | 'RANGE_100_PLUS';
-export type DataSource = 'COMMUNITY' | 'OVERPASS' | 'GEOAPIFY' | 'MUNICIPAL';
+export type DataSource = 'COMMUNITY' | 'OSM' | 'GEOAPIFY' | 'MUNICIPAL';
 export type ContributionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FLAGGED';
 export type GeometryType = 'POINT' | 'POLYGON' | 'LINE';
 

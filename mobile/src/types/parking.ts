@@ -9,7 +9,7 @@ export type CapacityRange =
 
 export type ContributionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FLAGGED';
 
-export type DataSource = 'COMMUNITY' | 'OVERPASS' | 'GEOAPIFY' | 'MUNICIPAL';
+export type DataSource = 'COMMUNITY' | 'OSM' | 'GEOAPIFY' | 'MUNICIPAL';
 
 /** GeoJSON simplificado (coordenadas [longitude, latitude]). */
 export type Geometry =

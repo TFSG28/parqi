@@ -21,7 +21,7 @@ import type {
 export class TrustCalculator implements ITrustCalculator {
     private readonly BASE_TRUST: Record<DataSource, number> = {
         COMMUNITY: 2,
-        OVERPASS: 6,
+        OSM: 6,
         GEOAPIFY: 6,
         MUNICIPAL: 7,
     };

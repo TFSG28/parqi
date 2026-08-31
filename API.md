@@ -148,7 +148,7 @@ Quando a confiança é negativa, o estacionamento fica `FLAGGED` e entra na fila
 moderação manual (admin).
 
 Estados: `PENDING`, `APPROVED`, `REJECTED`, `FLAGGED`
-Fontes: `COMMUNITY`, `OVERPASS`, `GEOAPIFY`
+Fontes: `COMMUNITY`, `OSM`, `GEOAPIFY`
 Tipos: `SURFACE`, `UNDERGROUND`, `MULTI_STORY`, `STREET`, `OTHER`
 Lotação: `RANGE_1_5`, `RANGE_6_20`, `RANGE_21_50`, `RANGE_51_100`, `RANGE_100_PLUS`
 
@@ -230,7 +230,7 @@ ou
 { "value": -1, "reason": "Local já não existe" }
 ```
 `reason` é obrigatória para votos negativos. Regras de confiança: base por fonte
-(`COMMUNITY`=2, `OVERPASS`/`GEOAPIFY`=6), upvote +1.5, downvote -2, clamp 0-10.
+(`COMMUNITY`=2, `OSM`/`GEOAPIFY`=6), upvote +1.5, downvote -2, clamp 0-10.
 `PENDING` → `APPROVED` aos 5; `APPROVED` → `FLAGGED` abaixo de 3; `FLAGGED`
 recupera aos 5. `REJECTED` não muda automaticamente.
 

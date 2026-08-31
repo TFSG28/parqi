@@ -17,3 +17,4 @@
 
 #FF6900 -> dark mode com esta cor principal
 #0647AC -> light mode com esta cor principal
+experimentar @maplibre/maplibre-react-native

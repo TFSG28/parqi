@@ -1,0 +1,25 @@
+Downloads falhados (2026-08-14T15:50:48.548Z) — sacar manualmente:
+
+[lugares-de-estacionamento-na-via-publica-para-residentes-ou-publico-em-geral] Lugares de estacionamento na via pública para residentes ou público em geral
+  formato: zip
+  erro: HTTP 403 (mirror: HTTP 502)
+  url: https://dados.cm-lisboa.pt/dataset/e6b0f4af-5c22-451f-a5f9-7373cac27624/resource/ec21e019-b97a-4adf-a9d5-7a3c513cdb51/download/statisticsplaces.7z
+  mirror: https://dados.gov.pt/api/1/datasets/r/ec21e019-b97a-4adf-a9d5-7a3c513cdb51
+
+[modelo-analitico-estacionamento-ucd-lab] Modelo Analítico - Estacionamento (UCD Lab)
+  formato: zip
+  erro: HTTP 403 (mirror: HTTP 502)
+  url: https://dados.cm-lisboa.pt/dataset/bd0ac016-79d1-4d8f-9c36-673d82c30133/resource/3d17974b-58e9-43dd-8e6c-98e0cc0b8168/download/codeparking.zip
+  mirror: https://dados.gov.pt/api/1/datasets/r/3d17974b-58e9-43dd-8e6c-98e0cc0b8168
+
+[emel] EMEL - Parques de estacionamento na via pública
+  formato: shp
+  erro: HTTP 403 (mirror: HTTP 502)
+  url: https://dados.cm-lisboa.pt/dataset/c08cf4fb-ba96-424b-b4d6-084d1d288938/resource/f8ffa392-9376-471b-b54c-3324e34422f9/download/parques-de-estacionamento.7z
+  mirror: https://dados.gov.pt/api/1/datasets/r/f8ffa392-9376-471b-b54c-3324e34422f9
+
+[areas-reguladas-de-estacionamento-na-via-publica] Áreas reguladas de estacionamento na via pública
+  formato: zip
+  erro: HTTP 403 (mirror: HTTP 502)
+  url: https://dados.cm-lisboa.pt/dataset/f769f6cc-461a-48be-adbd-22658fc02d11/resource/b41e7a70-46f1-40fd-b112-68298d1a1653/download/listzones.7z
+  mirror: https://dados.gov.pt/api/1/datasets/r/b41e7a70-46f1-40fd-b112-68298d1a1653

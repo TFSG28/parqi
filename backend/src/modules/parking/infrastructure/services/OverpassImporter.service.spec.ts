@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { OverpassImporter } from './OverpassImporter.service';
+import { normalizeOsmName } from './osmParser';
 import type { IParkingRepository } from '../../domain/repositories/IParking.repository';
 
 const nodeElement = {
@@ -70,7 +71,7 @@ describe('OverpassImporter', () => {
             hasDisabledSpaces: null,
             hasEvCharging: null,
             isCovered: null,
-            source: 'OVERPASS',
+            source: 'OSM',
             externalId: '',
             status: 'APPROVED',
             trustScore: 6,
@@ -86,6 +87,14 @@ describe('OverpassImporter', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+    });
+
+    it('remove identificadores técnicos dos títulos OSM', () => {
+        expect(normalizeOsmName('Parque de estacionamento (OSM way/441963801)')).toBe(
+            'Parque de estacionamento'
+        );
+        expect(normalizeOsmName('Parque Central')).toBe('Parque Central');
+        expect(normalizeOsmName()).toBe('Parque de estacionamento');
     });
 
     it('importa nodes e ways com mapeamento correto das tags OSM', async () => {
