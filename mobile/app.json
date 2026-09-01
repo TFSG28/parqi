@@ -49,7 +49,6 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "@maplibre/maplibre-react-native",
       [
         "expo-location",
         {

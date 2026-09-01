@@ -10,14 +10,27 @@ jest.mock('react-native-maps', () => ({
     Polyline: () => null,
 }));
 
-jest.mock('@maplibre/maplibre-react-native', () => ({
+jest.mock('@rnmapbox/maps', () => ({
     __esModule: true,
-    Map: () => null,
-    Camera: () => null,
-    GeoJSONSource: () => null,
-    Layer: () => null,
-    UserLocation: () => null,
+    default: {
+        MapView: () => null,
+        Camera: () => null,
+        ShapeSource: () => null,
+        FillLayer: () => null,
+        LineLayer: () => null,
+        CircleLayer: () => null,
+        SymbolLayer: () => null,
+        StyleURL: {
+            Street: 'mapbox://styles/mapbox/streets-v11',
+            Light: 'mapbox://styles/mapbox/light-v10',
+            Dark: 'mapbox://styles/mapbox/dark-v10',
+            SatelliteStreet: 'mapbox://styles/mapbox/satellite-streets-v11',
+            Outdoors: 'mapbox://styles/mapbox/outdoors-v11',
+        },
+        setAccessToken: jest.fn(),
+    },
 }));
+
 
 jest.mock('@react-native-async-storage/async-storage', () =>
     require('@react-native-async-storage/async-storage/jest/async-storage-mock')
