@@ -10,6 +10,8 @@ import { OsmMap } from './OsmMap';
  * Requer um development build Android; o Expo Go usa o provider OSM.
  */
 
+const LISBON_CENTER: [number, number] = [-9.1427, 38.7369];
+
 const ACCESS_TOKEN =
     process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ??
     (Constants.expoConfig?.extra?.mapboxAccessToken as string | undefined) ??
@@ -44,6 +46,7 @@ function markersToGeoJson(markers: OsmMarker[]): GeoJSON.FeatureCollection {
                 color: marker.color,
                 textColor: marker.textColor ?? '#FFFFFF',
                 dot: marker.kind === 'dot',
+                status: marker.status ?? 'APPROVED',
             },
         })),
     };
@@ -108,7 +111,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
             cameraRef.current?.setCamera({
                 centerCoordinate: [longitude, latitude],
                 zoomLevel: nextZoom ?? zoom,
-                animationDuration: 350,
+                animationDuration: 500,
+                animationMode: 'easeTo',
             });
         },
     }));
@@ -116,7 +120,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
     useEffect(() => {
         cameraRef.current?.setCamera({
             centerCoordinate: [center.longitude, center.latitude],
-            animationDuration: 350,
+            animationDuration: 500,
+            animationMode: 'easeTo',
         });
     }, [center.latitude, center.longitude]);
 
@@ -156,7 +161,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
             cameraRef.current?.setCamera({
                 centerCoordinate: coordinates,
                 zoomLevel: Math.min(zoom + 2.5, 18),
-                animationDuration: 350,
+                animationDuration: 500,
+                animationMode: 'easeTo',
             });
             return;
         }
@@ -218,8 +224,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
         >
             <Mapbox.Camera
                 ref={cameraRef}
-                centerCoordinate={[center.longitude, center.latitude]}
-                zoomLevel={zoom}
+                centerCoordinate={userLocation ? [userLocation.longitude, userLocation.latitude] : LISBON_CENTER}
+                zoomLevel={userLocation ? zoom : 12}
             />
 
             {polygonData && (
@@ -254,7 +260,7 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
                 id="parqi-markers"
                 shape={markerData}
                 cluster={cluster}
-                clusterRadius={60}
+                clusterRadius={48}
                 clusterMaxZoomLevel={16}
                 onPress={handleMarkerPress}
                 hitbox={{ width: 48, height: 48 }}
@@ -263,7 +269,15 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
                     id="parqi-clusters"
                     filter={['has', 'point_count']}
                     style={{
-                        circleColor: brandColor,
+                        circleColor: [
+                            'step',
+                            ['get', 'point_count'],
+                            brandColor,
+                            10,
+                            accentColor,
+                            100,
+                            '#7C3AED',
+                        ],
                         circleRadius: ['step', ['get', 'point_count'], 19, 10, 22, 100, 26],
                         circleStrokeWidth: 3,
                         circleStrokeColor: '#FFFFFF',

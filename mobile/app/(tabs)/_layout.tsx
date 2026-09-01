@@ -74,6 +74,7 @@ const renderHeader = () => <ParqiHeader />;
 export default function TabsLayout() {
     return (
         <Tabs
+            initialRouteName="mapa"
             tabBar={renderTabBar}
             screenOptions={{ header: renderHeader }}
         >

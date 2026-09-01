@@ -1,10 +1,12 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { forwardRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState, forwardRef } from 'react';
 import { Platform } from 'react-native';
 import { GoogleMap } from './GoogleMap';
 import { OsmMap, type OsmMapHandle, type OsmMapProps } from './OsmMap';
 
-export type { MapLayer, OsmMapHandle as AppMapHandle, OsmMarker } from './OsmMap';
+export type { MapLayer, OsmMapHandle as AppMapHandle, OsmMapProps, OsmMarker } from './OsmMap';
+export type MapProviderOption = 'osm' | 'mapbox' | 'google';
 
 /**
  * Fornecedor do mapa escolhido no .env:
@@ -23,7 +25,7 @@ const requestedProvider =
 const isExpoGo =
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-const PROVIDER =
+const DEFAULT_PROVIDER =
     isExpoGo
         ? 'osm'
         : requestedProvider === 'mapbox' && Platform.OS === 'android'
@@ -31,6 +33,8 @@ const PROVIDER =
             : requestedProvider === 'google'
                 ? 'google'
                 : 'osm';
+const PROVIDER_STORAGE_KEY = 'parqi.map_provider';
+export type MapProvider = MapProviderOption;
 
 type NativeMapComponent = typeof OsmMap;
 
@@ -44,11 +48,21 @@ function getMapbox(): NativeMapComponent | null {
     }
 }
 
-export const AppMap = forwardRef<OsmMapHandle, OsmMapProps>(function AppMap(props, ref) {
-    if (PROVIDER === 'mapbox') {
+export const AppMap = forwardRef<OsmMapHandle, OsmMapProps & { provider?: MapProvider }>(function AppMap(props, ref) {
+    const [provider, setProvider] = useState<MapProvider>(DEFAULT_PROVIDER as MapProvider);
+
+    useEffect(() => {
+        AsyncStorage.getItem(PROVIDER_STORAGE_KEY).then((value) => {
+            if (!value || isExpoGo) return;
+            if (value === 'mapbox' || value === 'osm' || value === 'google') setProvider(value);
+        }).catch(() => { });
+    }, []);
+
+    const selectedProvider = props.provider ?? provider;
+    if (selectedProvider === 'mapbox') {
         const MapboxMap = getMapbox();
         if (MapboxMap) return <MapboxMap ref={ref} {...props} />;
     }
-    if (PROVIDER === 'google') return <GoogleMap ref={ref} {...props} />;
+    if (selectedProvider === 'google') return <GoogleMap ref={ref} {...props} />;
     return <OsmMap ref={ref} {...props} />;
 });
