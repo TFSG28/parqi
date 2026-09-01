@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { forwardRef } from 'react';
 import { Platform } from 'react-native';
 import { GoogleMap } from './GoogleMap';
@@ -15,11 +15,22 @@ export type { MapLayer, OsmMapHandle as AppMapHandle, OsmMarker } from './OsmMap
  * O provider Mapbox é carregado de forma dinâmica porque o Expo Go não contém
  * o código nativo do SDK. Assim, o fallback OSM não avalia o módulo Mapbox.
  */
-const requestedProvider = process.env.EXPO_PUBLIC_MAP_PROVIDER ?? 'osm';
-const isExpoGo = Constants.appOwnership === 'expo' || Boolean(Constants.expoGoConfig);
-const PROVIDER = isExpoGo || (requestedProvider === 'mapbox' && Platform.OS !== 'android')
-    ? 'osm'
-    : requestedProvider;
+const requestedProvider =
+    process.env.EXPO_PUBLIC_MAP_PROVIDER ??
+    (Constants.expoConfig?.extra?.mapProvider as string | undefined) ??
+    'mapbox';
+
+const isExpoGo =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+const PROVIDER =
+    isExpoGo
+        ? 'osm'
+        : requestedProvider === 'mapbox' && Platform.OS === 'android'
+            ? 'mapbox'
+            : requestedProvider === 'google'
+                ? 'google'
+                : 'osm';
 
 type NativeMapComponent = typeof OsmMap;
 

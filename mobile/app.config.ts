@@ -48,6 +48,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         extra: {
             ...config.extra,
             ...(mapboxAccessToken ? { mapboxAccessToken } : {}),
+            mapProvider: process.env.EXPO_PUBLIC_MAP_PROVIDER ?? 'mapbox',
         },
         ios: {
             ...config.ios,
