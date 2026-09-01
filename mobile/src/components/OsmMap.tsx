@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { MAP_CONFIG, isValidCoordinate } from '../lib/mapConfig';
 
 /**
  * Mapa OpenStreetMap via Leaflet num WebView.
@@ -98,6 +99,7 @@ function buildHtml(
     brandColor: string,
     accentColor: string
 ): string {
+    const safeMarkers = markers.filter((marker) => isValidCoordinate(marker.latitude, marker.longitude));
     return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -163,7 +165,7 @@ function pinIcon(m) {
 
 const markerLayer = ${cluster}
     ? L.markerClusterGroup({
-          maxClusterRadius: 48,
+          maxClusterRadius: ${MAP_CONFIG.clusterRadius},
           showCoverageOnHover: false,
           spiderfyOnMaxZoom: true,
           animate: true,
@@ -171,7 +173,7 @@ const markerLayer = ${cluster}
           chunkedLoading: true,
           chunkInterval: 100,
           chunkDelay: 25,
-          disableClusteringAtZoom: 16,
+          disableClusteringAtZoom: ${MAP_CONFIG.clusterDisableZoom},
           iconCreateFunction: function (c) {
               const n = c.getChildCount();
               const size = n < 10 ? 38 : n < 100 ? 44 : 52;
@@ -192,6 +194,7 @@ let currentMarkers = [];
 let currentPolygon = [];
 let currentPolyline = [];
 let currentUser = null;
+let markerById = {};
 
 function post(payload) {
     window.ReactNativeWebView.postMessage(JSON.stringify(payload));
@@ -199,14 +202,27 @@ function post(payload) {
 
 function updateMarkers(list) {
     currentMarkers = list;
-    markerLayer.clearLayers();
+    const nextIds = {};
     list.forEach(function (m) {
-        L.marker([m.latitude, m.longitude], { icon: pinIcon(m) })
+        nextIds[m.id] = true;
+        const existing = markerById[m.id];
+        if (existing) {
+            const position = existing.getLatLng();
+            if (position.lat !== m.latitude || position.lng !== m.longitude) existing.setLatLng([m.latitude, m.longitude]);
+            return;
+        }
+        markerById[m.id] = L.marker([m.latitude, m.longitude], { icon: pinIcon(m) })
             .on('click', function (e) {
                 if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
                 post({ type: 'marker', id: m.id });
             })
             .addTo(markerLayer);
+    });
+    Object.keys(markerById).forEach(function (id) {
+        if (!nextIds[id]) {
+            markerLayer.removeLayer(markerById[id]);
+            delete markerById[id];
+        }
     });
 }
 
@@ -255,7 +271,7 @@ if (interactive) {
     });
 }
 
-updateMarkers(${JSON.stringify(markers)});
+updateMarkers(${JSON.stringify(safeMarkers)});
 setPolygon(${JSON.stringify(polygon)});
 setPolyline(${JSON.stringify(polyline)});
 setUser(${JSON.stringify(userLocation ?? null)});

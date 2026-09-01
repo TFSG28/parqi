@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import type { MapLayer, OsmMapHandle, OsmMapProps, OsmMarker } from './OsmMap';
 import { OsmMap } from './OsmMap';
+import { MAP_CONFIG, isValidCoordinate } from '../lib/mapConfig';
 
 /**
  * Mapa nativo baseado no Mapbox Maps SDK v11 através de @rnmapbox/maps.
@@ -35,7 +36,7 @@ type ShapePressEvent = { features: GeoJSON.Feature[] };
 function markersToGeoJson(markers: OsmMarker[]): GeoJSON.FeatureCollection {
     return {
         type: 'FeatureCollection',
-        features: markers.map((marker) => ({
+        features: markers.filter((marker) => isValidCoordinate(marker.latitude, marker.longitude)).map((marker) => ({
             type: 'Feature',
             geometry: {
                 type: 'Point',
@@ -105,6 +106,7 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
     ref
 ) {
     const cameraRef = useRef<Mapbox.Camera>(null);
+    const mapRef = useRef<Mapbox.MapView>(null);
 
     useImperativeHandle(ref, () => ({
         centerOn: (latitude, longitude, nextZoom) => {
@@ -149,7 +151,7 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
         [userLocation]
     );
 
-    const handleMarkerPress = (event: ShapePressEvent) => {
+    const handleMarkerPress = async (event: ShapePressEvent) => {
         const feature = event.features[0];
         if (!feature) return;
 
@@ -158,12 +160,16 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
         if (!coordinates) return;
 
         if (properties.cluster === true || properties.point_count !== undefined) {
-            cameraRef.current?.setCamera({
-                centerCoordinate: coordinates,
-                zoomLevel: Math.min(zoom + 2.5, 18),
-                animationDuration: 500,
-                animationMode: 'easeTo',
-            });
+            const clusterId = properties.cluster_id;
+            if (clusterId !== undefined) {
+                const expansionZoom = Math.min(zoom + MAP_CONFIG.clusterZoomStep, MAP_CONFIG.maxCameraZoom);
+                cameraRef.current?.setCamera({
+                    centerCoordinate: coordinates,
+                    zoomLevel: expansionZoom,
+                    animationDuration: 500,
+                    animationMode: 'easeTo',
+                });
+            }
             return;
         }
 
@@ -210,6 +216,7 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
 
     return (
         <Mapbox.MapView
+            ref={mapRef}
             style={[styles.map, style as StyleProp<ViewStyle>]}
             styleURL={MAP_STYLES[layer]}
             scrollEnabled={interactive}
@@ -219,6 +226,7 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
             attributionEnabled
             logoEnabled
             compassEnabled={false}
+            scaleBarEnabled={false}
             onPress={interactive ? handleMapPress : undefined}
             onMapIdle={interactive ? handleMapIdle : undefined}
         >
@@ -260,8 +268,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
                 id="parqi-markers"
                 shape={markerData}
                 cluster={cluster}
-                clusterRadius={48}
-                clusterMaxZoomLevel={16}
+                clusterRadius={MAP_CONFIG.clusterRadius}
+                clusterMaxZoomLevel={MAP_CONFIG.clusterMaxZoom}
                 onPress={handleMarkerPress}
                 hitbox={{ width: 48, height: 48 }}
             >

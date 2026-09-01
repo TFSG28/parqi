@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { MAP_CONFIG, isValidCoordinate } from '../lib/mapConfig';
 import MapView, { Marker, Polygon, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { MapLayer, OsmMapHandle, OsmMapProps } from './OsmMap';
 
@@ -43,6 +44,7 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
 ) {
     //   sem clustering no modo google; volta ao OSM se a densidade de pins pesar
     const mapRef = useRef<MapView>(null);
+    const safeMarkers = markers.filter((marker) => isValidCoordinate(marker.latitude, marker.longitude));
 
     const animateTo = (latitude: number, longitude: number, z: number) => {
         const delta = zoomToDelta(z);
@@ -78,7 +80,7 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
             toolbarEnabled={false}
             scrollEnabled={interactive}
             zoomEnabled={interactive}
-            rotateEnabled={interactive}
+            rotateEnabled={false}
             pitchEnabled={false}
             onPress={
                 interactive && onMapPress
@@ -99,7 +101,7 @@ export const GoogleMap = forwardRef<OsmMapHandle, OsmMapProps>(function GoogleMa
                     : undefined
             }
         >
-            {markers.map((m) =>
+            {safeMarkers.slice(0, MAP_CONFIG.maxMarkers).map((m) =>
                 m.kind === 'dot' ? (
                     <Marker
                         key={m.id}

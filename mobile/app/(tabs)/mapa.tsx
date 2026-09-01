@@ -20,6 +20,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { parkingApi } from '../../src/lib/api';
 import { regionToBbox, type Region } from '../../src/lib/geo';
 import { distanceLabel, freshnessLabel, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
+import { expandBbox, MAP_CONFIG } from '../../src/lib/mapConfig';
 import { PALETTE, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
@@ -53,12 +54,15 @@ export default function MapScreen() {
     const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
     const mapRef = useRef<AppMapHandle>(null);
     const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const requestController = useRef<AbortController | null>(null);
+    const requestId = useRef(0);
     const lastBbox = useRef(regionToBbox(DEFAULT_REGION));
+    const lastRequestedBbox = useRef<string | null>(null);
 
     const [center, setCenter] = useState<LatLng>(DEFAULT_REGION);
-    const [locationLoading, setLocationLoading] = useState(false);
     const [mapLayer, setMapLayer] = useState<MapLayer>(resolvedScheme === 'dark' ? 'dark' : 'standard');
     const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+    const [followUser, setFollowUser] = useState(true);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
@@ -69,29 +73,42 @@ export default function MapScreen() {
     const [confirming, setConfirming] = useState(false);
 
     const fetchSpots = useCallback(async (bbox: string) => {
+        const id = ++requestId.current;
+        const expandedBbox = expandBbox(bbox);
         lastBbox.current = bbox;
+        requestController.current?.abort();
+        const controller = new AbortController();
+        requestController.current = controller;
         setLoading(true);
         try {
-            const items = await parkingApi.list(bbox);
+            const items = await parkingApi.list(expandedBbox, controller.signal);
+            if (id !== requestId.current) return;
             setSpots(items);
             setShowingCachedData(false);
             setFetchFailed(false);
             await writeParkingCache(items);
-        } catch {
+        } catch (error) {
+            if (controller.signal.aborted || id !== requestId.current) return;
             const cached = await readParkingCache();
+            if (id !== requestId.current) return;
             if (cached) {
                 setSpots(cached.items);
                 setShowingCachedData(true);
             }
             setFetchFailed(true);
         } finally {
-            setLoading(false);
+            if (id === requestId.current) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
         (async () => {
             try {
+                const cached = await readParkingCache();
+                if (cached) {
+                    setSpots(cached.items);
+                    setShowingCachedData(true);
+                }
                 fetchSpots(regionToBbox(DEFAULT_REGION));
                 const permission = await Location.getForegroundPermissionsAsync();
                 const status = permission.status === 'granted'
@@ -103,20 +120,21 @@ export default function MapScreen() {
                 if (last) {
                     const quick = { latitude: last.coords.latitude, longitude: last.coords.longitude };
                     setUserLocation(quick);
-                    setCenter(quick);
+                    if (followUser) setCenter(quick);
                     fetchSpots(regionToBbox({ ...quick, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                 }
 
                 const current = await Location.getCurrentPositionAsync({});
                 const coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
                 setUserLocation(coords);
-                setCenter(coords);
+                if (followUser) setCenter(coords);
+
                 fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
             } catch {
                 // Sem permissão ou localização disponível, mantém Lisboa como centro.
             }
         })();
-    }, [fetchSpots]);
+    }, [fetchSpots, followUser]);
 
     const filteredSpots = useMemo(
         () => spots.filter((spot) => typeFilter === 'all' || spot.parkingType === typeFilter),
@@ -138,36 +156,16 @@ export default function MapScreen() {
     );
 
     const handleBoundsChange = useCallback((bbox: string) => {
+        if (bbox === lastRequestedBbox.current) return;
+        lastRequestedBbox.current = bbox;
         if (fetchTimer.current) clearTimeout(fetchTimer.current);
-        fetchTimer.current = setTimeout(() => fetchSpots(bbox), 550);
+        fetchTimer.current = setTimeout(() => fetchSpots(bbox), MAP_CONFIG.requestDebounceMs);
     }, [fetchSpots]);
 
     useEffect(() => () => {
         if (fetchTimer.current) clearTimeout(fetchTimer.current);
+        requestController.current?.abort();
     }, [handleBoundsChange]);
-
-    const centerOnUser = async () => {
-        setLocationLoading(true);
-        try {
-            const permission = await Location.getForegroundPermissionsAsync();
-            const status = permission.status === 'granted'
-                ? 'granted'
-                : (await Location.requestForegroundPermissionsAsync()).status;
-            if (status !== 'granted') {
-                mapRef.current?.centerOn(DEFAULT_REGION.latitude, DEFAULT_REGION.longitude, 14);
-                return;
-            }
-
-            const current = await Location.getCurrentPositionAsync({});
-            const coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
-            setUserLocation(coords);
-            mapRef.current?.centerOn(coords.latitude, coords.longitude, 15);
-        } catch {
-            mapRef.current?.centerOn(DEFAULT_REGION.latitude, DEFAULT_REGION.longitude, 14);
-        } finally {
-            setLocationLoading(false);
-        }
-    };
 
     return (
         <View style={styles.container}>
@@ -185,7 +183,10 @@ export default function MapScreen() {
                     const spot = spots.find((item) => item.id === id);
                     if (spot) setSelectedSpot(spot);
                 }}
-                onMapPress={() => setSelectedSpot(null)}
+                onMapPress={() => {
+                    setSelectedSpot(null);
+                    setFollowUser(false);
+                }}
                 onBoundsChange={handleBoundsChange}
                 style={styles.map}
             />
@@ -359,18 +360,6 @@ export default function MapScreen() {
 
             <View style={[styles.mapControls, selectedSpot && styles.mapControlsRaised]}>
                 <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
-                <Pressable
-                    style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
-                    onPress={centerOnUser}
-                    accessibilityRole="button"
-                    accessibilityLabel="Centrar na minha localização"
-                >
-                    {locationLoading ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                        <Ionicons name="navigate" size={20} color={colors.primary} />
-                    )}
-                </Pressable>
             </View>
 
             {(fetchFailed || showingCachedData) && (
