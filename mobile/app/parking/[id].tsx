@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -25,6 +25,7 @@ import { useFavorites } from '../../src/context/FavoritesContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { ApiError, parkingApi } from '../../src/lib/api';
 import { CAPACITY_LABELS, directionsUrl, formatDate, formatScore } from '../../src/lib/geo';
+import { freshnessLabel, isStale, readCachedSpot, trustMessage, writeSpotToCache } from '../../src/lib/parking';
 import { AMENITY_DESIGN, MONO, PALETTE, SOURCE_LABELS, themedText, trustColor, TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot } from '../../src/types/parking';
@@ -100,11 +101,13 @@ export default function ParkingDetailScreen() {
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [spot, setSpot] = useState<ParkingSpot | null>(null);
+    const spotRef = useRef<ParkingSpot | null>(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [voting, setVoting] = useState(false);
     const [voted, setVoted] = useState<'up' | 'down' | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [offlineSnapshot, setOfflineSnapshot] = useState(false);
     const [reasonModal, setReasonModal] = useState(false);
     const [reason, setReason] = useState('');
 
@@ -117,15 +120,29 @@ export default function ParkingDetailScreen() {
         }
         try {
             const fresh = await parkingApi.get(id);
+            spotRef.current = fresh;
             setSpot(fresh);
+            setOfflineSnapshot(false);
             setVoted(fresh.myVote ?? null);
             refreshFavorite(fresh);
+            await writeSpotToCache(fresh);
             setNotFound(false);
         } catch (error) {
             if (error instanceof ApiError && error.status === 404) {
                 setNotFound(true);
-            } else {
-                Alert.alert('Erro', opts?.refresh ? 'Não foi possível atualizar.' : 'Não foi possível carregar o estacionamento.');
+            } else if (!spotRef.current) {
+                const cached = await readCachedSpot(id);
+                if (cached) {
+                    spotRef.current = cached;
+                    setSpot(cached);
+                    setVoted(cached.myVote ?? null);
+                    setOfflineSnapshot(true);
+                    refreshFavorite(cached);
+                } else {
+                    Alert.alert('Erro', opts?.refresh ? 'Não foi possível atualizar.' : 'Não foi possível carregar o estacionamento.');
+                }
+            } else if (opts?.refresh) {
+                Alert.alert('Sem ligação', 'A informação em ecrã continua disponível, mas pode estar desatualizada.');
             }
         } finally {
             setLoading(false);
@@ -149,7 +166,10 @@ export default function ParkingDetailScreen() {
         if (!spot) return;
         setVoting(true);
         try {
-            setSpot(await parkingApi.vote(spot.id, value, voteReason));
+            const updated = await parkingApi.vote(spot.id, value, voteReason);
+            spotRef.current = updated;
+            setSpot(updated);
+            await writeSpotToCache(updated);
             setVoted(value === 1 ? 'up' : 'down');
             Haptics.selectionAsync().catch(() => {});
         } catch (error) {
@@ -165,7 +185,10 @@ export default function ParkingDetailScreen() {
         if (!spot) return;
         setVoting(true);
         try {
-            setSpot(await parkingApi.unvote(spot.id));
+            const updated = await parkingApi.unvote(spot.id);
+            spotRef.current = updated;
+            setSpot(updated);
+            await writeSpotToCache(updated);
             setVoted(null);
             Haptics.selectionAsync().catch(() => {});
         } catch (error) {
@@ -257,6 +280,13 @@ export default function ParkingDetailScreen() {
         >
             <Stack.Screen options={{ headerShown: false }} />
 
+            {offlineSnapshot && (
+                <View style={styles.offlineBanner} accessibilityRole="alert">
+                    <Ionicons name="cloud-offline-outline" size={15} color={colors.accent} />
+                    <Text style={styles.offlineBannerText}>Sem ligação. Esta informação pode estar desatualizada.</Text>
+                </View>
+            )}
+
             {/* Hero — gradiente na cor da confiança, como no design v2 */}
             <View style={[styles.hero, { paddingTop: insets.top + 12, backgroundColor: scoreColor + '14' }]}>
                 <View style={styles.heroRow}>
@@ -328,7 +358,11 @@ export default function ParkingDetailScreen() {
                         </Text>
                     </View>
                     <TrustBar trustScore={spot.trustScore} />
-                    <Text style={styles.trustCaption}>{trustCaption(spot.trustScore)}</Text>
+                    <Text style={styles.trustCaption}>{trustMessage(spot)}</Text>
+                    <View style={styles.freshnessRow}>
+                        <Ionicons name={isStale(spot.updatedAt) ? 'time-outline' : 'checkmark-circle-outline'} size={14} color={isStale(spot.updatedAt) ? colors.accent : colors.primary} />
+                        <Text style={styles.freshnessText}>{freshnessLabel(spot.updatedAt)}</Text>
+                    </View>
                 </View>
 
                 {/* Comodidades */}
@@ -393,7 +427,8 @@ export default function ParkingDetailScreen() {
                     ) : (
                         <Text style={styles.coords}>Coordenadas não disponíveis</Text>
                     )}
-                    <Text style={styles.submittedBy}>Submetido por {SOURCE_LABELS[spot.source]}</Text>
+                    <Text style={styles.submittedBy}>Fonte: {SOURCE_LABELS[spot.source] ?? 'Desconhecida'}</Text>
+                    <Text style={styles.availabilityNote}>Disponibilidade atual: não disponível</Text>
                 </View>
 
                 {/* Mapa */}
@@ -493,6 +528,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     emptyTitle: {
         fontSize: 16,
         color: colors.textMuted,
+    },
+    offlineBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: colors.accent + '18',
+    },
+    offlineBannerText: {
+        flex: 1,
+        fontSize: 12,
+        color: colors.text,
     },
     hero: {
         paddingHorizontal: 16,
@@ -610,6 +658,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.textMuted,
         marginTop: 8,
     },
+    freshnessRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 10,
+    },
+    freshnessText: {
+        fontSize: 12,
+        color: colors.textMuted,
+    },
     amenityGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -693,6 +751,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 12,
         color: colors.textMuted,
         marginTop: 4,
+    },
+    availabilityNote: {
+        fontSize: 12,
+        color: colors.textMuted,
+        marginTop: 8,
+        fontStyle: 'italic',
     },
     mapCard: {
         borderRadius: 16,

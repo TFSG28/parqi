@@ -11,6 +11,7 @@ import { Pool } from 'pg';
 const LEGACY_SOURCE = 'OVERPASS';
 const OSM_SOURCE = 'OSM';
 const OSM_TECHNICAL_SUFFIX = String.raw`[[:space:]]*\(OSM[[:space:]]+(way|node)/[0-9]+\)[[:space:]]*$`;
+const FALLBACK_NAME = 'Parque de Estacionamento';
 
 async function main(): Promise<void> {
     const connectionString = process.env.DATABASE_URL;
@@ -46,16 +47,31 @@ async function main(): Promise<void> {
             `SELECT to_regclass('public."ParkingSpot"') IS NOT NULL AS exists`
         );
 
-        if (tableRows[0]?.exists && labels.has(OSM_SOURCE)) {
+        if (tableRows[0]?.exists && labels.has(LEGACY_SOURCE) && labels.has(OSM_SOURCE)) {
+            const sourceResult = await pool.query(
+                `UPDATE "ParkingSpot" SET "source" = $1 WHERE "source" = $2`,
+                [OSM_SOURCE, LEGACY_SOURCE]
+            );
+            console.log(`✅ Fonte normalizada: ${sourceResult.rowCount ?? 0} registo(s) OVERPASS → OSM`);
+        }
+
+        if (tableRows[0]?.exists) {
             const result = await pool.query(
                 `
                     UPDATE "ParkingSpot"
-                    SET "name" = trim(regexp_replace("name", $1, '', 'gi'))
+                    SET "name" = CASE
+                        WHEN lower(trim(regexp_replace("name", $1, '', 'gi'))) = '[object object]'
+                             OR trim(regexp_replace("name", $1, '', 'gi')) = ''
+                        THEN $2
+                        ELSE trim(regexp_replace("name", $1, '', 'gi'))
+                    END
                     WHERE "name" ~* $1
+                       OR lower(trim("name")) = '[object object]'
+                       OR trim("name") = ''
                 `,
-                [OSM_TECHNICAL_SUFFIX]
+                [OSM_TECHNICAL_SUFFIX, FALLBACK_NAME]
             );
-            console.log(`✅ Dados OSM normalizados: ${result.rowCount ?? 0} título(s) limpo(s)`);
+            console.log(`✅ Dados normalizados: ${result.rowCount ?? 0} título(s) corrigido(s)`);
         } else {
             console.log('ℹ️ Migração OSM sem alterações (base ainda não inicializada ou já atualizada)');
         }

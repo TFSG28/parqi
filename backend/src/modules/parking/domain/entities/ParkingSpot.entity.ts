@@ -11,6 +11,17 @@ export type DataSource = 'COMMUNITY' | 'OSM' | 'GEOAPIFY' | 'MUNICIPAL';
 export type ContributionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FLAGGED';
 export type GeometryType = 'POINT' | 'POLYGON' | 'LINE';
 
+/** Nome seguro para apresentação: remove lixo técnico e valores serializados acidentalmente. */
+export function normalizeParkingName(value: string): string {
+    const cleaned = value
+        .replace(/\s*\(OSM\s+(?:way|node)\/[0-9]+\)\s*$/i, '')
+        .trim();
+    if (!cleaned || /^\[object object\]$/i.test(cleaned)) {
+        return 'Parque de Estacionamento';
+    }
+    return cleaned;
+}
+
 export interface ParkingSpotEntity {
     id: string;
     name: string;
