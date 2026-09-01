@@ -340,7 +340,7 @@ jobs:
       # O APK embute a API em build-time via EXPO_PUBLIC_*. Default: quality
       # (apip.cesar.wearemateria.com); por environment pode-se apontar outro.
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://apip.cesar.wearemateria.com/api/v1' }}
-      EXPO_PUBLIC_MAP_PROVIDER: ${{ vars.EXPO_PUBLIC_MAP_PROVIDER || 'mapbox' }}
+      EXPO_PUBLIC_MAP_PROVIDER: ${{ vars.EXPO_PUBLIC_MAP_PROVIDER || 'osm' }}
       EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN }}
       RNMAPBOX_MAPS_DOWNLOAD_TOKEN: ${{ secrets.RNMAPBOX_MAPS_DOWNLOAD_TOKEN }}
       EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
