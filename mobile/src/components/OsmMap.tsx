@@ -20,6 +20,7 @@ export interface OsmMarker {
     color: string;
     /** Cor do "P" dentro do pin (default branco; escuro sobre laranja). */
     textColor?: string;
+    status?: 'APPROVED' | 'PENDING' | 'FLAGGED' | 'REJECTED';
     /** 'pin' = sinal P (default); 'dot' = ponto pequeno (vértices de polígono). */
     kind?: 'pin' | 'dot';
 }
@@ -108,8 +109,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#e8e8e8}
 .parqi-pin,.parqi-cluster{background:transparent;border:none}
 </style>
 </head><body><div id="map"></div><script>
-const interactive = ${interactive};
-const map = L.map('map', {
+const interactive = ${interactive};    const map = L.map('map', {
     zoomControl: false,
     dragging: interactive,
     touchZoom: interactive,
@@ -117,6 +117,12 @@ const map = L.map('map', {
     scrollWheelZoom: interactive,
     boxZoom: false,
     keyboard: false,
+    zoomAnimation: true,
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    inertia: true,
+    inertiaDeceleration: 2800,
+    easeLinearity: 0.2,
 }).setView([${center.latitude}, ${center.longitude}], ${zoom});
 
 const LAYERS = {
@@ -157,10 +163,15 @@ function pinIcon(m) {
 
 const markerLayer = ${cluster}
     ? L.markerClusterGroup({
-          maxClusterRadius: 60,
+          maxClusterRadius: 48,
           showCoverageOnHover: false,
           spiderfyOnMaxZoom: true,
-          disableClusteringAtZoom: 17,
+          animate: true,
+          animateAddingMarkers: true,
+          chunkedLoading: true,
+          chunkInterval: 100,
+          chunkDelay: 25,
+          disableClusteringAtZoom: 16,
           iconCreateFunction: function (c) {
               const n = c.getChildCount();
               const size = n < 10 ? 38 : n < 100 ? 44 : 52;

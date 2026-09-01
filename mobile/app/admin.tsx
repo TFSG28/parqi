@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     ActivityIndicator,
     Alert,
@@ -10,16 +11,20 @@ import {
     StyleSheet,
     Text,
     TextInput,
+    Switch,
     View,
 } from 'react-native';
 import { Chip } from '../src/components/Chip';
 import { useTheme } from '../src/context/ThemeContext';
+import { useAuth } from '../src/context/AuthContext';
+import type { MapProvider } from '../src/components/AppMap';
 import { ApiError, parkingApi } from '../src/lib/api';
 import { formatScore, STATUS_META, TYPE_META } from '../src/lib/geo';
 import type { ThemeColors } from '../src/theme/colors';
 import type { ParkingSpot, ParkingSuggestion } from '../src/types/parking';
 
 type Tab = 'contributions' | 'suggestions';
+const PROVIDER_STORAGE_KEY = 'parqi.map_provider';
 
 interface PendingAction {
     kind: 'spot' | 'suggestion';
@@ -44,6 +49,7 @@ function summarizeSuggestion(data: Record<string, unknown>): string[] {
 
 export default function AdminScreen() {
     const { colors } = useTheme();
+    const { user } = useAuth();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [tab, setTab] = useState<Tab>('contributions');
@@ -53,6 +59,20 @@ export default function AdminScreen() {
     const [busy, setBusy] = useState(false);
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [reason, setReason] = useState('');
+    const [mapProvider, setMapProvider] = useState<MapProvider>('osm');
+
+    useEffect(() => {
+        AsyncStorage.getItem(PROVIDER_STORAGE_KEY).then((value) => {
+            if (value === 'osm' || value === 'mapbox') setMapProvider(value);
+        }).catch(() => {});
+    }, []);
+
+    const changeMapProvider = (enabled: boolean) => {
+        if (user?.role !== 'ADMIN') return;
+        const next: MapProvider = enabled ? 'mapbox' : 'osm';
+        setMapProvider(next);
+        AsyncStorage.setItem(PROVIDER_STORAGE_KEY, next).catch(() => {});
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -249,6 +269,20 @@ export default function AdminScreen() {
 
     return (
         <View style={styles.container}>
+            <View style={styles.providerCard}>
+                <View style={styles.providerCopy}>
+                    <Text style={styles.providerTitle}>Motor do mapa</Text>
+                    <Text style={styles.providerHint}>Escolhe o mapa neste dispositivo. OSM funciona sempre; Mapbox requer development build e token.</Text>
+                </View>
+                <Switch
+                    value={mapProvider === 'mapbox'}
+                    onValueChange={changeMapProvider}
+                    disabled={user?.role !== 'ADMIN'}
+                    trackColor={{ false: colors.border, true: colors.primary + '66' }}
+                    thumbColor={mapProvider === 'mapbox' ? colors.primary : colors.textMuted}
+                    accessibilityLabel="Alternar entre OpenStreetMap e Mapbox"
+                />
+            </View>
             <View style={styles.tabs}>
                 <Chip label={`Contribuições (${queue.length})`} selected={tab === 'contributions'} onPress={() => setTab('contributions')} />
                 <Chip label={`Sugestões (${suggestions.length})`} selected={tab === 'suggestions'} onPress={() => setTab('suggestions')} />
@@ -312,6 +346,32 @@ const createStyles = (colors: ThemeColors) =>
         container: {
             flex: 1,
             backgroundColor: colors.background,
+        },
+        providerCard: {
+            margin: 16,
+            marginBottom: 0,
+            padding: 14,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        providerCopy: {
+            flex: 1,
+            gap: 4,
+        },
+        providerTitle: {
+            color: colors.text,
+            fontSize: 14,
+            fontWeight: '700',
+        },
+        providerHint: {
+            color: colors.textMuted,
+            fontSize: 11,
+            lineHeight: 16,
         },
         tabs: {
             flexDirection: 'row',

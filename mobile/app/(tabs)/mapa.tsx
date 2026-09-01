@@ -56,6 +56,7 @@ export default function MapScreen() {
     const lastBbox = useRef(regionToBbox(DEFAULT_REGION));
 
     const [center, setCenter] = useState<LatLng>(DEFAULT_REGION);
+    const [locationLoading, setLocationLoading] = useState(false);
     const [mapLayer, setMapLayer] = useState<MapLayer>(resolvedScheme === 'dark' ? 'dark' : 'standard');
     const [userLocation, setUserLocation] = useState<LatLng | null>(null);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
@@ -89,9 +90,9 @@ export default function MapScreen() {
     }, []);
 
     useEffect(() => {
-        fetchSpots(regionToBbox(DEFAULT_REGION));
         (async () => {
             try {
+                fetchSpots(regionToBbox(DEFAULT_REGION));
                 const permission = await Location.getForegroundPermissionsAsync();
                 const status = permission.status === 'granted'
                     ? 'granted'
@@ -112,7 +113,7 @@ export default function MapScreen() {
                 setCenter(coords);
                 fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
             } catch {
-                // Sem permissão ou localização disponível, mantém a região inicial.
+                // Sem permissão ou localização disponível, mantém Lisboa como centro.
             }
         })();
     }, [fetchSpots]);
@@ -131,33 +132,40 @@ export default function MapScreen() {
                 longitude: spot.longitude!,
                 color: spot.status === 'APPROVED' ? colors.primary : PALETTE.amberDeep,
                 textColor: colors.white,
+                status: spot.status,
             })),
         [filteredSpots, colors]
     );
 
-    const handleBoundsChange = (bbox: string) => {
+    const handleBoundsChange = useCallback((bbox: string) => {
         if (fetchTimer.current) clearTimeout(fetchTimer.current);
-        fetchTimer.current = setTimeout(() => fetchSpots(bbox), 450);
-    };
+        fetchTimer.current = setTimeout(() => fetchSpots(bbox), 550);
+    }, [fetchSpots]);
 
     useEffect(() => () => {
         if (fetchTimer.current) clearTimeout(fetchTimer.current);
-    }, []);
+    }, [handleBoundsChange]);
 
     const centerOnUser = async () => {
+        setLocationLoading(true);
         try {
             const permission = await Location.getForegroundPermissionsAsync();
             const status = permission.status === 'granted'
                 ? 'granted'
                 : (await Location.requestForegroundPermissionsAsync()).status;
-            if (status !== 'granted') return;
+            if (status !== 'granted') {
+                mapRef.current?.centerOn(DEFAULT_REGION.latitude, DEFAULT_REGION.longitude, 14);
+                return;
+            }
 
             const current = await Location.getCurrentPositionAsync({});
             const coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
             setUserLocation(coords);
             mapRef.current?.centerOn(coords.latitude, coords.longitude, 15);
         } catch {
-            // Ignora falhas pontuais de localização.
+            mapRef.current?.centerOn(DEFAULT_REGION.latitude, DEFAULT_REGION.longitude, 14);
+        } finally {
+            setLocationLoading(false);
         }
     };
 
@@ -357,7 +365,11 @@ export default function MapScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Centrar na minha localização"
                 >
-                    <Ionicons name="navigate" size={20} color={colors.primary} />
+                    {locationLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                        <Ionicons name="navigate" size={20} color={colors.primary} />
+                    )}
                 </Pressable>
             </View>
 
