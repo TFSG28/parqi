@@ -131,7 +131,7 @@ const NETWORK_ERROR_MESSAGE =
 const TIMEOUT_ERROR_MESSAGE =
     'O servidor demorou demasiado a responder. Tenta de novo daqui a pouco.';
 
-async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+async function request<T>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const token = await getToken();
     if (token) {
@@ -149,10 +149,11 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
             method: init.method ?? 'GET',
             headers,
             body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-            signal: controller.signal,
+            signal: init.signal ?? controller.signal,
         });
     } catch (error) {
         const timedOut = error instanceof Error && error.name === 'AbortError';
+        if (init.signal?.aborted) throw error;
         throw new ApiError(
             timedOut ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE,
             0,
@@ -177,7 +178,7 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
 }
 
 export const api = {
-    get: <T>(path: string) => request<T>(path),
+    get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
     post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
     patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
     delete: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', body }),
@@ -237,8 +238,8 @@ export const authApi = {
 };
 
 export const parkingApi = {
-    list: (bbox: string) =>
-        api.get<ParkingSpot[]>(`/parking?bbox=${encodeURIComponent(bbox)}&limit=100`),
+    list: (bbox: string, signal?: AbortSignal) =>
+        api.get<ParkingSpot[]>(`/parking?bbox=${encodeURIComponent(bbox)}&limit=100`, signal),
     /** Pesquisa por nome em todo o país (não limitada ao viewport). */
     search: (q: string) =>
         api.get<ParkingSpot[]>(`/parking?q=${encodeURIComponent(q)}&limit=50`),
