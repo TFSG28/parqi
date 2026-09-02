@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { CapacityRange, ContributionStatus, DataSource, ParkingType } from '../types/parking';
+import { TYPE_COLOR } from '../theme/design';
 import type { ThemeColors } from '../theme/colors';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -37,12 +38,13 @@ export function directionsUrl(latitude: number, longitude: number): string {
     return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
 }
 
+/** Cores vêm de TYPE_COLOR (theme/design.ts) — única fonte de cor por tipo. */
 export const TYPE_META: Record<ParkingType, { label: string; icon: IoniconName; color: string }> = {
-    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: '#0EA5E9' },
-    UNDERGROUND: { label: 'Subterrâneo', icon: 'water', color: '#8B5CF6' },
-    MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: '#0647AC' },
-    STREET: { label: 'Na via', icon: 'car', color: '#FF6900' },
-    OTHER: { label: 'Outro', icon: 'help', color: '#94A3B8' },
+    SURFACE: { label: 'Ao ar livre', icon: 'sunny', color: TYPE_COLOR.SURFACE },
+    UNDERGROUND: { label: 'Subterrâneo', icon: 'water', color: TYPE_COLOR.UNDERGROUND },
+    MULTI_STORY: { label: 'Edifício / andares', icon: 'business', color: TYPE_COLOR.MULTI_STORY },
+    STREET: { label: 'Na via', icon: 'car', color: TYPE_COLOR.STREET },
+    OTHER: { label: 'Outro', icon: 'help', color: TYPE_COLOR.OTHER },
 };
 
 export const SOURCE_META: Record<DataSource, { label: string; icon: IoniconName; color: string }> = {

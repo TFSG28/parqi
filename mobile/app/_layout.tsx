@@ -9,6 +9,8 @@ import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { registerForPushNotifications } from '../src/services/notifications';
 
 function HeaderLogo({ title }: Readonly<{ title?: string }>) {
+    const { colors } = useTheme();
+
     return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Image
@@ -17,7 +19,7 @@ function HeaderLogo({ title }: Readonly<{ title?: string }>) {
                 resizeMode="contain"
             />
             {title ? (
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>{title}</Text>
+                <Text style={{ color: colors.white, fontWeight: '700', fontSize: 16 }}>{title}</Text>
             ) : null}
         </View>
     );
