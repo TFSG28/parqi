@@ -28,7 +28,7 @@ App comunitária para encontrar estacionamento em Portugal. Junta dados público
 2. **Sinalética, não decoração** — a linguagem visual vem dos sinais de trânsito (o "P" azul europeu É o azul da marca); todo o ornamento deve informar.
 3. **O mapa é o herói** — UI flutua sobre o mapa, nunca compete com ele; chrome mínimo.
 4. **Confiança visível** — a métrica de confiança e o estado de validação são cidadãos de primeira classe, não metadados escondidos.
-5. **Laranja é ação** — #F2A116 marca as ações primárias (rota, contribuir, CTAs) e estados de atenção (pendente); sempre com tinta escura por cima (branco sobre laranja falha o contraste AA). Azul é estrutura e marca.
+5. **Laranja é ação** — #FF6900 marca as ações primárias (rota, contribuir, CTAs) e estados de atenção (pendente); no site, texto pequeno sobre laranja usa tinta escura (branco sobre laranja falha o contraste AA); a app usa branco sobre laranja nos botões. Azul é estrutura e marca (#0647AC, o azul do sinal de estacionamento, igual no site e na app).
 
 ## Accessibility & Inclusion
 

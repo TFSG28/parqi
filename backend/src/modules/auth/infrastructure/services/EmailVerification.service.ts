@@ -70,7 +70,7 @@ export class EmailVerificationService {
             'Parqi — confirma o teu email',
             `<p>Olá <strong>${escapeHtml(user.name)}</strong>,</p>
              <p>Usa o código abaixo para validar a tua conta:</p>
-             <p style="font-size:30px;font-weight:800;letter-spacing:8px;text-align:center;color:#3B6BFF;background:#F0F4FF;border-radius:10px;padding:14px">${code}</p>
+             <p style="font-size:30px;font-weight:800;letter-spacing:8px;text-align:center;color:#0647AC;background:#F0F4FF;border-radius:10px;padding:14px">${code}</p>
              <p>O código expira em <strong>15 minutos</strong>. Se não foste tu, ignora este email.</p>`
         );
 
