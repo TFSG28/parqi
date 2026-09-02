@@ -167,7 +167,7 @@ export default function ProfileScreen() {
     const statCards: { label: string; value: string; color: string }[] = stats
         ? [
             { label: 'Locais adicionados', value: String(stats.total), color: colors.primary },
-            { label: 'Verificados', value: String(stats.approved), color: '#10B981' },
+            { label: 'Verificados', value: String(stats.approved), color: colors.success },
             { label: 'Votos dados', value: String(stats.votesGiven), color: colors.text },
             { label: 'Taxa de aprovação', value: `${Math.round(stats.approvedRate)}%`, color: PALETTE.amberDeep },
         ]

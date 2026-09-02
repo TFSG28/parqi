@@ -277,15 +277,8 @@ export const MapboxMap = forwardRef<OsmMapHandle, OsmMapProps>(function MapboxMa
                     id="parqi-clusters"
                     filter={['has', 'point_count']}
                     style={{
-                        circleColor: [
-                            'step',
-                            ['get', 'point_count'],
-                            brandColor,
-                            10,
-                            accentColor,
-                            100,
-                            '#7C3AED',
-                        ],
+                        // Todos os clusters na cor da marca, como no OSM/Google.
+                        circleColor: brandColor,
                         circleRadius: ['step', ['get', 'point_count'], 19, 10, 22, 100, 26],
                         circleStrokeWidth: 3,
                         circleStrokeColor: '#FFFFFF',

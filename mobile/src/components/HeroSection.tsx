@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { PALETTE } from '../theme/design';
 import type { ThemeColors } from '../theme/colors';
 
 interface HeroSectionProps {
@@ -45,7 +46,7 @@ export function HeroSection({ totalSpots, verifiedSpots }: Readonly<HeroSectionP
 
                 <View style={styles.statsRow}>
                     <View style={styles.statPill}>
-                        <Ionicons name="shield-checkmark" size={14} color="#A7F3D0" />
+                        <Ionicons name="shield-checkmark" size={14} color={PALETTE.emerald} />
                         <Text style={styles.statText}>
                             {verifiedSpots} verificados
                         </Text>
@@ -110,7 +111,7 @@ const createStyles = (colors: ThemeColors) =>
         statText: {
             fontSize: 12,
             fontWeight: '600',
-            color: '#A7F3D0',
+            color: PALETTE.emerald,
         },
         cta: {
             alignItems: 'center',

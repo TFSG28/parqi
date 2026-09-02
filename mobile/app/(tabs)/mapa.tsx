@@ -21,7 +21,7 @@ import { parkingApi } from '../../src/lib/api';
 import { regionToBbox, type Region } from '../../src/lib/geo';
 import { distanceLabel, freshnessLabel, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
 import { expandBbox, MAP_CONFIG } from '../../src/lib/mapConfig';
-import { PALETTE, TYPE_DESIGN } from '../../src/theme/design';
+import { TYPE_DESIGN } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
 
@@ -148,7 +148,7 @@ export default function MapScreen() {
                 id: spot.id,
                 latitude: spot.latitude!,
                 longitude: spot.longitude!,
-                color: spot.status === 'APPROVED' ? colors.primary : PALETTE.amberDeep,
+                color: colors.primary,
                 textColor: colors.white,
                 status: spot.status,
             })),
