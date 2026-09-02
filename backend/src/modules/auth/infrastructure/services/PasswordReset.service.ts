@@ -60,7 +60,7 @@ export class PasswordResetService {
             'Parqi — recupera a tua palavra-passe',
             `<p>Olá <strong>${escapeHtml(user.name)}</strong>,</p>
              <p>Usa o código abaixo para definir uma palavra-passe nova:</p>
-             <p style="font-size:30px;font-weight:800;letter-spacing:8px;text-align:center;color:#3B6BFF;background:#F0F4FF;border-radius:10px;padding:14px">${code}</p>
+             <p style="font-size:30px;font-weight:800;letter-spacing:8px;text-align:center;color:#0647AC;background:#F0F4FF;border-radius:10px;padding:14px">${code}</p>
              <p>O código expira em <strong>15 minutos</strong>. Se não pediste esta alteração, ignora este email — a tua palavra-passe mantém-se.</p>`
         );
 

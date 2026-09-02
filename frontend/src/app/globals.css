@@ -1,40 +1,46 @@
 @import "tailwindcss";
 
+/* dark: responde à classe .dark no <html> (aplicada antes do primeiro paint
+   pelo script de init no layout), não à preferência do sistema operativo. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-brand: #3b6bff;
-  --color-brand-deep: #2a4ed6;
-  --color-brand-night: #1b2f8a;
-  --color-accent: #ff7a00;
-  --color-on-brand: #e3e8ff; /* texto claro sobre blocos de marca (herói/rodapé) */
-  --color-on-accent: #15173a; /* texto sobre o laranja de realce */
-  --color-ink: #15173a;
-  --color-ink-soft: #4d5079;
-  --color-paper: #fdfdff;
-  --color-mist: #e3e8ff;
-  --color-danger: #dc2626;
-  --color-success: #16a34a;
-  --color-muted: #6b7280;
-  --color-surface: #ffffff;
-  --color-border: #e5e7eb;
+  /* Paleta da marca = a da app (mobile/src/theme/colors.ts LIGHT).
+     Azul do sinal de estacionamento #0647AC; laranja de ação #FF6900. */
+  --color-brand: #0647ac;      /* app LIGHT.primary */
+  --color-brand-deep: #053a8c; /* app LIGHT.heroBg — tom profundo para herói/rodapé */
+  --color-accent: #ff6900;     /* app LIGHT.accent */
+  --color-on-brand: #f5f5f7;   /* off-white da app, sobre blocos de marca */
+  --color-on-accent: #ffffff;  /* app LIGHT.onAccent — branco sobre laranja */
+  --color-ink: #111111;        /* app LIGHT.text */
+  --color-ink-soft: #4b5563;   /* cinza neutro AA (7.6:1) para prosa */
+  --color-paper: #f5f5f7;      /* app LIGHT.background */
+  --color-mist: #ebebed;       /* app LIGHT.muted — superfícies subtis */
+  --color-danger: #e5303a;     /* app LIGHT.danger */
+  --color-success: #059669;    /* app LIGHT.success */
+  --color-muted: #6b7280;      /* cinza neutro AA (4.8:1) para texto secundário */
+  --color-surface: #ffffff;    /* app LIGHT.card */
+  --color-border: #e3e3e6;     /* app LIGHT.border */
   --font-display: var(--font-display);
   --font-sans: var(--font-body);
 }
 
-/* Escuro = o tema escuro da app móvel: noite-azul com a marca a virar laranja. */
+/* Escuro = o tema escuro da app móvel (mobile DARK), 1:1:
+   fundo neutro #111, cartões #1C1C1E e a marca a virar laranja. */
 .dark {
-  --color-brand: #ff6900;      /* mobile DARK.primary — a marca vira laranja */
-  --color-brand-deep: #131826; /* mobile DARK.card/bar — superfície noite dos blocos */
-  --color-on-brand: #e8edf5;   /* mobile DARK.text sobre blocos de marca */
-  --color-on-accent: #ffffff;  /* mobile DARK.onAccent */
-  --color-ink: #e8edf5;        /* mobile DARK.text */
-  --color-ink-soft: #6b7fa0;   /* mobile DARK.textMuted */
-  --color-paper: #0b0f1a;      /* mobile DARK.background */
-  --color-mist: #1a2030;       /* mobile DARK.heroBg — superfície elevada */
-  --color-surface: #131826;    /* mobile DARK.card */
-  --color-border: #31221c;     /* mobile DARK.border — laranja achatado */
-  --color-muted: #6b7fa0;
-  --color-danger: #ef4444;     /* mobile DARK.danger */
-  --color-success: #34d399;    /* mobile DARK.success */
+  --color-brand: #ff6900;      /* app DARK.primary — a marca vira laranja */
+  --color-brand-deep: #1c1c1e; /* app DARK.card/bar — superfície dos blocos de marca */
+  --color-on-brand: #f0ede8;   /* app DARK.text */
+  --color-on-accent: #ffffff;  /* app DARK.onAccent */
+  --color-ink: #f0ede8;        /* app DARK.text */
+  --color-ink-soft: #878785;   /* app DARK.textMuted (5.4:1 sobre #111) */
+  --color-paper: #111111;      /* app DARK.background */
+  --color-mist: #242426;       /* app DARK.muted — superfícies elevadas */
+  --color-surface: #1c1c1e;    /* app DARK.card */
+  --color-border: #2a2a2c;     /* app DARK.border */
+  --color-muted: #878785;      /* app DARK.textMuted */
+  --color-danger: #ef4444;     /* app DARK.danger */
+  --color-success: #34d399;    /* app DARK.success */
 }
 
 body {

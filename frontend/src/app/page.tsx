@@ -3,6 +3,62 @@ import Link from "next/link";
 import ScrollReveal from "@/components/feature/ScrollReveal";
 import ThemeToggle from "@/components/feature/ThemeToggle";
 
+/* Ecrãs reais da app, dentro de molduras de telemóvel. */
+const PHONE_SCREENS = [
+  {
+    src: "/app/mapa-dark.jpg",
+    alt: "App Parqi: mapa em tema escuro com estacionamentos por perto",
+    caption: "Mapa em tema escuro",
+    width: 1080,
+    height: 2400,
+  },
+  {
+    src: "/app/mapa-light.jpg",
+    alt: "App Parqi: mapa em tema claro com estacionamentos por perto",
+    caption: "Mapa em tema claro",
+    width: 1080,
+    height: 2400,
+  },
+  {
+    src: "/app/pesquisa-light.jpg",
+    alt: "App Parqi: lista de estacionamentos com confiança da comunidade",
+    caption: "Pesquisa com confiança da comunidade",
+    width: 1080,
+    height: 2400,
+  },
+  {
+    src: "/app/pesquisa-dark.jpg",
+    alt: "App Parqi: lista de estacionamentos em tema escuro",
+    caption: "Pesquisa em tema escuro",
+    width: 1080,
+    height: 2400,
+  },
+];
+
+function PhoneFrame({
+  src,
+  alt,
+  width,
+  height,
+  priority = false,
+}: Readonly<{ src: string; alt: string; width: number; height: number; priority?: boolean }>) {
+  return (
+    <div className="rounded-[38px] bg-[#101114] p-1.25 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.45)]">
+      <div className="overflow-hidden rounded-[33px]">
+        <Image
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          sizes="260px"
+          className="h-auto w-full"
+          priority={priority}
+        />
+      </div>
+    </div>
+  );
+}
+
 const PILLARS = [
   {
     glyph: "P",
@@ -63,61 +119,6 @@ function ParkingSign({ className, inverted }: Readonly<{ className?: string; inv
   );
 }
 
-/* Cena de mapa: ruas esquematizadas e um trajeto que termina no sinal P. */
-function MapScene({ className }: Readonly<{ className?: string }>) {
-  return (
-    <svg
-      viewBox="0 0 320 340"
-      role="img"
-      aria-label="Mapa esquemático com um trajeto até um lugar de estacionamento"
-      className={className}
-    >
-      {/* quarteirões */}
-      <g fill="#ffffff" opacity="0.07">
-        <rect x="24" y="30" width="88" height="64" rx="6" />
-        <rect x="138" y="18" width="72" height="76" rx="6" />
-        <rect x="24" y="122" width="60" height="92" rx="6" />
-        <rect x="110" y="122" width="100" height="60" rx="6" />
-        <rect x="236" y="96" width="62" height="86" rx="6" />
-        <rect x="66" y="242" width="96" height="68" rx="6" />
-        <rect x="188" y="210" width="110" height="100" rx="6" />
-      </g>
-      {/* ruas */}
-      <g stroke="#ffffff" strokeOpacity="0.22" strokeWidth="3" strokeLinecap="round">
-        <path d="M0 108 H320" />
-        <path d="M0 196 H320" />
-        <path d="M96 0 V340" />
-        <path d="M222 0 V340" />
-      </g>
-      {/* trajeto */}
-      <path
-        d="M14 330 H96 V196 H222 V108"
-        fill="none"
-        stroke="#ff7a00"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="route-draw"
-      />
-      {/* destino: sinal P com pulso */}
-      <g className="pulse-target">
-        <circle r="30" fill="#ff7a00" opacity="0.25" />
-        <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#ffffff" />
-        <text
-          y="12"
-          textAnchor="middle"
-          fontFamily="var(--font-display)"
-          fontWeight="800"
-          fontSize="34"
-          fill="var(--color-brand)"
-        >
-          P
-        </text>
-      </g>
-    </svg>
-  );
-}
-
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
@@ -169,11 +170,10 @@ export default function Home() {
               </h1>
               <p className="rise rise-2 mt-8 max-w-[36ch] text-lg leading-relaxed text-on-brand">
                 O Parqi junta dados públicos e uma comunidade de condutores para
-                te mostrar onde estacionar em Portugal, com a rota no Google
-                Maps a um toque.
+                te mostrar onde estacionar em Portugal.
               </p>
               <p className="rise rise-3 mt-10 flex flex-wrap items-center gap-3 text-sm">
-                <span className="text-on-brand">Brevemente em</span>
+                <span className="text-on-brand">Brevemente na</span>
                 <span className="store-badge rounded-full border border-accent/80 px-4 py-1.5 font-semibold">
                   App Store
                 </span>
@@ -182,7 +182,16 @@ export default function Home() {
                 </span>
               </p>
             </div>
-            <MapScene className="rise rise-3 mx-auto w-full max-w-[320px]" />
+            <div className="rise rise-3 relative mx-auto h-110 w-75 sm:h-127.5 sm:w-85">
+              {/* Telemóvel de trás: mapa claro, rodado */}
+              <div className="absolute left-0 top-10 w-[52%] -rotate-6 opacity-95">
+                <PhoneFrame {...PHONE_SCREENS[1]} />
+              </div>
+              {/* Telemóvel da frente: mapa escuro */}
+              <div className="absolute right-0 top-0 w-[62%] rotate-2">
+                <PhoneFrame {...PHONE_SCREENS[0]} priority />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -217,8 +226,41 @@ export default function Home() {
 
         <ScrollReveal threshold={0.3}>
           <p className="sr-solo mt-10 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
-            A app é grátis e feita pela comunidade.
+            A app é grátis e feita para a comunidade.
           </p>
+        </ScrollReveal>
+      </section>
+
+      {/* A app — molduras de telemóvel com ecrãs reais */}
+      <section className="mx-auto max-w-5xl px-6 pb-[clamp(4rem,10vh,7rem)]">
+        <ScrollReveal>
+          <h2 className="sr-solo font-display text-4xl font-bold tracking-tight">A app</h2>
+        </ScrollReveal>
+
+        <ScrollReveal className="mt-12 flex flex-wrap justify-center gap-8">
+          {PHONE_SCREENS.map((screen, i) => (
+            <figure
+              key={screen.src}
+              className="sr-item w-55"
+              style={{ transitionDelay: `${i * 90}ms` }}
+            >
+              <div className="rounded-[38px] bg-[#101114] p-1.25 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.35)]">
+                <div className="overflow-hidden rounded-[33px]">
+                  <Image
+                    src={screen.src}
+                    alt={screen.alt}
+                    width={screen.width}
+                    height={screen.height}
+                    sizes="220px"
+                    className="h-auto w-full"
+                  />
+                </div>
+              </div>
+              <figcaption className="mt-4 text-center text-sm text-ink-soft">
+                {screen.caption}
+              </figcaption>
+            </figure>
+          ))}
         </ScrollReveal>
       </section>
 

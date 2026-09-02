@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<title>Banner Parqi</title>
+<style>
+  body {
+    margin: 0; padding: 52px 0 58px;
+    background: #053A8C;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 42px;
+  }
+  .head { text-align: center; color: #fff; }
+  .head h1 { margin: 0; font-size: 56px; font-weight: 800; letter-spacing: -1px; }
+  .head p { margin: 10px 0 0; font-size: 20px; color: #E3E8FF; }
+
+  .phones { display: flex; gap: 46px; align-items: flex-start; }
+  .phone {
+    width: 252px; border-radius: 38px; background: #101114; padding: 6px;
+    box-shadow: 0 26px 48px -16px rgba(0, 0, 0, 0.45);
+    box-sizing: border-box;
+  }
+  .phone img { display: block; width: 100%; height: auto; border-radius: 32px; }
+  .phone.back { transform: rotate(-4deg) translateY(14px); }
+  .phone.front { transform: rotate(2.5deg); }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Parqi</h1>
+    <p>Encontra estacionamento em Portugal, sem dar voltas.</p>
+  </div>
+  <div class="phones">
+    <div class="phone back"><img src="../frontend/public/app/pesquisa-light.jpg" alt=""></div>
+    <div class="phone front"><img src="../frontend/public/app/mapa-dark.jpg" alt=""></div>
+    <div class="phone"><img src="../frontend/public/app/mapa-light.jpg" alt=""></div>
+    <div class="phone"><img src="../frontend/public/app/pesquisa-dark.jpg" alt=""></div>
+  </div>
+</body>
+</html>

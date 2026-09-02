@@ -37,7 +37,7 @@ export const baseEmailTemplate = (content: string, subject: string) => {
                 border: 1px solid #eaeaea;
             }
             .header {
-                background: #3B6BFF;
+                background: #0647AC;
                 padding: 30px 20px;
                 text-align: center;
                 color: white;

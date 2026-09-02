@@ -2,28 +2,28 @@
 name: Parqi
 description: App comunitária para encontrar estacionamento em Portugal
 colors:
-  brand: "#3B6BFF"
-  brand-deep: "#2A4ED6"
-  brand-night: "#1B2F8A"
-  accent: "#FF7A00"
-  ink: "#15173A"
-  ink-soft: "#4D5079"
-  paper: "#FDFDFF"
-  mist: "#E3E8FF"
-  app-background: "#F7F8FA"
-  app-card: "#FFFFFF"
-  app-text: "#111318"
-  app-text-muted: "#6B7280"
-  app-border: "#E5E7EB"
-  success: "#16A34A"
-  danger: "#DC2626"
-  dark-background: "#0F1117"
-  dark-card: "#1A1D27"
-  dark-text: "#F2F3F7"
-  dark-text-muted: "#9AA0B4"
-  dark-border: "#2A2E3D"
-  dark-primary: "#3B6BFF"
-  dark-bar: "#2E46C9"
+  brand: "#0647AC"
+  brand-deep: "#053A8C"
+  accent: "#FF6900"
+  on-accent: "#FFFFFF"
+  ink: "#111111"
+  ink-soft: "#4B5563"
+  paper: "#F5F5F7"
+  mist: "#EBEBED"
+  surface: "#FFFFFF"
+  border: "#E3E3E6"
+  muted: "#6B7280"
+  success: "#059669"
+  danger: "#E5303A"
+  dark-background: "#111111"
+  dark-surface: "#1C1C1E"
+  dark-text: "#F0EDE8"
+  dark-text-muted: "#878785"
+  dark-border: "#2A2A2C"
+  dark-muted: "#242426"
+  dark-primary: "#FF6900"
+  dark-success: "#34D399"
+  dark-danger: "#EF4444"
 typography:
   display:
     fontFamily: "Barlow Semi Condensed, sans-serif"
@@ -90,12 +90,12 @@ Parqi encontra estacionamento em Portugal com dados públicos e comunidade. A id
 
 Estratégia *committed* no site (o azul carrega herói e rodapé; o miolo é branco) e *restrained* na app (neutros claros, azul só em ações primárias e na barra superior).
 
-- `brand` #3B6BFF é o azul do sinal de estacionamento (versão mais clara e viva): ações primárias, barras, marca.
-- `accent` #FF7A00 é a cor de ação (laranja vivo): CTAs primários (Rota, Enviar contribuição, FAB de adicionar), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam `ink` (branco sobre laranja vivo falha o contraste AA).
-- Neutros do site (`ink`, `ink-soft`, `paper`, `mist`) são tintados para o azul da marca; os da app (`app-*`) são neutros frios do sistema.
+- `brand` #0647AC é o azul do sinal de estacionamento, igual no site e na app (mobile LIGHT.primary): ações primárias, barras, marca. `brand-deep` #053A8C carrega os blocos de marca do site (herói e rodapé).
+- `accent` #FF6900 é a cor de ação (laranja vivo), igual no site e na app: CTAs primários (Rota, Enviar contribuição, FAB de adicionar), rota no mapa do site, estado "em verificação". Texto/ícones sobre laranja usam branco ou `ink` conforme o contexto (branco sobre laranja no site falha o contraste AA em texto pequeno).
+- Neutros partilhados: os dois registos usam os mesmos neutros frios do sistema (paper #F5F5F7, texto #111111, bordas #E3E3E6); a fonte de verdade é `mobile/src/theme/colors.ts`, espelhada em `frontend/src/app/globals.css`.
 - Semânticos: `success` verde para confiança alta e "Verificado", `danger` para reportar/sinalizado, `accent` para pendente e confiança média.
-- Sobre azul usa-se branco ou `mist`; nunca cinzento sobre cor.
-- A app tem tema claro/escuro (Sistema/Claro/Escuro em Conta → Preferências, persistido). No escuro, `dark-primary` mantém o azul da marca (o #3B6BFF contrasta com texto branco em botões) e as barras usam `dark-bar` #2E46C9. Semânticos (success/danger) têm variantes mais claras no escuro.
+- Sobre azul usa-se branco ou `paper`; nunca cinzento sobre cor.
+- A app tem tema claro/escuro (Sistema/Claro/Escuro em Conta → Preferências, persistido); o site espelha o mesmo tema via `.dark`. No escuro a marca vira laranja (`dark-primary` #FF6900, que contrasta com tinta escura em botões), os cartões passam a #1C1C1E sobre fundo #111111 e o texto a #F0EDE8. Semânticos (success/danger) têm variantes mais claras no escuro.
 
 ## Typography
 
@@ -112,10 +112,10 @@ Estratégia *committed* no site (o azul carrega herói e rodapé; o miolo é bra
 
 - **parking-sign**: o quadrado azul com "P" (rounded 22%). Marca no site (invertido, branco com P azul, quando sobre azul) e glifos de secção.
 - **chip**: seleção de opções na app (tipo, lotação, modo). Pílula com borda; selecionada fica azul com texto branco. `hitSlop` de 6 para alvo tátil.
-- **app-card**: cartão branco, borda 1px, raio 16. Nunca aninhar cartões.
+- **app-card**: cartão branco, borda 1px, raio 16. Nunca aninhar cartões. No escuro, cartão #1C1C1E sobre fundo #111111.
 - **TrustBar**: barra de confiança 0–10; cor por faixa (≥5 verde, ≥3 laranja, <3 vermelho).
 - **StatusBadge**: pílula com ponto colorido; Verificado/Em verificação/Sinalizado/Rejeitado.
-- **tab bar**: navegação principal da app no rodapé (Parques / Mapa / Conta); fundo `app-card`, hairline `app-border`, ativo a azul com ícone preenchido, inativo `app-text-muted` com ícone outline.
+- **tab bar**: navegação principal da app no rodapé (Mapa / Pesquisa / Adicionar / Perfil); fundo `surface`, hairline `border`, ativo a azul com ícone preenchido, inativo `muted` com ícone outline.
 - **FABs do mapa**: círculos brancos de 48px com ícone azul, sombra discreta; o FAB de adicionar na lista é laranja (`accent`) com ícone `ink`.
 - **road-line** (site): separador com traço descontínuo de estrada, uso único por página.
 - Botões: verbo + objeto ("Enviar contribuição"), estados disabled a opacity 0.45–0.6, loading com `ActivityIndicator` inline.
