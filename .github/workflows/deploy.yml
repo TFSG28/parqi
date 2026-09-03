@@ -193,11 +193,71 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # E2E da API: os specs supertest (src/tests/e2e) contra uma base de dados
+  # real com PostGIS, em processo. Bloqueia o deploy do backend.
+  # ---------------------------------------------------------------------------
+  e2e-backend:
+    name: Backend e2e (API contra PostGIS)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: parqi
+          POSTGRES_PASSWORD: parqi
+          POSTGRES_DB: parqi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U parqi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://parqi:parqi@localhost:5432/parqi_test
+      DATABASE_USER: parqi
+      DATABASE_PASSWORD: parqi
+      DATABASE_NAME: parqi_test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: "5432"
+      JWT_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-ci-secret-ci-secret-ci-secret
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      EMAIL: ci@parqi.pt
+      EMAIL_PASS: ci-pass
+      FRONT_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Preparar base de dados (PostGIS + schema)
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npm run db-extensions
+          npx prisma db push --skip-generate
+
+      - name: Testes e2e
+        working-directory: backend
+        run: npm run test:e2e
+
+  # ---------------------------------------------------------------------------
   # Deploy — cPanel (backend) e cPanel (frontend), cada um só se selecionado.
   # ---------------------------------------------------------------------------
   deploy-backend:
     if: github.event_name != 'pull_request' && needs.set-environment.outputs.part_backend == 'true'
-    needs: [quality-backend, set-environment]
+    needs: [quality-backend, e2e-backend, set-environment]
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:

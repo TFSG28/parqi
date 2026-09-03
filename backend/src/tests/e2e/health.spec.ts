@@ -1,37 +1,38 @@
-import { test, expect } from '@playwright/test';
+import { describe, it, expect } from 'vitest';
+import request from 'supertest';
+import app from '../../app';
 
-test.describe('Health Checks', () => {
-    test('should return healthy status', async ({ request }) => {
-        const response = await request.get('/health');
-        expect(response.ok()).toBeTruthy();
-        
-        const data = await response.json();
-        expect(data.status).toBe('healthy');
-        expect(data.services.database.status).toBe('up');
+/**
+ * Health checks da API — convertidos de Playwright para supertest:
+ * correm em processo, sem servidor nem browser, ideais para CI.
+ */
+describe('Health Checks', () => {
+    it('GET /health — estado saudável com base de dados up', async () => {
+        const response = await request(app).get('/health');
+
+        expect(response.status).toBe(200);
+        expect(response.body.status).toBe('healthy');
+        expect(response.body.services.database.status).toBe('up');
     });
 
-    test('should return ready status', async ({ request }) => {
-        const response = await request.get('/health/ready');
-        expect(response.ok()).toBeTruthy();
-        
-        const data = await response.json();
-        expect(data.status).toBe('ready');
+    it('GET /health/ready — pronto para servir tráfego', async () => {
+        const response = await request(app).get('/health/ready');
+
+        expect(response.status).toBe(200);
+        expect(response.body.status).toBe('ready');
     });
 
-    test('should return alive status', async ({ request }) => {
-        const response = await request.get('/health/live');
-        expect(response.ok()).toBeTruthy();
-        
-        const data = await response.json();
-        expect(data.status).toBe('alive');
+    it('GET /health/live — processo vivo', async () => {
+        const response = await request(app).get('/health/live');
+
+        expect(response.status).toBe(200);
+        expect(response.body.status).toBe('alive');
     });
 
-    test('should return metrics', async ({ request }) => {
-        const response = await request.get('/metrics');
-        expect(response.ok()).toBeTruthy();
-        
-        const text = await response.text();
-        expect(text).toContain('http_requests_total');
-        expect(text).toContain('http_request_duration_seconds');
+    it('GET /metrics — métricas Prometheus expostas', async () => {
+        const response = await request(app).get('/metrics');
+
+        expect(response.text).toContain('http_requests_total');
+        expect(response.text).toContain('http_request_duration_seconds');
     });
 });

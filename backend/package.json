@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "eslint .",
     "db-update": "npm run db-extensions && npm run db-migrate-osm && npx prisma generate && npx prisma db push && npm run db-indexes",
     "db-extensions": "tsx src/scripts/enable-postgis.ts",

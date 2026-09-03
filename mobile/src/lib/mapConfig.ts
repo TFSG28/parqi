@@ -16,7 +16,9 @@ export function isValidCoordinate(latitude: number | null | undefined, longitude
         && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 }
 
-export function expandBbox(bbox: string, padding = MAP_CONFIG.viewportPadding): string {
+// padding tipado explicitamente: com `as const` o default inferiria o literal 0.12
+// e impedia passing de outro padding.
+export function expandBbox(bbox: string, padding: number = MAP_CONFIG.viewportPadding): string {
     const values = bbox.split(',').map(Number);
     if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) return bbox;
     const [minLon, minLat, maxLon, maxLat] = values;
