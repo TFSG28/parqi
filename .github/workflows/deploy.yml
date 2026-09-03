@@ -246,7 +246,7 @@ jobs:
         run: |
           npx prisma generate
           npm run db-extensions
-          npx prisma db push --skip-generate
+          npx prisma db push
 
       - name: Testes e2e
         working-directory: backend
