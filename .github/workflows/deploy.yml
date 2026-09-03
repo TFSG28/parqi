@@ -26,7 +26,12 @@ on:
         type: boolean
         default: true
       deploy_mobile:
-        description: "Construir e publicar APK Android (GitHub Release)"
+        description: "Construir APK Android"
+        required: true
+        type: boolean
+        default: false
+      apk_publico:
+        description: "Publicar APK no repo público de downloads (TFSG28/parqi-releases)"
         required: true
         type: boolean
         default: false
@@ -169,6 +174,7 @@ jobs:
       part_backend: ${{ steps.resolve.outputs.part_backend }}
       part_frontend: ${{ steps.resolve.outputs.part_frontend }}
       part_mobile: ${{ steps.resolve.outputs.part_mobile }}
+      part_apk_publico: ${{ steps.resolve.outputs.part_apk_publico }}
     steps:
       - name: Resolver environment e partes a deployar
         id: resolve
@@ -178,6 +184,7 @@ jobs:
             echo "part_backend=${{ inputs.deploy_backend }}" >> "$GITHUB_OUTPUT"
             echo "part_frontend=${{ inputs.deploy_frontend }}" >> "$GITHUB_OUTPUT"
             echo "part_mobile=${{ inputs.deploy_mobile }}" >> "$GITHUB_OUTPUT"
+            echo "part_apk_publico=${{ inputs.apk_publico }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.ref_name }}" = "quality" ]; then
             # quality só tem backend (apip.cesar.wearemateria.com); o frontend
             # ainda não tem destino. O mobile é sempre manual (dispatch).
@@ -397,6 +404,9 @@ jobs:
     permissions:
       contents: write
     env:
+      # Repo público onde o APK fica disponível para download. O default
+      # (vazio) mantém o comportamento atual: release neste repo.
+      PUBLIC_RELEASES_REPO: ${{ vars.PUBLIC_RELEASES_REPO || '' }}
       # O APK embute a API em build-time via EXPO_PUBLIC_*. Default: quality
       # (apip.cesar.wearemateria.com); por environment pode-se apontar outro.
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://apip.cesar.wearemateria.com/api/v1' }}
@@ -446,7 +456,27 @@ jobs:
           echo "APK_ENV=${ENV_NAME}" >> "$GITHUB_ENV"
           echo "APK_FILE=parqi-v${VERSION}-${ENV_NAME}-${SHA}.apk" >> "$GITHUB_ENV"
 
-      - name: Publicar release com APK
+      # Sem repo público configurado (ou sem APK público no dispatch), publica
+      # aqui como sempre. Com repo público + APK público, publica lá via PAT
+      # (GITHUB_TOKEN só serve para o repo atual).
+      - name: Publicar release com APK (repo público)
+        if: needs.set-environment.outputs.part_apk_publico == 'true' && env.PUBLIC_RELEASES_REPO != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ env.PUBLIC_RELEASES_REPO }}
+          token: ${{ secrets.RELEASES_REPO_TOKEN }}
+          tag_name: mobile-v${{ env.APK_VERSION }}-${{ env.APK_ENV }}-${{ env.APK_SHA }}
+          name: "Parqi Android ${{ env.APK_ENV }} v${{ env.APK_VERSION }}"
+          files: mobile/${{ env.APK_FILE }}
+          body: |
+            APK de **${{ env.APK_ENV }}** — v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
+
+            - API: `${{ env.EXPO_PUBLIC_API_URL }}`
+            - Mapa: `${{ env.EXPO_PUBLIC_MAP_PROVIDER }}`
+          prerelease: ${{ needs.set-environment.outputs.env_name == 'quality' }}
+
+      - name: Publicar release com APK (neste repo)
+        if: needs.set-environment.outputs.part_apk_publico != 'true' || env.PUBLIC_RELEASES_REPO == ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mobile-v${{ env.APK_VERSION }}-${{ env.APK_ENV }}-${{ env.APK_SHA }}
