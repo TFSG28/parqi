@@ -10,21 +10,26 @@ export default defineConfig({
         exclude: [...configDefaults.exclude, 'src/tests/e2e/**', 'dist/**'],
         coverage: {
             provider: 'v8',
+            // Ativo por omissão: sem isto os thresholds nunca são avaliados
+            // (vitest só calcula cobertura com --coverage).
+            enabled: true,
             reporter: ['text', 'json', 'html'],
             exclude: [
                 'node_modules/',
                 'src/tests/',
                 'dist/',
+                // Cliente gerado: distorce as percentagens sem testes úteis.
+                'src/generated/**',
                 '**/*.spec.ts',
                 '**/*.test.ts',
             ],
-            // Porteira anti-regressão: a cobertura nunca pode descer abaixo destes
-            // mínimos. Sobem à medida que os use cases ganham specs.
+            // Porteira anti-regressão: a cobertura nunca pode descer abaixo
+            // destes mínimos. Sobem à medida que o código ganha specs.
             thresholds: {
-                statements: 35,
-                branches: 27,
-                functions: 31,
-                lines: 61,
+                statements: 60,
+                branches: 48,
+                functions: 52,
+                lines: 62,
             },
         },
     },
