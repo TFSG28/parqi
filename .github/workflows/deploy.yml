@@ -471,7 +471,6 @@ jobs:
           body: |
             APK de **${{ env.APK_ENV }}** — v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
 
-            - API: `${{ env.EXPO_PUBLIC_API_URL }}`
             - Mapa: `${{ env.EXPO_PUBLIC_MAP_PROVIDER }}`
           prerelease: ${{ needs.set-environment.outputs.env_name == 'quality' }}
 
