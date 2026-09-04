@@ -63,14 +63,6 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      # Chains: vitest run -> eslint -> prisma generate -> tsc.
-      # vitest is scoped to unit specs; Playwright e2e runs separately.
-      # prisma generate primeiro: os testes importam o client gerado
-      # (src/generated/prisma), que não existe num runner fresco.
-      - name: Generate Prisma client
-        working-directory: backend
-        run: npx prisma generate
-
       - name: Lint, test & typecheck
         working-directory: backend
         run: npm run build
