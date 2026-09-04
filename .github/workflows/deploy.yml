@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment a fazer deploy"
+        description: "Environment (production = só release do APK público)"
         required: true
         type: choice
         options:
@@ -144,10 +144,18 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "env_name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-            echo "part_backend=${{ inputs.deploy_backend }}" >> "$GITHUB_OUTPUT"
-            echo "part_frontend=${{ inputs.deploy_frontend }}" >> "$GITHUB_OUTPUT"
-            echo "part_mobile=${{ inputs.deploy_mobile }}" >> "$GITHUB_OUTPUT"
-            echo "part_apk_publico=${{ inputs.apk_publico }}" >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.environment }}" = "production" ]; then
+              # production é apenas o release do APK público — sem cPanel.
+              echo "part_backend=false" >> "$GITHUB_OUTPUT"
+              echo "part_frontend=false" >> "$GITHUB_OUTPUT"
+              echo "part_mobile=true" >> "$GITHUB_OUTPUT"
+              echo "part_apk_publico=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "part_backend=${{ inputs.deploy_backend }}" >> "$GITHUB_OUTPUT"
+              echo "part_frontend=${{ inputs.deploy_frontend }}" >> "$GITHUB_OUTPUT"
+              echo "part_mobile=${{ inputs.deploy_mobile }}" >> "$GITHUB_OUTPUT"
+              echo "part_apk_publico=${{ inputs.apk_publico }}" >> "$GITHUB_OUTPUT"
+            fi
           elif [ "${{ github.ref_name }}" = "quality" ]; then
             # quality só tem backend (apip.cesar.wearemateria.com); o frontend
             # ainda não tem destino. O mobile é sempre manual (dispatch).
@@ -156,10 +164,12 @@ jobs:
             echo "part_frontend=false" >> "$GITHUB_OUTPUT"
             echo "part_mobile=false" >> "$GITHUB_OUTPUT"
           else
+            # push para production: só o release do APK público.
             echo "env_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            echo "part_backend=true" >> "$GITHUB_OUTPUT"
-            echo "part_frontend=true" >> "$GITHUB_OUTPUT"
-            echo "part_mobile=false" >> "$GITHUB_OUTPUT"
+            echo "part_backend=false" >> "$GITHUB_OUTPUT"
+            echo "part_frontend=false" >> "$GITHUB_OUTPUT"
+            echo "part_mobile=true" >> "$GITHUB_OUTPUT"
+            echo "part_apk_publico=true" >> "$GITHUB_OUTPUT"
           fi
 
   # ---------------------------------------------------------------------------
@@ -410,11 +420,22 @@ jobs:
           VERSION=$(node -p "require('./app.json').expo.version")
           SHA=$(git rev-parse --short HEAD)
           ENV_NAME="${{ needs.set-environment.outputs.env_name }}"
-          cp android/app/build/outputs/apk/release/app-release.apk "parqi-v${VERSION}-${ENV_NAME}-${SHA}.apk"
+          # production publica como release limpa: sem segmento de environment
+          # no tag/título (é a release pública que os utilizadores descarregam).
+          if [ "$ENV_NAME" = "production" ]; then
+            SUFFIX="-${SHA}"
+            TITLE="Parqi Android v${VERSION}"
+          else
+            SUFFIX="-${ENV_NAME}-${SHA}"
+            TITLE="Parqi Android ${ENV_NAME} v${VERSION}"
+          fi
+          cp android/app/build/outputs/apk/release/app-release.apk "parqi-v${VERSION}${SUFFIX}.apk"
           echo "APK_VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "APK_SHA=${SHA}" >> "$GITHUB_ENV"
           echo "APK_ENV=${ENV_NAME}" >> "$GITHUB_ENV"
-          echo "APK_FILE=parqi-v${VERSION}-${ENV_NAME}-${SHA}.apk" >> "$GITHUB_ENV"
+          echo "APK_TAG=mobile-v${VERSION}${SUFFIX}" >> "$GITHUB_ENV"
+          echo "APK_TITLE=${TITLE}" >> "$GITHUB_ENV"
+          echo "APK_FILE=parqi-v${VERSION}${SUFFIX}.apk" >> "$GITHUB_ENV"
 
       # Sem repo público configurado (ou sem APK público no dispatch), publica
       # aqui como sempre. Com repo público + APK público, publica lá via PAT
@@ -425,11 +446,11 @@ jobs:
         with:
           repository: ${{ env.PUBLIC_RELEASES_REPO }}
           token: ${{ secrets.RELEASES_REPO_TOKEN }}
-          tag_name: mobile-v${{ env.APK_VERSION }}-${{ env.APK_ENV }}-${{ env.APK_SHA }}
-          name: "Parqi Android ${{ env.APK_ENV }} v${{ env.APK_VERSION }}"
+          tag_name: ${{ env.APK_TAG }}
+          name: ${{ env.APK_TITLE }}
           files: mobile/${{ env.APK_FILE }}
           body: |
-            APK de **${{ env.APK_ENV }}** — v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
+            v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
 
             - Mapa: `${{ env.EXPO_PUBLIC_MAP_PROVIDER }}`
           prerelease: ${{ needs.set-environment.outputs.env_name == 'quality' }}
@@ -438,11 +459,11 @@ jobs:
         if: needs.set-environment.outputs.part_apk_publico != 'true' || env.PUBLIC_RELEASES_REPO == ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mobile-v${{ env.APK_VERSION }}-${{ env.APK_ENV }}-${{ env.APK_SHA }}
-          name: "Parqi Android ${{ env.APK_ENV }} v${{ env.APK_VERSION }}"
+          tag_name: ${{ env.APK_TAG }}
+          name: ${{ env.APK_TITLE }}
           files: mobile/${{ env.APK_FILE }}
           body: |
-            APK de **${{ env.APK_ENV }}** — v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
+            v${{ env.APK_VERSION }} (${{ env.APK_SHA }})
 
             - API: `${{ env.EXPO_PUBLIC_API_URL }}`
             - Mapa: `${{ env.EXPO_PUBLIC_MAP_PROVIDER }}`
