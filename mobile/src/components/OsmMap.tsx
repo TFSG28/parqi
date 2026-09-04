@@ -14,6 +14,21 @@ import { MAP_CONFIG, isValidCoordinate } from '../lib/mapConfig';
 
 export type MapLayer = 'standard' | 'satellite' | 'dark' | 'light' | 'topo';
 
+/**
+ * API key CARTO (basemaps raster). Desde 2026 os tiles dark/light de
+ * basemaps.cartocdn.com exigem `?key=` — sem ela os tiles vêm com o
+ * watermark "API key required". Grátis até 5M pedidos/mês: carto.com/basemaps/apikey
+ */
+const CARTO_API_KEY = process.env.EXPO_PUBLIC_CARTO_API_KEY ?? '';
+
+// Caminho canónico rastertiles/ (o alias sem prefixo também responde, mas é o
+// caminho legado; CARTO documenta o prefixado e está a reformar os rasters).
+function cartoUrl(path: string): string {
+    return CARTO_API_KEY
+        ? `https://basemaps.cartocdn.com/rastertiles/${path}?key=${CARTO_API_KEY}`
+        : `https://basemaps.cartocdn.com/rastertiles/${path}`;
+}
+
 export interface OsmMarker {
     id: string;
     latitude: number;
@@ -59,28 +74,35 @@ const TILE_PRESETS = {
     standard: {
         url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         maxZoom: 19,
+        cssFilter: '',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     },
     satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         maxZoom: 19,
+        cssFilter: '',
         attribution:
             'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
     },
     dark: {
-        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        url: cartoUrl('dark_all/{z}/{x}/{y}{r}.png'),
         maxZoom: 20,
+        // dark_all da CARTO tem estradas pouco contrastadas; filtro CSS só nos
+        // tiles (pins/clusters ficam intactos). Ajustar aqui para gosto.
+        cssFilter: 'brightness(1.15) contrast(1.4) saturate(1.1)',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     },
     light: {
-        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        url: cartoUrl('light_all/{z}/{x}/{y}{r}.png'),
         maxZoom: 20,
+        cssFilter: '',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     },
     topo: {
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
         maxZoom: 19,
         maxNativeZoom: 17,
+        cssFilter: '',
         attribution:
             'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
     },
@@ -128,18 +150,22 @@ const interactive = ${interactive};    const map = L.map('map', {
 }).setView([${center.latitude}, ${center.longitude}], ${zoom});
 
 const LAYERS = {
-    standard: { url: '${TILE_PRESETS.standard.url}', maxZoom: ${TILE_PRESETS.standard.maxZoom}, attr: '${TILE_PRESETS.standard.attribution}' },
-    satellite: { url: '${TILE_PRESETS.satellite.url}', maxZoom: ${TILE_PRESETS.satellite.maxZoom}, attr: '${TILE_PRESETS.satellite.attribution}' },
-    dark: { url: '${TILE_PRESETS.dark.url}', maxZoom: ${TILE_PRESETS.dark.maxZoom}, attr: '${TILE_PRESETS.dark.attribution}' },
-    light: { url: '${TILE_PRESETS.light.url}', maxZoom: ${TILE_PRESETS.light.maxZoom}, attr: '${TILE_PRESETS.light.attribution}' },
-    topo: { url: '${TILE_PRESETS.topo.url}', maxZoom: ${TILE_PRESETS.topo.maxZoom}, maxNativeZoom: ${TILE_PRESETS.topo.maxNativeZoom}, attr: '${TILE_PRESETS.topo.attribution}' },
+    standard: { url: '${TILE_PRESETS.standard.url}', maxZoom: ${TILE_PRESETS.standard.maxZoom}, filter: '${TILE_PRESETS.standard.cssFilter}', attr: '${TILE_PRESETS.standard.attribution}' },
+    satellite: { url: '${TILE_PRESETS.satellite.url}', maxZoom: ${TILE_PRESETS.satellite.maxZoom}, filter: '${TILE_PRESETS.satellite.cssFilter}', attr: '${TILE_PRESETS.satellite.attribution}' },
+    dark: { url: '${TILE_PRESETS.dark.url}', maxZoom: ${TILE_PRESETS.dark.maxZoom}, filter: '${TILE_PRESETS.dark.cssFilter}', attr: '${TILE_PRESETS.dark.attribution}' },
+    light: { url: '${TILE_PRESETS.light.url}', maxZoom: ${TILE_PRESETS.light.maxZoom}, filter: '${TILE_PRESETS.light.cssFilter}', attr: '${TILE_PRESETS.light.attribution}' },
+    topo: { url: '${TILE_PRESETS.topo.url}', maxZoom: ${TILE_PRESETS.topo.maxZoom}, maxNativeZoom: ${TILE_PRESETS.topo.maxNativeZoom}, filter: '${TILE_PRESETS.topo.cssFilter}', attr: '${TILE_PRESETS.topo.attribution}' },
 };
 
 let tile = null;
 function switchLayer(name) {
     const cfg = LAYERS[name] || LAYERS.standard;
     if (tile) { map.removeLayer(tile); }
-    tile = L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, maxNativeZoom: cfg.maxNativeZoom || cfg.maxZoom, attribution: cfg.attr, subdomains: 'abc' }).addTo(map);
+    tile = L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, maxNativeZoom: cfg.maxNativeZoom || cfg.maxZoom, attribution: cfg.attr, subdomains: 'abcd' }).addTo(map);
+    // Filtro CSS apenas no container dos tiles — pins/clusters/polígonos ficam intactos
+    if (cfg.filter && tile.getContainer()) {
+        tile.getContainer().style.filter = cfg.filter;
+    }
 }
 switchLayer('${layer}');
 

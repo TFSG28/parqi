@@ -36,6 +36,34 @@ const DEFAULT_PROVIDER =
 const PROVIDER_STORAGE_KEY = 'parqi.map_provider';
 export type MapProvider = MapProviderOption;
 
+/** Provider escolhido no arranque (Expo Go força 'osm' — sem SDK nativo). */
+export function getDefaultProvider(): MapProvider {
+    return DEFAULT_PROVIDER as MapProvider;
+}
+
+/** Mapbox só existe em development builds com o SDK nativo. */
+export function isMapboxAvailable(): boolean {
+    return !isExpoGo && Platform.OS === 'android' && getMapbox() !== null;
+}
+
+export async function getStoredProvider(): Promise<MapProvider | null> {
+    try {
+        const value = await AsyncStorage.getItem(PROVIDER_STORAGE_KEY);
+        if (value === 'mapbox' || value === 'osm' || value === 'google') return value;
+    } catch {
+        // storage indisponível: usa o default
+    }
+    return null;
+}
+
+export async function setStoredProvider(provider: MapProvider): Promise<void> {
+    try {
+        await AsyncStorage.setItem(PROVIDER_STORAGE_KEY, provider);
+    } catch {
+        // storage indisponível: mantém só em memória
+    }
+}
+
 type NativeMapComponent = typeof OsmMap;
 
 function getMapbox(): NativeMapComponent | null {
