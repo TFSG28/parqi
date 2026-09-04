@@ -61,7 +61,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#0647AC"
         }
-      ]
+      ],
+      "./plugins/withReleaseSigning"
     ]
   }
 }

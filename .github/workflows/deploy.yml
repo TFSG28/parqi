@@ -383,6 +383,11 @@ jobs:
       EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
       EXPO_PUBLIC_PROJECT_ID: ${{ vars.EXPO_PUBLIC_PROJECT_ID }}
       EXPO_PUBLIC_CARTO_API_KEY: ${{ secrets.EXPO_PUBLIC_CARTO_API_KEY }}
+      # Assinatura de release: todas as builds partilham o mesmo keystore,
+      # para updates instalarem uns sobre os outros (mesma assinatura).
+      PARQI_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+      PARQI_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'parqi' }}
+      PARQI_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -403,6 +408,19 @@ jobs:
       - name: Install dependencies
         working-directory: mobile
         run: npm ci
+
+      # Keystore de release: decodifica a secret RELEASE_KEYSTORE (base64 do
+      # ficheiro .keystore) para mobile/keystore/ (gitignored). O plugin
+      # withReleaseSigning injeta-o no gradle gerado pelo prebuild.
+      - name: Restaurar keystore de release
+        working-directory: mobile
+        run: |
+          mkdir -p keystore
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > keystore/parqi-release.keystore
+          if [ ! -s keystore/parqi-release.keystore ]; then
+            echo "::error::RELEASE_KEYSTORE vazia ou ausente — define a secret com o conteúdo do .keystore em base64"
+            exit 1
+          fi
 
       # Gera o projeto nativo (android/ está no .gitignore) e compila o APK.
       - name: Prebuild e compilar APK
