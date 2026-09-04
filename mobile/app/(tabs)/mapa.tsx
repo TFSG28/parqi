@@ -12,7 +12,16 @@ import {
     Text,
     View,
 } from 'react-native';
-import { AppMap, type AppMapHandle, type MapLayer } from '../../src/components/AppMap';
+import {
+    AppMap,
+    getDefaultProvider,
+    getStoredProvider,
+    isMapboxAvailable,
+    setStoredProvider,
+    type AppMapHandle,
+    type MapLayer,
+    type MapProvider,
+} from '../../src/components/AppMap';
 import { MapLayerPicker } from '../../src/components/MapLayerPicker';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { useAuth } from '../../src/context/AuthContext';
@@ -21,7 +30,7 @@ import { parkingApi } from '../../src/lib/api';
 import { regionToBbox, type Region } from '../../src/lib/geo';
 import { distanceLabel, freshnessLabel, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
 import { expandBbox, MAP_CONFIG } from '../../src/lib/mapConfig';
-import { TYPE_DESIGN } from '../../src/theme/design';
+import { TYPE_DESIGN, MONO } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
 import type { ParkingSpot, ParkingType } from '../../src/types/parking';
 
@@ -61,6 +70,14 @@ export default function MapScreen() {
 
     const [center, setCenter] = useState<LatLng>(DEFAULT_REGION);
     const [mapLayer, setMapLayer] = useState<MapLayer>(resolvedScheme === 'dark' ? 'dark' : 'standard');
+    // Provider do mapa: default do .env/dispositivo; admin pode alternar OSM <-> Mapbox.
+    const mapboxAvailable = useMemo(() => isMapboxAvailable(), []);
+    const [mapProvider, setMapProvider] = useState<MapProvider>(getDefaultProvider());
+    useEffect(() => {
+        getStoredProvider().then((stored) => {
+            if (stored) setMapProvider(stored);
+        }).catch(() => { });
+    }, []);
     const [userLocation, setUserLocation] = useState<LatLng | null>(null);
     const [followUser, setFollowUser] = useState(true);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
@@ -155,6 +172,17 @@ export default function MapScreen() {
         [filteredSpots, colors]
     );
 
+    // Alternância de provider (só admin, só com SDK nativo Mapbox disponível)
+    const canToggleProvider = user?.role === 'ADMIN' && mapboxAvailable;
+    const toggleMapProvider = useCallback(() => {
+        setMapProvider((current) => {
+            const next: MapProvider = current === 'mapbox' ? 'osm' : 'mapbox';
+            setStoredProvider(next);
+            return next;
+        });
+        Haptics.selectionAsync().catch(() => { });
+    }, []);
+
     const handleBoundsChange = useCallback((bbox: string) => {
         if (bbox === lastRequestedBbox.current) return;
         lastRequestedBbox.current = bbox;
@@ -177,6 +205,7 @@ export default function MapScreen() {
                 markers={markers}
                 userLocation={userLocation}
                 layer={mapLayer}
+                provider={mapProvider}
                 brandColor={colors.primary}
                 accentColor={colors.accent}
                 onMarkerPress={(id) => {
@@ -359,6 +388,16 @@ export default function MapScreen() {
             </Pressable>
 
             <View style={[styles.mapControls, selectedSpot && styles.mapControlsRaised]}>
+                {canToggleProvider && (
+                    <Pressable
+                        style={({ pressed }) => [styles.providerButton, pressed && styles.pressed]}
+                        onPress={toggleMapProvider}
+                        accessibilityRole="button"
+                        accessibilityLabel={mapProvider === 'mapbox' ? 'Mudar mapa para OSM' : 'Mudar mapa para Mapbox'}
+                    >
+                        <Text style={styles.providerButtonText}>{mapProvider === 'mapbox' ? 'MB' : 'OSM'}</Text>
+                    </Pressable>
+                )}
                 <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
             </View>
 
@@ -517,6 +556,27 @@ const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.creat
     },
     layerPicker: {
         position: 'relative',
+    },
+    providerButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 9,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 5,
+    },
+    providerButtonText: {
+        fontSize: 11,
+        fontWeight: '800',
+        fontFamily: MONO,
+        color: colors.text,
     },
     locationButton: {
         width: 48,

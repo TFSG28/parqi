@@ -135,3 +135,14 @@ npm start
 
 ### Frontend (.env.development)
 - `NEXT_PUBLIC_API_URL` - Backend API URL
+
+### Mobile (.env)
+Vars `EXPO_PUBLIC_*` são embutidas no bundle em build-time.
+- `EXPO_PUBLIC_API_URL` - Backend API URL
+- `EXPO_PUBLIC_MAP_PROVIDER` - `osm` | `google` | `mapbox` (default `mapbox`)
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` - Token Mapbox (provider `mapbox`)
+- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` - Google Maps SDK (provider `google`)
+- `EXPO_PUBLIC_CARTO_API_KEY` - API key CARTO para tiles dark/light do mapa OSM
+  (grátis até 5M pedidos/mês: carto.com/basemaps/apikey; vai na URL como `?key=`;
+  sem key os tiles mostram o watermark "API key required")
+- `EXPO_PUBLIC_PROJECT_ID` - Expo project ID (notificações)
