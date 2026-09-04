@@ -10,3 +10,6 @@ expo-env.d.ts
 # CNG: pastas nativas geradas pelo prebuild (gitignored, regeneradas via `npx expo prebuild`)
 android/
 ios/
+
+# Keystore de release (nunca commitar; fazer backup offline)
+keystore/
