@@ -1,32 +1,38 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     ActivityIndicator,
-    FlatList,
-    Linking,
     Pressable,
-    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
-import { Onboarding } from '../../src/components/Onboarding';
+import {
+    AppMap,
+    getDefaultProvider,
+    getStoredProvider,
+    isMapboxAvailable,
+    setStoredProvider,
+    type AppMapHandle,
+    type MapLayer,
+    type MapProvider,
+} from '../../src/components/AppMap';
+import { MapLayerPicker } from '../../src/components/MapLayerPicker';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
-import { SearchBar } from '../../src/components/SearchBar';
-import { SpotCardSkeleton } from '../../src/components/SpotCardSkeleton';
-import { StatusBadge } from '../../src/components/StatusBadge';
-import { TypeChip } from '../../src/components/TypeChip';
-import { parkingApi } from '../../src/lib/api';
+import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
-import { directionsUrl, regionToBbox, type Region } from '../../src/lib/geo';
-import { distanceLabel, freshnessLabel, isStale, rankParkingSpots, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
-import { AMENITY_DESIGN, MONO, TYPE_COLOR } from '../../src/theme/design';
+import { parkingApi } from '../../src/lib/api';
+import { regionToBbox, type Region } from '../../src/lib/geo';
+import { distanceLabel, freshnessLabel, readParkingCache, trustMessage, writeParkingCache } from '../../src/lib/parking';
+import { expandBbox, MAP_CONFIG } from '../../src/lib/mapConfig';
+import { TYPE_DESIGN, MONO } from '../../src/theme/design';
 import type { ThemeColors } from '../../src/theme/colors';
-import type { ParkingSpot } from '../../src/types/parking';
+import type { ParkingSpot, ParkingType } from '../../src/types/parking';
 
 const DEFAULT_REGION: Region = {
     latitude: 38.7369,
@@ -35,332 +41,365 @@ const DEFAULT_REGION: Region = {
     longitudeDelta: 0.06,
 };
 
-type StatusFilter = 'all' | 'APPROVED' | 'PENDING';
-type SortBy = 'trust' | 'recent' | 'free';
+type TypeFilter = 'all' | ParkingType;
 
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-    { id: 'all', label: 'Todos' },
-    { id: 'APPROVED', label: 'Verificados' },
-    { id: 'PENDING', label: 'Em revisão' },
+const TYPE_FILTERS: { id: TypeFilter; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
+    { id: 'all', label: 'Tudo' },
+    { id: 'SURFACE', label: 'Rua', icon: 'car-outline' },
+    { id: 'UNDERGROUND', label: 'Subterrâneo', icon: 'arrow-down-circle-outline' },
+    { id: 'MULTI_STORY', label: 'Edifício', icon: 'business-outline' },
+    { id: 'STREET', label: 'Via', icon: 'navigate-outline' },
 ];
 
-const SORTS: { id: SortBy; label: string }[] = [
-    { id: 'trust', label: 'Confiança' },
-    { id: 'recent', label: 'Novos' },
-    { id: 'free', label: 'Gratuitos' },
-];
-
-function priceLabel(isFree: boolean | null): string {
-    if (isFree === true) return 'Gratuito';
-    if (isFree === false) return 'Pago';
-    return '—';
+interface LatLng {
+    latitude: number;
+    longitude: number;
 }
 
-function ListSeparator() {
-    return <View style={{ height: 12 }} />;
-}
-
-export default function DiscoverScreen() {
-    const { colors } = useTheme();
-    const styles = useMemo(() => createStyles(colors), [colors]);
+export default function MapScreen() {
+    const { colors, resolvedScheme } = useTheme();
+    const { user } = useAuth();
+    const insets = useSafeAreaInsets();
+    const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+    const mapRef = useRef<AppMapHandle>(null);
+    const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const requestController = useRef<AbortController | null>(null);
+    const requestId = useRef(0);
     const lastBbox = useRef(regionToBbox(DEFAULT_REGION));
+    const lastRequestedBbox = useRef<string | null>(null);
 
+    const [center, setCenter] = useState<LatLng>(DEFAULT_REGION);
+    const [mapLayer, setMapLayer] = useState<MapLayer>(resolvedScheme === 'dark' ? 'dark' : 'standard');
+    // Provider do mapa: default do .env/dispositivo; admin pode alternar OSM <-> Mapbox.
+    const mapboxAvailable = useMemo(() => isMapboxAvailable(), []);
+    const [mapProvider, setMapProvider] = useState<MapProvider>(getDefaultProvider());
+    useEffect(() => {
+        getStoredProvider().then((stored) => {
+            if (stored) setMapProvider(stored);
+        }).catch(() => { });
+    }, []);
+    const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+    const [followUser, setFollowUser] = useState(true);
     const [spots, setSpots] = useState<ParkingSpot[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
-    const [search, setSearch] = useState('');
-    const [searchResults, setSearchResults] = useState<ParkingSpot[] | null>(null);
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-    const [sortBy, setSortBy] = useState<SortBy>('trust');
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const [onboardingChecked, setOnboardingChecked] = useState(false);
-    const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
     const [showingCachedData, setShowingCachedData] = useState(false);
-
-    useEffect(() => {
-        AsyncStorage.getItem('parqi.onboarding_done')
-            .then((val) => {
-                if (val !== '1') setShowOnboarding(true);
-            })
-            .catch(() => { })
-            .finally(() => setOnboardingChecked(true));
-    }, []);
+    const [confirming, setConfirming] = useState(false);
 
     const fetchSpots = useCallback(async (bbox: string) => {
+        const id = ++requestId.current;
+        const expandedBbox = expandBbox(bbox);
         lastBbox.current = bbox;
+        requestController.current?.abort();
+        const controller = new AbortController();
+        requestController.current = controller;
         setLoading(true);
         try {
-            const items = await parkingApi.list(bbox);
+            const items = await parkingApi.list(expandedBbox, controller.signal);
+            if (id !== requestId.current) return;
             setSpots(items);
             setShowingCachedData(false);
             setFetchFailed(false);
             await writeParkingCache(items);
-        } catch {
-            if (spots.length === 0) {
+        } catch (error) {
+            if (controller.signal.aborted || id !== requestId.current) return;
+            const cached = await readParkingCache();
+            if (id !== requestId.current) return;
+            if (cached) {
+                setSpots(cached.items);
+                setShowingCachedData(true);
+            }
+            setFetchFailed(true);
+        } finally {
+            if (id === requestId.current) setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
                 const cached = await readParkingCache();
                 if (cached) {
                     setSpots(cached.items);
                     setShowingCachedData(true);
                 }
-            }
-            setFetchFailed(true);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    const isFirstLoad = loading && spots.length === 0;
-
-    // Primeira carga + centrar na localização do utilizador
-    useEffect(() => {
-        fetchSpots(regionToBbox(DEFAULT_REGION));
-        (async () => {
-            try {
-                const perm = await Location.getForegroundPermissionsAsync();
-                const status = perm.status === 'granted'
+                fetchSpots(regionToBbox(DEFAULT_REGION));
+                const permission = await Location.getForegroundPermissionsAsync();
+                const status = permission.status === 'granted'
                     ? 'granted'
                     : (await Location.requestForegroundPermissionsAsync()).status;
-                if (status === 'granted') {
-                    const last = await Location.getLastKnownPositionAsync();
-                    if (last) {
-                        const quick = { latitude: last.coords.latitude, longitude: last.coords.longitude };
-                        setUserLocation(quick);
-                        fetchSpots(regionToBbox({ ...quick, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
-                    }
-                    const loc = await Location.getCurrentPositionAsync({});
-                    const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-                    setUserLocation(coords);
-                    fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
+                if (status !== 'granted') return;
+
+                const last = await Location.getLastKnownPositionAsync();
+                if (last) {
+                    const quick = { latitude: last.coords.latitude, longitude: last.coords.longitude };
+                    setUserLocation(quick);
+                    if (followUser) setCenter(quick);
+                    fetchSpots(regionToBbox({ ...quick, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
                 }
+
+                const current = await Location.getCurrentPositionAsync({});
+                const coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+                setUserLocation(coords);
+                if (followUser) setCenter(coords);
+
+                fetchSpots(regionToBbox({ ...coords, latitudeDelta: 0.03, longitudeDelta: 0.03 }));
             } catch {
-                // sem permissão - mantém a região inicial
+                // Sem permissão ou localização disponível, mantém Lisboa como centro.
             }
         })();
+    }, [fetchSpots, followUser]);
+
+    const filteredSpots = useMemo(
+        () => spots.filter((spot) => typeFilter === 'all' || spot.parkingType === typeFilter),
+        [spots, typeFilter]
+    );
+
+    const markers = useMemo(
+        () => filteredSpots
+            .filter((spot) => spot.latitude !== null && spot.longitude !== null)
+            .map((spot) => ({
+                id: spot.id,
+                latitude: spot.latitude!,
+                longitude: spot.longitude!,
+                color: colors.primary,
+                textColor: colors.white,
+                status: spot.status,
+            })),
+        [filteredSpots, colors]
+    );
+
+    // Alternância de provider (só admin, só com SDK nativo Mapbox disponível)
+    const canToggleProvider = user?.role === 'ADMIN' && mapboxAvailable;
+    const toggleMapProvider = useCallback(() => {
+        setMapProvider((current) => {
+            const next: MapProvider = current === 'mapbox' ? 'osm' : 'mapbox';
+            setStoredProvider(next);
+            return next;
+        });
+        Haptics.selectionAsync().catch(() => { });
+    }, []);
+
+    const handleBoundsChange = useCallback((bbox: string) => {
+        if (bbox === lastRequestedBbox.current) return;
+        lastRequestedBbox.current = bbox;
+        if (fetchTimer.current) clearTimeout(fetchTimer.current);
+        fetchTimer.current = setTimeout(() => fetchSpots(bbox), MAP_CONFIG.requestDebounceMs);
     }, [fetchSpots]);
 
-    // Pesquisa por nome no servidor (país inteiro) com debounce
-    useEffect(() => {
-        const q = search.trim();
-        if (q.length < 2) {
-            setSearchResults(null);
-            return;
-        }
-        const timer = setTimeout(async () => {
-            try {
-                setSearchResults(await parkingApi.search(q));
-            } catch {
-                setSearchResults(null);
-            }
-        }, 350);
-        return () => clearTimeout(timer);
-    }, [search]);
-
-    const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all' || sortBy !== 'trust';
-
-    const clearFilters = () => {
-        setSearch('');
-        setStatusFilter('all');
-        setSortBy('trust');
-    };
-
-    const openRoute = (spot: ParkingSpot) => {
-        if (spot.latitude === null || spot.longitude === null) return;
-        Linking.openURL(directionsUrl(spot.latitude, spot.longitude)).catch(() => {});
-    };
-
-    const visible = useMemo(() => {
-        const source = searchResults ?? spots;
-        const q = search.trim().toLowerCase();
-        const filtered = source.filter((s) => {
-            const matchSearch = !q || searchResults ? true : s.name.toLowerCase().includes(q);
-            const matchStatus = statusFilter === 'all' || s.status === statusFilter;
-            return matchSearch && matchStatus;
-        });
-        if (sortBy === 'trust') return rankParkingSpots(filtered, userLocation);
-        return [...filtered].sort((a, b) => {
-            if (sortBy === 'recent') return b.updatedAt.localeCompare(a.updatedAt);
-            return (a.isFree ? 0 : 1) - (b.isFree ? 0 : 1);
-        });
-    }, [spots, searchResults, search, statusFilter, sortBy, userLocation]);
-
-    if (!onboardingChecked) {
-        return (
-            <View style={[styles.container, styles.center]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
-    }
-
-    if (showOnboarding) {
-        return <Onboarding onDone={() => setShowOnboarding(false)} />;
-    }
+    useEffect(() => () => {
+        if (fetchTimer.current) clearTimeout(fetchTimer.current);
+        requestController.current?.abort();
+    }, [handleBoundsChange]);
 
     return (
         <View style={styles.container}>
-            <FlatList
-                data={isFirstLoad ? [] : visible}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContent}
-                ItemSeparatorComponent={ListSeparator}
-                ListHeaderComponent={
-                    <View style={styles.listHeader}>
-                        <SearchBar
-                            value={search}
-                            onChangeText={setSearch}
-                            placeholder="Nome, rua, zona…"
-                        />
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chips}
+            <AppMap
+                ref={mapRef}
+                center={center}
+                zoom={14}
+                cluster
+                markers={markers}
+                userLocation={userLocation}
+                layer={mapLayer}
+                provider={mapProvider}
+                brandColor={colors.primary}
+                accentColor={colors.accent}
+                onMarkerPress={(id) => {
+                    const spot = spots.find((item) => item.id === id);
+                    if (spot) setSelectedSpot(spot);
+                }}
+                onMapPress={() => {
+                    setSelectedSpot(null);
+                    setFollowUser(false);
+                }}
+                onBoundsChange={handleBoundsChange}
+                style={styles.map}
+            />
+
+            <View style={styles.topOverlay} pointerEvents="box-none">
+                <View style={styles.searchBar}>
+                    <Pressable
+                        style={({ pressed }) => [styles.searchMain, pressed && styles.pressed]}
+                        onPress={() => router.push('/inicio')}
+                        accessibilityRole="button"
+                        accessibilityLabel="Pesquisar estacionamento"
+                    >
+                        <Ionicons name="search" size={20} color={colors.text} />
+                        <Text style={styles.searchLabel} numberOfLines={1}>Pesquisar estacionamento</Text>
+                    </Pressable>
+                    <View style={styles.searchDivider} />
+                    {loading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.filterButton,
+                                (filtersOpen || typeFilter !== 'all') && styles.filterButtonActive,
+                                pressed && styles.pressed,
+                            ]}
+                            onPress={() => setFiltersOpen((open) => !open)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Mostrar filtros"
+                            accessibilityState={{ expanded: filtersOpen }}
                         >
-                            {STATUS_FILTERS.map((f) => {
-                                const active = statusFilter === f.id;
+                            <Ionicons
+                                name="options-outline"
+                                size={20}
+                                color={filtersOpen || typeFilter !== 'all' ? colors.white : colors.textMuted}
+                            />
+                        </Pressable>
+                    )}
+                </View>
+
+                {filtersOpen && (
+                    <View style={styles.filterPanel}>
+                        <View style={styles.filterPanelHeader}>
+                            <Text style={styles.filterTitle}>Tipo de estacionamento</Text>
+                            <Pressable
+                                onPress={() => {
+                                    setTypeFilter('all');
+                                    setSelectedSpot(null);
+                                    setFiltersOpen(false);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Limpar filtro"
+                            >
+                                <Text style={styles.clearFilter}>Limpar</Text>
+                            </Pressable>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+                            {TYPE_FILTERS.map(({ id, label, icon }) => {
+                                const active = typeFilter === id;
                                 return (
                                     <Pressable
-                                        key={f.id}
-                                        onPress={() => setStatusFilter(f.id)}
-                                        hitSlop={8}
+                                        key={id}
+                                        onPress={() => {
+                                            setTypeFilter(id);
+                                            setSelectedSpot(null);
+                                            setFiltersOpen(false);
+                                        }}
                                         style={({ pressed }) => [
-                                            styles.filterChip,
-                                            active && styles.filterChipActive,
+                                            styles.filter,
+                                            active && styles.filterActive,
                                             pressed && styles.pressed,
                                         ]}
+                                        accessibilityRole="button"
+                                        accessibilityState={{ selected: active }}
                                     >
-                                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                            {f.label}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
-                            <View style={styles.sortDivider} />
-                            {SORTS.map((s) => {
-                                const active = sortBy === s.id;
-                                return (
-                                    <Pressable
-                                        key={s.id}
-                                        onPress={() => setSortBy(s.id)}
-                                        hitSlop={8}
-                                        style={({ pressed }) => [
-                                            styles.filterChip,
-                                            active && styles.filterChipActive,
-                                            pressed && styles.pressed,
-                                        ]}
-                                    >
-                                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                                            {s.label}
-                                        </Text>
+                                        {icon ? <Ionicons name={icon} size={14} color={active ? colors.white : colors.text} /> : null}
+                                        <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
                                     </Pressable>
                                 );
                             })}
                         </ScrollView>
                     </View>
-                }
-                refreshControl={
-                    <RefreshControl
-                        refreshing={loading && !isFirstLoad}
-                        onRefresh={() => fetchSpots(lastBbox.current)}
-                        tintColor={colors.primary}
-                    />
-                }
-                renderItem={({ item: spot }) => {
-                    const amenities = AMENITY_DESIGN.filter((a) => spot[a.key] === true);
-                    const typeColor = TYPE_COLOR[spot.parkingType];
-                    return (
+                )}
+            </View>
+
+            {selectedSpot && (
+                <View style={styles.previewCard}>
+                    <View style={styles.previewTop}>
+                        <View style={styles.previewMarker}>
+                            <Text style={styles.previewMarkerText}>P</Text>
+                        </View>
+                        <View style={styles.previewCopy}>
+                            <Text style={styles.previewName} numberOfLines={1}>{selectedSpot.name}</Text>
+                            <Text style={styles.previewMeta} numberOfLines={1}>
+                                {TYPE_DESIGN[selectedSpot.parkingType].label}
+                                {selectedSpot.isFree !== null ? ` · ${selectedSpot.isFree ? 'Gratuito' : 'Pago'}` : ''}
+                            </Text>
+                            <Text style={styles.previewFreshness} numberOfLines={1}>
+                                {distanceLabel(selectedSpot, userLocation) ?? 'Distância indisponível'} · {freshnessLabel(selectedSpot.updatedAt)}
+                            </Text>
+                        </View>
                         <Pressable
-                            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                            onPress={() => router.push(`/parking/${spot.id}`)}
+                            style={({ pressed }) => [styles.closePreview, pressed && styles.pressed]}
+                            onPress={() => setSelectedSpot(null)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Fechar pré-visualização"
+                            hitSlop={8}
                         >
-                            <View style={styles.cardTop}>
-                                <View style={[styles.typeDot, { backgroundColor: typeColor + '18' }]}>
-                                    <Ionicons name="location" size={16} color={typeColor} />
-                                </View>
-                                <View style={styles.cardTitleWrap}>
-                                    <Text style={styles.cardName} numberOfLines={2}>{spot.name}</Text>
-                                    {spot.description ? (
-                                        <Text style={styles.cardAddress} numberOfLines={1}>{spot.description}</Text>
-                                    ) : null}
-                                </View>
-                                <ScoreBadge score={spot.trustScore} />
-                            </View>
-
-                            <View style={styles.metaRow}>
-                                <StatusBadge status={spot.status} />
-                                <TypeChip type={spot.parkingType} />
-                                <Text
-                                    style={[styles.price, spot.isFree && { color: colors.primary }]}
-                                >
-                                    {priceLabel(spot.isFree)}
-                                </Text>
-                            </View>
-                            <View style={styles.infoRow}>
-                                <Text style={styles.infoText}>
-                                    {distanceLabel(spot, userLocation) ?? 'Distância indisponível'}
-                                </Text>
-                                <Text style={[styles.infoText, isStale(spot.updatedAt) && styles.infoTextStale]}>
-                                    {freshnessLabel(spot.updatedAt)}
-                                </Text>
-                                <Text style={styles.infoText} numberOfLines={1}>
-                                    {trustMessage(spot)}
-                                </Text>
-                            </View>
-
-                            <View style={styles.cardFooter}>
-                                {amenities.length > 0 ? (
-                                    <View style={styles.amenities}>
-                                        {amenities.map((a) => (
-                                            <Ionicons
-                                                key={a.key}
-                                                name={a.icon}
-                                                size={14}
-                                                color={colors.textMuted}
-                                                accessibilityLabel={a.label}
-                                            />
-                                        ))}
-                                    </View>
-                                ) : <View />}
-                                <Pressable
-                                    style={({ pressed }) => [styles.routeButton, pressed && styles.pressed]}
-                                    onPress={(event) => {
-                                        event.stopPropagation();
-                                        openRoute(spot);
-                                    }}
-                                    disabled={spot.latitude === null || spot.longitude === null}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={`Abrir rota para ${spot.name}`}
-                                >
-                                    <Ionicons name="navigate" size={15} color={colors.primary} />
-                                    <Text style={styles.routeButtonText}>Rota</Text>
-                                </Pressable>
-                            </View>
+                            <Ionicons name="close" size={18} color={colors.textMuted} />
                         </Pressable>
-                    );
-                }}
-                ListEmptyComponent={
-                    isFirstLoad ? (
-                        <View style={styles.skeletons}>
-                            {[0, 1, 2, 3].map((i) => <SpotCardSkeleton key={i} />)}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyWrap}>
-                            <Text style={styles.emptyText}>Nenhum estacionamento corresponde à pesquisa.</Text>
-                            {!hasActiveFilters && (
-                                <Text style={styles.emptyHint}>Experimenta outro nome ou zona.</Text>
-                            )}
-                            {hasActiveFilters && (
-                                <Pressable
-                                    style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}
-                                    onPress={clearFilters}
-                                    hitSlop={8}
-                                    accessibilityRole="button"
-                                >
-                                    <Text style={styles.emptyActionText}>Limpar filtros</Text>
-                                </Pressable>
-                            )}
-                        </View>
-                    )
-                }
-            />
+                    </View>
+                    <Text style={styles.previewTrust} numberOfLines={1}>{trustMessage(selectedSpot)}</Text>
+                    <View style={styles.previewActions}>
+                        <Pressable
+                            style={({ pressed }) => [styles.confirmButton, pressed && styles.pressed, confirming && styles.disabled]}
+                            disabled={confirming}
+                            onPress={async () => {
+                                if (!user) {
+                                    router.push('/login');
+                                    return;
+                                }
+                                setConfirming(true);
+                                try {
+                                    const updated = await parkingApi.vote(selectedSpot.id, 1);
+                                    setSelectedSpot(updated);
+                                    setSpots((current) => current.map((spot) => spot.id === updated.id ? updated : spot));
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+                                } catch {
+                                    router.push(`/parking/${selectedSpot.id}`);
+                                } finally {
+                                    setConfirming(false);
+                                }
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Confirmar informação de ${selectedSpot.name}`}
+                        >
+                            <Ionicons name="checkmark" size={15} color={colors.primary} />
+                            <Text style={styles.confirmButtonText}>{confirming ? 'A confirmar…' : 'Confirmar'}</Text>
+                        </Pressable>
+                        <Pressable
+                            style={({ pressed }) => [styles.reportButton, pressed && styles.pressed]}
+                            onPress={() => router.push(`/parking/${selectedSpot.id}`)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Corrigir informação de ${selectedSpot.name}`}
+                        >
+                            <Text style={styles.reportButtonText}>Corrigir</Text>
+                        </Pressable>
+                    </View>
+                    <View style={styles.previewBottom}>
+                        <ScoreBadge score={selectedSpot.trustScore} />
+                        <Pressable
+                            style={({ pressed }) => [styles.detailsButton, pressed && styles.pressed]}
+                            onPress={() => router.push(`/parking/${selectedSpot.id}`)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Ver detalhes de ${selectedSpot.name}`}
+                        >
+                            <Text style={styles.detailsButtonText}>Ver detalhes</Text>
+                            <Ionicons name="arrow-forward" size={16} color={colors.white} />
+                        </Pressable>
+                    </View>
+                </View>
+            )}
+
+            <Pressable
+                style={({ pressed }) => [styles.listButton, pressed && styles.pressed]}
+                onPress={() => router.push('/inicio')}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir lista de estacionamentos"
+            >
+                <Ionicons name="list" size={20} color={colors.primary} />
+            </Pressable>
+
+            <View style={[styles.mapControls, selectedSpot && styles.mapControlsRaised]}>
+                {canToggleProvider && (
+                    <Pressable
+                        style={({ pressed }) => [styles.providerButton, pressed && styles.pressed]}
+                        onPress={toggleMapProvider}
+                        accessibilityRole="button"
+                        accessibilityLabel={mapProvider === 'mapbox' ? 'Mudar mapa para OSM' : 'Mudar mapa para Mapbox'}
+                    >
+                        <Text style={styles.providerButtonText}>{mapProvider === 'mapbox' ? 'MB' : 'OSM'}</Text>
+                    </Pressable>
+                )}
+                <MapLayerPicker onChange={setMapLayer} style={styles.layerPicker} />
+            </View>
 
             {(fetchFailed || showingCachedData) && (
                 <Pressable
@@ -369,9 +408,9 @@ export default function DiscoverScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Sem ligação ao servidor. Tentar de novo"
                 >
-                    <Ionicons name={showingCachedData ? "time-outline" : "cloud-offline"} size={18} color={colors.white} />
+                    <Ionicons name={fetchFailed ? "cloud-offline" : "time-outline"} size={17} color={colors.white} />
                     <Text style={styles.errorPillText}>
-                        {showingCachedData ? 'A mostrar os últimos dados guardados. Toca para atualizar.' : 'Sem ligação ao servidor. Tenta de novo.'}
+                        {showingCachedData ? 'A mostrar os últimos dados guardados. Tocar para atualizar.' : 'Sem ligação. Tocar para tentar de novo.'}
                     </Text>
                 </Pressable>
             )}
@@ -379,199 +418,317 @@ export default function DiscoverScreen() {
     );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, topInset: number) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
     },
-    center: {
-        alignItems: 'center',
-        justifyContent: 'center',
+    map: {
+        flex: 1,
     },
-    listHeader: {
-        paddingTop: 12,
-        paddingBottom: 12,
+    topOverlay: {
+        position: 'absolute',
+        top: topInset + 8,
+        left: 14,
+        right: 14,
         gap: 10,
     },
-    chips: {
-        gap: 8,
-        paddingRight: 8,
-    },
-    sortDivider: {
-        width: 1,
-        height: 18,
-        backgroundColor: colors.border,
-        marginHorizontal: 2,
-    },
-    filterChip: {
+    searchBar: {
+        minHeight: 54,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
+        borderRadius: 20,
         backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 5,
     },
-    filterChipActive: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
-    },
-    filterChipText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: colors.textMuted,
-    },
-    filterChipTextActive: {
-        color: colors.white,
-    },
-    listContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
-    },
-    skeletons: {
-        gap: 12,
-    },
-    card: {
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 16,
-        padding: 14,
-    },
-    cardPressed: {
-        opacity: 0.85,
-        transform: [{ scale: 0.99 }],
-    },
-    cardTop: {
+    searchMain: {
+        flex: 1,
+        minHeight: 42,
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: 10,
-        marginBottom: 10,
+        paddingHorizontal: 8,
     },
-    typeDot: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+    searchLabel: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    searchDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: colors.border,
+    },
+    filterButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    cardTitleWrap: {
-        flex: 1,
-        minWidth: 0,
-        paddingRight: 4,
+    filterButtonActive: {
+        backgroundColor: colors.primary,
     },
-    cardName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: colors.text,
-        lineHeight: 18,
+    filterPanel: {
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        borderRadius: 18,
+        backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
     },
-    cardAddress: {
-        fontSize: 12,
-        color: colors.textMuted,
-        marginTop: 2,
-    },
-    metaRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        flexWrap: 'wrap',
-    },
-    price: {
-        marginLeft: 'auto',
-        fontSize: 12,
-        fontWeight: '600',
-        fontFamily: MONO,
-        color: colors.textMuted,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 10,
-        flexWrap: 'wrap',
-    },
-    infoText: {
-        fontSize: 11,
-        color: colors.textMuted,
-    },
-    infoTextStale: {
-        color: colors.accent,
-    },
-    cardFooter: {
+    filterPanelHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 10,
-        marginTop: 10,
-        paddingTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
+        marginBottom: 9,
     },
-    amenities: {
-        flex: 1,
+    filterTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.textMuted,
+    },
+    clearFilter: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    filters: {
+        gap: 8,
+        paddingRight: 10,
+    },
+    filter: {
+        minHeight: 38,
         flexDirection: 'row',
-        gap: 12,
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 13,
+        borderRadius: 999,
+        backgroundColor: colors.background,
     },
-    routeButton: {
+    filterActive: {
+        backgroundColor: colors.primary,
+    },
+    filterText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    filterTextActive: {
+        color: colors.white,
+    },
+    listButton: {
+        position: 'absolute',
+        left: 14,
+        bottom: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 9,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 5,
+    },
+    mapControls: {
+        position: 'absolute',
+        right: 14,
+        bottom: 22,
+        alignItems: 'center',
+        gap: 10,
+    },
+    mapControlsRaised: {
+        bottom: 150,
+    },
+    layerPicker: {
+        position: 'relative',
+    },
+    providerButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 9,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 5,
+    },
+    providerButtonText: {
+        fontSize: 11,
+        fontWeight: '800',
+        fontFamily: MONO,
+        color: colors.text,
+    },
+    locationButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 9,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 5,
+    },
+    previewCard: {
+        position: 'absolute',
+        left: 14,
+        right: 14,
+        bottom: 18,
+        padding: 14,
+        borderRadius: 22,
+        backgroundColor: colors.card,
+        shadowColor: '#000',
+        shadowOpacity: 0.22,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: -2 },
+        elevation: 8,
+    },
+    previewTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    previewMarker: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+    },
+    previewMarkerText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.white,
+    },
+    previewCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    previewName: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: colors.text,
+    },
+    previewMeta: {
+        marginTop: 3,
+        fontSize: 12,
+        color: colors.textMuted,
+    },
+    previewFreshness: {
+        marginTop: 3,
+        fontSize: 11,
+        color: colors.textMuted,
+    },
+    previewTrust: {
+        marginTop: 12,
+        fontSize: 11,
+        color: colors.textMuted,
+    },
+    closePreview: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.muted,
+    },
+    previewActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 10,
+    },
+    confirmButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
         paddingHorizontal: 10,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderRadius: 10,
         backgroundColor: colors.primary + '12',
     },
-    routeButtonText: {
+    confirmButtonText: {
         fontSize: 12,
         fontWeight: '700',
         color: colors.primary,
     },
-    emptyWrap: {
-        paddingVertical: 48,
-        alignItems: 'center',
+    reportButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+        backgroundColor: colors.background,
     },
-    emptyText: {
-        fontSize: 14,
-        color: colors.textMuted,
-    },
-    emptyHint: {
-        marginTop: 6,
+    reportButtonText: {
         fontSize: 12,
+        fontWeight: '600',
         color: colors.textMuted,
     },
-    emptyAction: {
-        marginTop: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.card,
+    previewBottom: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 12,
     },
-    emptyActionText: {
+    detailsButton: {
+        flex: 1,
+        minHeight: 42,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        borderRadius: 14,
+        backgroundColor: colors.primary,
+    },
+    detailsButtonText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: colors.primary,
+        fontWeight: '800',
+        color: colors.white,
     },
     errorPill: {
         position: 'absolute',
-        bottom: 20,
+        bottom: 24,
         alignSelf: 'center',
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: colors.danger,
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingVertical: 10,
         borderRadius: 999,
+        backgroundColor: colors.danger,
     },
     errorPillText: {
         color: colors.white,
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    disabled: {
+        opacity: 0.5,
     },
     pressed: {
-        opacity: 0.85,
-        transform: [{ scale: 0.99 }],
+        opacity: 0.82,
+        transform: [{ scale: 0.98 }],
     },
 });

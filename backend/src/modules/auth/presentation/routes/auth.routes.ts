@@ -5,8 +5,6 @@ import { validate } from '../../../../shared/middleware/validation.middleware';
 import { authMiddleware } from '../../../../shared/middleware/auth.middleware';
 import { csrfMiddleware } from '../../../../shared/middleware/csrf.middleware';
 import { LoginSchema } from '../../application/dtos/Login.dto';
-import { VerifyEmailSchema } from '../../application/dtos/VerifyEmail.dto';
-import { ResendCodeSchema } from '../../application/dtos/ResendCode.dto';
 import { ForgotPasswordSchema } from '../../application/dtos/ForgotPassword.dto';
 import { ResetPasswordSchema } from '../../application/dtos/ResetPassword.dto';
 
@@ -41,15 +39,5 @@ router.post('/reset-password', passwordLimiter, validate(ResetPasswordSchema), a
 // Authenticated
 router.get('/me', authMiddleware, authController.me);
 router.post('/logout', authMiddleware, csrfMiddleware, authController.logout);
-
-// Verificação de email por código
-router.post(
-    '/verify-email',
-    authMiddleware,
-    csrfMiddleware,
-    validate(VerifyEmailSchema),
-    authController.verifyEmail
-);
-router.post('/resend-code', authMiddleware, csrfMiddleware, validate(ResendCodeSchema), authController.resendCode);
 
 export default router;

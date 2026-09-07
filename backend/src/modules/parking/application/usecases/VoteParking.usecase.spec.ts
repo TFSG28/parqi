@@ -172,10 +172,10 @@ describe('VoteParkingUseCase', () => {
         );
     });
 
-    it('bloqueia votos de contas com email não verificado', async () => {
+    it('bloqueia votos de contas suspensas', async () => {
         vi.mocked(mockUserRepository.findById).mockResolvedValue({
             id: 'user-1',
-            emailVerified: false,
+            isActive: false,
         } as never);
         vi.mocked(mockRepository.findById).mockResolvedValue(makeSpot());
 

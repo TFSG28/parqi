@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CreateUserUseCase } from './CreateUser.usecase';
 import { UserAlreadyExistsError } from '../../domain/errors/UserAlreadyExists.error';
-import { EmailVerificationService } from '../../../auth/infrastructure/services/EmailVerification.service';
 import type { IUserRepository } from '../../domain/repositories/IUser.repository';
 
 function makeUser(overrides: Record<string, unknown> = {}) {
@@ -26,7 +25,6 @@ function makeUser(overrides: Record<string, unknown> = {}) {
 describe('CreateUserUseCase', () => {
     let createUserUseCase: CreateUserUseCase;
     let mockUserRepository: IUserRepository;
-    let mockVerificationService: EmailVerificationService;
 
     beforeEach(() => {
         mockUserRepository = {
@@ -37,11 +35,7 @@ describe('CreateUserUseCase', () => {
             delete: vi.fn(),
         } as unknown as IUserRepository;
 
-        mockVerificationService = {
-            sendCode: vi.fn().mockResolvedValue(undefined),
-        } as unknown as EmailVerificationService;
-
-        createUserUseCase = new CreateUserUseCase(mockUserRepository, mockVerificationService);
+        createUserUseCase = new CreateUserUseCase(mockUserRepository);
     });
 
     it('deve criar um usuário com sucesso', async () => {
@@ -53,18 +47,16 @@ describe('CreateUserUseCase', () => {
         };
 
         vi.mocked(mockUserRepository.findByEmail).mockResolvedValue(null);
-        vi.mocked(mockUserRepository.create).mockResolvedValue(makeUser() as never);
+        vi.mocked(mockUserRepository.create).mockResolvedValue(makeUser({ emailVerified: true }) as never);
 
         const result = await createUserUseCase.execute(userData);
 
         expect(result).toBeDefined();
         expect(result.email).toBe(userData.email);
         expect(result.name).toBe(userData.name);
-        expect(result.emailVerified).toBe(false);
+        expect(result.emailVerified).toBe(true);
         expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(userData.email);
         expect(mockUserRepository.create).toHaveBeenCalled();
-        // o código de verificação é enviado logo após o registo
-        expect(mockVerificationService.sendCode).toHaveBeenCalledWith('1');
     });
 
     it('deve lançar erro se o usuário já existe', async () => {
@@ -84,6 +76,5 @@ describe('CreateUserUseCase', () => {
             UserAlreadyExistsError
         );
         expect(mockUserRepository.create).not.toHaveBeenCalled();
-        expect(mockVerificationService.sendCode).not.toHaveBeenCalled();
     });
 });

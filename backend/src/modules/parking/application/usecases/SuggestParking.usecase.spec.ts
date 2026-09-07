@@ -178,10 +178,10 @@ describe('SuggestParkingUseCase (modelo híbrido por reputação)', () => {
         ).rejects.toThrow(InvalidParkingActionError);
     });
 
-    it('bloqueia contas com email não verificado', async () => {
+    it('bloqueia contas suspensas', async () => {
         vi.mocked(mockUsers.findById).mockResolvedValue({
             id: 'user-1',
-            emailVerified: false,
+            isActive: false,
         } as never);
 
         await expect(
