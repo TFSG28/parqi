@@ -227,9 +227,6 @@ export const authApi = {
             // limpeza local independente do resultado
         }
     },
-    verifyEmail: (code: string) =>
-        api.post<{ emailVerified: true }>('/auth/verify-email', { code }),
-    resendCode: () => api.post<{ resentAt: string; waitSeconds: number }>('/auth/resend-code'),
     forgotPassword: (email: string) =>
         api.post<{ message: string }>('/auth/forgot-password', { email }),
     resetPassword: (email: string, code: string, password: string) =>

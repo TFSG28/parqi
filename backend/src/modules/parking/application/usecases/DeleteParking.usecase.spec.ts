@@ -91,11 +91,8 @@ describe('DeleteParkingUseCase', () => {
         ).rejects.toThrow(ParkingNotFoundError);
     });
 
-    it('utilizador sem email verificado é bloqueado antes de consultar o spot', async () => {
-        vi.mocked(mockUsers.findById).mockResolvedValue({
-            emailVerified: false,
-            isActive: true,
-        } as never);
+    it('utilizador inexistente é bloqueado antes de consultar o spot', async () => {
+        vi.mocked(mockUsers.findById).mockResolvedValue(null);
 
         await expect(
             useCase.execute({ parkingSpotId: 'spot-1', userId: 'owner-1' })
@@ -103,9 +100,8 @@ describe('DeleteParkingUseCase', () => {
         expect(mockParking.findById).not.toHaveBeenCalled();
     });
 
-    it('conta suspensa é bloqueada mesmo com email verificado', async () => {
+    it('conta suspensa é bloqueada', async () => {
         vi.mocked(mockUsers.findById).mockResolvedValue({
-            emailVerified: true,
             isActive: false,
         } as never);
 

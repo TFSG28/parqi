@@ -179,15 +179,15 @@ describe('CreateParkingUseCase', () => {
         expect(mockRepository.create).not.toHaveBeenCalled();
     });
 
-    it('bloqueia contribuições de contas com email não verificado', async () => {
+    it('bloqueia contribuições de contas suspensas', async () => {
         vi.mocked(mockUserRepository.findById).mockResolvedValue({
             id: 'user-1',
-            emailVerified: false,
+            isActive: false,
         } as never);
 
         await expect(
             useCase.execute({
-                name: 'Parque Sem Verificação',
+                name: 'Parque Conta Suspensa',
                 geometry: guimaraesPoint,
                 parkingType: 'SURFACE',
                 userId: 'user-1',

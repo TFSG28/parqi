@@ -67,10 +67,6 @@ function AppContent() {
                     options={{ title: 'Recuperar palavra-passe', headerBackButtonDisplayMode: 'minimal' }}
                 />
                 <Stack.Screen
-                    name="verify"
-                    options={{ title: 'Confirmar email', headerBackButtonDisplayMode: 'minimal' }}
-                />
-                <Stack.Screen
                     name="suggest/[id]"
                     options={{ title: 'Sugerir alteração', presentation: 'modal' }}
                 />

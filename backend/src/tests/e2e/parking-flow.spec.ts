@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
 import { prisma } from '../../lib/prisma';
@@ -42,54 +42,28 @@ describe('Health Checks', () => {
  * Fluxo completo da API com dois utilizadores reais:
  *   contribuidor cria → votante (outro utilizador) vota e sugere → stats.
  *
- * A verificação de email usa o código que o serviço gera: guardado com hash,
- * mas registado em texto claro no log quando o SMTP falha em não-produção.
  * Usa Bearer token (como a app Expo), por isso o CSRF não se aplica.
  */
 describe('Parking API — fluxo completo', () => {
     let contributorToken: string;
     let voterToken: string;
     let parkingId: string;
-    let logSpy: ReturnType<typeof vi.spyOn>;
 
-    /**
-     * Registo → verificação de email → login. Devolve o token Bearer.
-     * isola a captura do código por utilizador.
-     */
-    async function createVerifiedUser(name: string): Promise<string> {
+    /** Registo → login. Devolve o token Bearer. */
+    async function createUser(name: string): Promise<string> {
         const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@parqi.pt`;
 
-        logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
         await request(app).post('/api/v1/user').send({
             name,
             email,
             password: 'Test1234!',
         });
-        const logged = logSpy.mock.calls
-            .map(([msg]) => String(msg))
-            .find((msg) => msg.includes(`Código de verificação de ${email}`));
-        logSpy.mockRestore();
-        if (!logged) {
-            throw new Error(`Serviço de verificação não registou o código em log para ${email}`);
-        }
-        const code = logged.split(': ').pop()!;
 
         const loginRes = await request(app).post('/api/v1/auth/login').send({
             email,
             password: 'Test1234!',
         });
-        const token = loginRes.body.data.token;
-
-        const verifyRes = await request(app)
-            .post('/api/v1/auth/verify-email')
-            .set('Authorization', `Bearer ${token}`)
-            .send({ code });
-        if (verifyRes.status !== 200) {
-            throw new Error(
-                `verify-email falhou com ${verifyRes.status}: ${JSON.stringify(verifyRes.body)}`
-            );
-        }
-        return token;
+        return loginRes.body.data.token;
     }
 
     beforeAll(async () => {
@@ -99,12 +73,11 @@ describe('Parking API — fluxo completo', () => {
             where: { name: { startsWith: 'Parque de Teste' }, source: 'COMMUNITY' },
         });
 
-        contributorToken = await createVerifiedUser('E2E Contribuidor');
-        voterToken = await createVerifiedUser('E2E Votante');
+        contributorToken = await createUser('E2E Contribuidor');
+        voterToken = await createUser('E2E Votante');
     }, 120_000);
 
     afterAll(async () => {
-        logSpy?.mockRestore();
         // Limpa os artefactos deste run (spots criados no ponto de teste),
         // para a próxima execução não bater com a regra de duplicados.
         await prisma.parkingSpot.deleteMany({

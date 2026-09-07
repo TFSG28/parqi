@@ -8,8 +8,8 @@ import { useTheme } from '../../src/context/ThemeContext';
 import type { ThemeColors } from '../../src/theme/colors';
 
 const TAB_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
-    mapa: { icon: 'navigate', label: 'Mapa' },
-    index: { icon: 'search', label: 'Pesquisa' },
+    index: { icon: 'navigate', label: 'Mapa' },
+    inicio: { icon: 'search', label: 'Pesquisa' },
     add: { icon: 'add', label: '' },
     conta: { icon: 'person', label: 'Perfil' },
 };
@@ -74,12 +74,12 @@ const renderHeader = () => <ParqiHeader />;
 export default function TabsLayout() {
     return (
         <Tabs
-            initialRouteName="mapa"
+            initialRouteName="index"
             tabBar={renderTabBar}
             screenOptions={{ header: renderHeader }}
         >
-            <Tabs.Screen name="mapa" options={{ headerShown: false }} />
-            <Tabs.Screen name="index" />
+            <Tabs.Screen name="index" options={{ headerShown: false }} />
+            <Tabs.Screen name="inicio" />
             <Tabs.Screen name="add" />
             <Tabs.Screen name="conta" />
         </Tabs>

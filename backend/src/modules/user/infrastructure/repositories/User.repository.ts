@@ -58,7 +58,8 @@ export class UserRepository implements IUserRepository {
     }
 
     async create(data: { name: string; email: string; password: string }): Promise<UserEntity> {
-        const user = await prisma.user.create({ data });
+        // Sem verificação de email obrigatória: a conta já nasce validada.
+        const user = await prisma.user.create({ data: { ...data, emailVerified: true } });
         return toEntity(user);
     }
 
