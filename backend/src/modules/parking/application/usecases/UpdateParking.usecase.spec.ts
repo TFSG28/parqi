@@ -70,10 +70,10 @@ describe('UpdateParkingUseCase', () => {
         useCase = new UpdateParkingUseCase(mockRepository, mockUserRepository);
     });
 
-    it('bloqueia edição de conta com email não verificado', async () => {
+    it('bloqueia edição de conta suspensa', async () => {
         vi.mocked(mockUserRepository.findById).mockResolvedValue({
             id: 'user-2',
-            emailVerified: false,
+            isActive: false,
         } as never);
         vi.mocked(mockRepository.findById).mockResolvedValue(makeSpot());
 

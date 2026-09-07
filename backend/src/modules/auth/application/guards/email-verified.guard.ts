@@ -2,8 +2,7 @@ import { ForbiddenError } from '../../../../shared/errors/AppError';
 import { IUserRepository } from '../../../user/domain/repositories/IUser.repository';
 
 /**
- * Exige conta com email verificado para ações da comunidade
- * (adicionar/editar/votar/sugerir). Sem verificação não há spam de conteúdo.
+ * Bloqueia ações da comunidade (adicionar/editar/votar/sugerir) para contas suspensas.
  * Admins não são bloqueados (a moderação continua sempre disponível).
  */
 export async function assertEmailVerified(
@@ -16,8 +15,8 @@ export async function assertEmailVerified(
         return;
     }
     const user = await userRepository.findById(userId);
-    if (!user || !user.emailVerified) {
-        throw new ForbiddenError(`Verifica o teu email para poderes ${action}.`);
+    if (!user) {
+        throw new ForbiddenError(`Autentica-te para poderes ${action}.`);
     }
     // Conta suspensa não pode agir, mesmo com JWT ainda válido.
     if (user.isActive === false) {

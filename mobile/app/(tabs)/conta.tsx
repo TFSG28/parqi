@@ -223,19 +223,6 @@ export default function ProfileScreen() {
                     </Pressable>
                 )}
 
-                {user?.emailVerified === false && (
-                    <Pressable
-                        style={({ pressed }) => [styles.verifyBanner, pressed && styles.pressed]}
-                        onPress={() => router.push('/verify')}
-                    >
-                        <Ionicons name="mail-unread" size={16} color={PALETTE.amber} />
-                        <Text style={styles.verifyText}>
-                            Email não verificado — valida a tua conta para poderes contribuir.
-                        </Text>
-                        <Ionicons name="chevron-forward" size={14} color={PALETTE.amber} />
-                    </Pressable>
-                )}
-
                 {/* Favoritos guardados no dispositivo */}
                 <View style={styles.card}>
                     <Text style={styles.sectionLabel}>Favoritos</Text>
@@ -587,14 +574,6 @@ const createStyles = (colors: ThemeColors) =>
             opacity: 0.85,
             transform: [{ scale: 0.99 }],
         },
-        verifyBanner: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            backgroundColor: alpha10(PALETTE.amber),
-            borderRadius: 16,
-            padding: 12,
-        },
         favEmpty: {
             fontSize: 12,
             color: colors.textMuted,
@@ -620,11 +599,6 @@ const createStyles = (colors: ThemeColors) =>
         },
         favTrust: {
             width: 120,
-        },
-        verifyText: {
-            flex: 1,
-            fontSize: 12,
-            color: colors.text,
         },
         card: {
             backgroundColor: colors.card,

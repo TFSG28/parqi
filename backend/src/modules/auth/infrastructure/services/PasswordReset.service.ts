@@ -13,7 +13,7 @@ import {
     EMAIL_RESEND_INTERVAL_MS,
     hashEmailCode,
     safeEqualHex,
-} from './EmailVerification.service';
+} from '../../../../shared/utils/email-code.util';
 
 function escapeHtml(value: string): string {
     return value.replace(/[&<>"']/g, (c) =>
@@ -32,7 +32,7 @@ export class PasswordResetService {
     constructor(
         @inject(USER_TOKENS.IUserRepository)
         private readonly userRepository: IUserRepository
-    ) {}
+    ) { }
 
     async requestReset(email: string): Promise<void> {
         const user = await this.userRepository.findByEmail(email);

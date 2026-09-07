@@ -42,11 +42,8 @@ export default function LoginScreen() {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
-    // Conta nova ou email ainda não validado -> ecrã do código de verificação
     useEffect(() => {
-        if (user && user.emailVerified === false) {
-            router.replace('/verify');
-        } else if (user) {
+        if (user) {
             goBackSafe();
         }
     }, [user]);
